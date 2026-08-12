@@ -93,7 +93,7 @@ def chat_completion(
         content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         return content
     except httpx.ConnectError:
-        return "[Error: Cannot connect to API. Is CLIProxy running? Try `codex-mentis setup` to reconfigure.]"
+        return "[Error: Cannot connect to API. Is CLIProxy running? Try `pitagora setup` to reconfigure.]"
     except httpx.TimeoutException:
         return "[Error: Request timed out. The model may be overloaded.]"
     except Exception as e:
@@ -229,7 +229,7 @@ def _check_due_reviews() -> Optional[str]:
         sr = SpacedRepetition()
         due = sr.get_due_reviews()
         if due and len(due) > 0:
-            return f"📚 You have {len(due)} concepts due for review. Run `codex-mentis review start`."
+            return f"📚 You have {len(due)} concepts due for review. Run `pitagora review start`."
     except Exception:
         pass
     return None
@@ -252,11 +252,15 @@ def launch_chat(
     # Build system prompt with context
     if system_prompt is None:
         system_prompt = (
-            "You are Codex Mentis, an expert mathematics and physics tutor. "
+            "You are Pitagora, an expert mathematics, physics, and philosophy tutor. "
+            "Named after Pythagoras — the philosopher-mathematician who believed numbers "
+            "were the essence of all things. "
             "You explain concepts clearly using the Socratic method — ask guiding questions "
             "before giving answers. Use LaTeX notation for equations ($..$ inline, $$...$$ display). "
             "Be precise, rigorous, and encouraging. When a student makes a mistake, "
             "guide them to discover the error rather than just correcting it. "
+            "Adapt your explanation style to the student's level. For beginners, use analogies "
+            "and intuition first, then formalism. For advanced students, lead with rigor. "
             "Use markdown formatting for structure."
         )
 
@@ -268,14 +272,9 @@ def launch_chat(
     messages = [{"role": "system", "content": system_prompt}]
 
     # Welcome
-    console.print(Panel(
-        f"[bold cyan]Codex Mentis[/bold cyan] — {mode.title()} mode\n"
-        f"Model: [dim]{model}[/dim] | Topic: [dim]{topic}[/dim]\n\n"
-        f"Commands: [cyan]/mode[/cyan] [cyan]/topic[/cyan] [cyan]/model[/cyan] "
-        f"[cyan]/verify[/cyan] [cyan]/research[/cyan] [cyan]/clear[/cyan] [cyan]/quit[/cyan]",
-        title="🧠 Codex Mentis",
-        border_style="blue",
-    ))
+    from codex_mentis.cli.rich_ui import show_pitagora_banner, show_welcome
+    show_pitagora_banner()
+    show_welcome(model=model)
 
     # Check for due reviews
     review_msg = _check_due_reviews()
@@ -284,7 +283,7 @@ def launch_chat(
 
     while True:
         try:
-            user_input = console.input(f"[bold green]({mode}:{topic}) 🧠 [/bold green]")
+            user_input = console.input(f"[bold gold1]△ pitagora>[/bold gold1] ")
             
             if not user_input.strip():
                 continue
@@ -474,11 +473,11 @@ def launch_chat(
                         "  /clear            Clear conversation\n"
                         "  /quit             Exit\n\n"
                         "[bold]CLI Commands:[/bold]\n"
-                        "  codex-mentis setup      Configure providers\n"
-                        "  codex-mentis onboard     Set up learning profile\n"
-                        "  codex-mentis doctor      System health check\n"
-                        "  codex-mentis review      Spaced repetition\n"
-                        "  codex-mentis profile     View knowledge map\n",
+                        "  pitagora setup      Configure providers\n"
+                        "  pitagora onboard     Set up learning profile\n"
+                        "  pitagora doctor      System health check\n"
+                        "  pitagora review      Spaced repetition\n"
+                        "  pitagora profile     View knowledge map\n",
                         title="Help",
                         border_style="cyan",
                     ))

@@ -6,9 +6,65 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.tree import Tree
 from rich.text import Text
+from rich.align import Align
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
 console = Console()
+
+PITAGORA_BANNER = r"""[bold gold1]
+    ██████╗ ██╗████████╗ █████╗  ██████╗  ██████╗ ██████╗  █████╗ 
+    ██╔══██╗██║╚══██╔══╝██╔══██╗██╔════╝ ██╔═══██╗██╔══██╗██╔══██╗
+    ██████╔╝██║   ██║   ███████║██║  ███╗██║   ██║██████╔╝████████║
+    ██╔═══╝ ██║   ██║   ██╔══██║██║   ██║██║   ██║██╔══██╗██╔══██║
+    ██║     ██║   ██║   ██║  ██║╚██████╔╝╚██████╔╝██║  ██║██║  ██║
+    ╚═╝     ╚═╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝[/bold gold1]
+[dim italic]    ▸ Think. Prove. Understand.[/dim italic]"""
+
+
+def show_pitagora_banner() -> None:
+    """Display the Pitagora startup banner."""
+    console.print()
+    console.print(PITAGORA_BANNER)
+    console.print()
+
+
+def show_welcome(username: str = "", model: str = "", active_journeys: Optional[List[Dict]] = None, due_reviews: int = 0) -> None:
+    """Show the branded Pitagora welcome panel with status."""
+    lines = []
+    if username:
+        lines.append(f"Welcome back, [bold]{username}[/bold].")
+    else:
+        lines.append("Welcome to [bold gold1]Pitagora[/bold gold1].")
+    
+    if model:
+        lines.append(f"Model: [dim]{model}[/dim]")
+    
+    if due_reviews > 0:
+        lines.append(f"📚 [yellow]{due_reviews} concepts due for review[/yellow]")
+    
+    if active_journeys:
+        journey_strs = []
+        for j in active_journeys:
+            name = j.get("topic", "?")
+            pct = j.get("progress", 0)
+            bar_len = 10
+            filled = int(pct / 100 * bar_len)
+            bar = "█" * filled + "░" * (bar_len - filled)
+            journey_strs.append(f"  {name}: [{bar}] {pct}%")
+        if journey_strs:
+            lines.append("")
+            lines.append("[bold]Active journeys:[/bold]")
+            lines.extend(journey_strs)
+    
+    lines.append("")
+    lines.append("Type [cyan]/help[/cyan] for commands. [cyan]/explore <topic>[/cyan] to start learning.")
+    
+    console.print(Panel(
+        "\n".join(lines),
+        title="[bold gold1]△ Pitagora[/bold gold1]",
+        border_style="gold1",
+        expand=False,
+    ))
 
 def print_markdown(content: str) -> None:
     """Renders standard markdown content using Rich, supporting code syntax highlighting."""

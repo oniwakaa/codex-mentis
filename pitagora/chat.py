@@ -412,16 +412,9 @@ def launch_chat(
     teaching_analyzer = None
     teaching_journey = None  # set in TASK 3 wiring
 
-    # Welcome
-    console.print(Panel(
-        f"[bold cyan]Pitagora[/bold cyan] — {mode.title()} mode\n"
-        f"Model: [dim]{model}[/dim] | Topic: [dim]{topic}[/dim]\n\n"
-        f"Commands: [cyan]/mode[/cyan] [cyan]/topic[/cyan] [cyan]/model[/cyan] "
-        f"[cyan]/explore[/cyan] [cyan]/verify[/cyan] [cyan]/research[/cyan] "
-        f"[cyan]/clear[/cyan] [cyan]/quit[/cyan]",
-        title="🧠 Pitagora",
-        border_style="blue",
-    ))
+    # Welcome — gold ASCII banner + info panel.
+    from pitagora.cli.rich_ui import show_welcome
+    show_welcome(mode=mode, topic=topic, model=model, con=console)
 
     # Check for due reviews
     review_msg = _check_due_reviews()
@@ -430,7 +423,7 @@ def launch_chat(
 
     while True:
         try:
-            user_input = console.input(f"[bold green]({mode}:{topic}) 🧠 [/bold green]")
+            user_input = console.input(f"[bold green]△ pitagora ({mode}:{topic})> [/bold green]")
             
             if not user_input.strip():
                 continue

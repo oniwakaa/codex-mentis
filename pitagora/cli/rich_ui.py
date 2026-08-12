@@ -6,65 +6,46 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.tree import Tree
 from rich.text import Text
-from rich.align import Align
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
 console = Console()
 
-PITAGORA_BANNER = r"""[bold gold1]
-    ██████╗ ██╗████████╗ █████╗  ██████╗  ██████╗ ██████╗  █████╗ 
-    ██╔══██╗██║╚══██╔══╝██╔══██╗██╔════╝ ██╔═══██╗██╔══██╗██╔══██╗
-    ██████╔╝██║   ██║   ███████║██║  ███╗██║   ██║██████╔╝████████║
-    ██╔═══╝ ██║   ██║   ██╔══██║██║   ██║██║   ██║██╔══██╗██╔══██║
-    ██║     ██║   ██║   ██║  ██║╚██████╔╝╚██████╔╝██║  ██║██║  ██║
-    ╚═╝     ╚═╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝[/bold gold1]
-[dim italic]    ▸ Think. Prove. Understand.[/dim italic]"""
+
+# ASCII banner for the Pitagora REPL. Gold on dark, fits 80 cols.
+_PITAGORA_BANNER = r"""
+ ____  _   _ _____ _   _ ____  ___  _____   __
+|  _ \| | | | ____| | | / ___||_ _|_   _| / /
+| |_) | |_| |  _| | |_| \___ \ | |  | |  / /_
+|  __/|  _  | |___|  _  |___) || |  | | / __ \
+|_|   |_| |_|_____|_| |_|____/___| |_| /_/  \_\
+"""
 
 
-def show_pitagora_banner() -> None:
-    """Display the Pitagora startup banner."""
-    console.print()
-    console.print(PITAGORA_BANNER)
-    console.print()
+def show_pitagora_banner(con: Optional[Console] = None) -> None:
+    """Print the gold ASCII Pitagora banner."""
+    con = con or console
+    con.print(f"[bold yellow]{_PITAGORA_BANNER}[/bold yellow]")
 
 
-def show_welcome(username: str = "", model: str = "", active_journeys: Optional[List[Dict]] = None, due_reviews: int = 0) -> None:
-    """Show the branded Pitagora welcome panel with status."""
-    lines = []
-    if username:
-        lines.append(f"Welcome back, [bold]{username}[/bold].")
-    else:
-        lines.append("Welcome to [bold gold1]Pitagora[/bold gold1].")
-    
-    if model:
-        lines.append(f"Model: [dim]{model}[/dim]")
-    
-    if due_reviews > 0:
-        lines.append(f"📚 [yellow]{due_reviews} concepts due for review[/yellow]")
-    
-    if active_journeys:
-        journey_strs = []
-        for j in active_journeys:
-            name = j.get("topic", "?")
-            pct = j.get("progress", 0)
-            bar_len = 10
-            filled = int(pct / 100 * bar_len)
-            bar = "█" * filled + "░" * (bar_len - filled)
-            journey_strs.append(f"  {name}: [{bar}] {pct}%")
-        if journey_strs:
-            lines.append("")
-            lines.append("[bold]Active journeys:[/bold]")
-            lines.extend(journey_strs)
-    
-    lines.append("")
-    lines.append("Type [cyan]/help[/cyan] for commands. [cyan]/explore <topic>[/cyan] to start learning.")
-    
-    console.print(Panel(
-        "\n".join(lines),
-        title="[bold gold1]△ Pitagora[/bold gold1]",
-        border_style="gold1",
-        expand=False,
+def show_welcome(
+    mode: str = "study",
+    topic: str = "general",
+    model: str = "unknown",
+    con: Optional[Console] = None,
+) -> None:
+    """Print the banner plus a welcome panel with mode/model/topic/commands."""
+    con = con or console
+    show_pitagora_banner(con)
+    con.print(Panel(
+        f"[bold cyan]Pitagora[/bold cyan] — {mode.title()} mode\n"
+        f"Model: [dim]{model}[/dim] | Topic: [dim]{topic}[/dim]\n\n"
+        f"Commands: [cyan]/mode[/cyan] [cyan]/topic[/cyan] [cyan]/model[/cyan] "
+        f"[cyan]/explore[/cyan] [cyan]/verify[/cyan] [cyan]/research[/cyan] "
+        f"[cyan]/clear[/cyan] [cyan]/quit[/cyan]",
+        title="🧠 Pitagora",
+        border_style="blue",
     ))
+
 
 def print_markdown(content: str) -> None:
     """Renders standard markdown content using Rich, supporting code syntax highlighting."""

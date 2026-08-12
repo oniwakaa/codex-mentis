@@ -5,6 +5,7 @@ from rich.console import Console
 
 from pitagora.cli.rich_ui import (
     print_concept_map, print_math, print_equation_block, print_mastery_dashboard,
+    show_pitagora_banner, show_welcome,
 )
 
 
@@ -80,3 +81,20 @@ def test_mastery_dashboard_table():
     assert "philosophy" in out
     assert "Active journeys" in out
     assert "limits" in out
+
+
+def test_show_pitagora_banner():
+    out = _capture(show_pitagora_banner)
+    # Banner contains the ASCII art and prints in gold.
+    assert "Pitagora" not in out  # ASCII art uses the stylized letters, not the word
+    assert "_" in out or "|" in out  # box-drawing characters present
+
+
+def test_show_welcome():
+    out = _capture(show_welcome, mode="study", topic="limits", model="gemini-3.6")
+    # Banner + welcome panel both present
+    assert "Pitagora" in out
+    assert "Study" in out  # mode.title()
+    assert "limits" in out
+    assert "gemini-3.6" in out
+    assert "Commands" in out

@@ -1,12 +1,19 @@
 """Interactive chat REPL — the main user experience.
 
-This is the core chat loop. It connects to the configured provider and provides
-a conversational interface for studying math/physics.
+This is the core chat loop. It connects ALL systems:
+- Provider (CLIProxy/Gemini/OpenAI/etc)
+- Knowledge base (RAG — inject relevant context)
+- Concept graph (track what user studies)
+- User graph (personalize by level/mastery)
+- SymPy sandbox (verify math claims)
+- Memory (save/load conversations)
+- Spaced repetition (trigger reviews)
 """
 import os
 import sys
 import asyncio
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+from datetime import datetime
 
 import httpx
 
@@ -18,7 +25,6 @@ def load_provider_config() -> Dict[str, Any]:
 
     config_path = Path("~/.codex-mentis/config.yaml").expanduser()
     
-    # Try config file
     if config_path.exists():
         with open(config_path) as f:
             config = yaml.safe_load(f) or {}
@@ -27,7 +33,6 @@ def load_provider_config() -> Dict[str, Any]:
         if provider_config:
             return provider_config
 
-    # Try environment variables (CLIProxy)
     api_key = os.getenv("OPENAI_API_KEY", os.getenv("CLIPROXY_API_KEY", ""))
     base_url = os.getenv("OPENAI_BASE_URL", "")
     
@@ -40,7 +45,6 @@ def load_provider_config() -> Dict[str, Any]:
             "default_model": os.getenv("CM_MODEL", "google/gemini-3.6-flash-high"),
         }
 
-    # Try CLIProxy defaults
     return {
         "name": "cliproxy",
         "type": "openai_compatible",
@@ -96,22 +100,156 @@ def chat_completion(
         return f"[Error: {e}]"
 
 
+def _get_rag_context(query: str, max_tokens: int = 2000) -> str:
+    """Retrieve relevant context from knowledge base for RAG."""
+    try:
+        from codex_mentis.knowledge.base import KnowledgeBase
+        kb = KnowledgeBase()
+        results = kb.search(query, limit=3)
+        if not results:
+            return ""
+        
+        context_parts = ["[Relevant knowledge from your documents:]"]
+        for r in results:
+            source = r.get("source", "Unknown")
+            content = r.get("content", "")[:500]
+            context_parts.append(f"- [{source}]: {content}")
+        
+        return "\n".join(context_parts)
+    except Exception:
+        return ""
+
+
+def _get_concept_context(topic: str) -> str:
+    """Get concept graph context — prerequisites, learning path."""
+    try:
+        from codex_mentis.concepts.graph import ConceptGraph
+        cg = ConceptGraph()
+        
+        # Check if topic exists in graph
+        if topic.lower() in [k.lower() for k in cg.graph.keys()]:
+            prereqs = cg.get_prerequisites(topic)
+            path = cg.get_learning_path(topic)
+            if prereqs or path:
+                parts = [f"[Concept graph for '{topic}':]"]
+                if prereqs:
+                    parts.append(f"  Prerequisites: {', '.join(prereqs)}")
+                if path:
+                    parts.append(f"  Learning path: {' → '.join(path[:5])}")
+                return "\n".join(parts)
+    except Exception:
+        pass
+    return ""
+
+
+def _get_user_context() -> str:
+    """Get user profile context — level, mastery, recent activity."""
+    try:
+        from codex_mentis.cli.commands.onboard import load_profile
+        profile = load_profile()
+        if not profile:
+            return ""
+        
+        parts = [f"[User profile: {profile.get('name', 'Student')}]"]
+        levels = profile.get("levels", {})
+        for subj, level in levels.items():
+            parts.append(f"  {subj}: {level}")
+        
+        interests = profile.get("interests", [])
+        if interests:
+            parts.append(f"  Interests: {', '.join(interests)}")
+        
+        return "\n".join(parts)
+    except Exception:
+        return ""
+
+
+def _verify_math(response: str) -> Optional[str]:
+    """Check if response contains math claims and verify with SymPy."""
+    import re
+    
+    # Look for simple equations in the response
+    equations = re.findall(r'\$([^$]+)\$', response)
+    if not equations:
+        return None
+    
+    try:
+        from codex_mentis.math_engine.sandbox import SymPySandbox
+        sandbox = SymPySandbox()
+        
+        verified = []
+        for eq in equations[:3]:  # Check up to 3 equations
+            # Try to evaluate
+            result = sandbox.evaluate(eq)
+            if result.verified:
+                verified.append(f"  ✓ {eq} = {result.value}")
+            elif result.error:
+                verified.append(f"  ⚠ {eq}: {result.error}")
+        
+        if verified:
+            return "[SymPy verification:]\n" + "\n".join(verified)
+    except Exception:
+        pass
+    return None
+
+
+def _save_to_memory(role: str, content: str, topic: str = "general") -> None:
+    """Save message to memory store."""
+    try:
+        from codex_mentis.memory.store import MemoryStore
+        from codex_mentis.core.models import MemoryEntry
+        store = MemoryStore()
+        entry = MemoryEntry(
+            layer="L1",
+            content=f"[{role}] {content[:500]}",
+            topic=topic,
+        )
+        store.create_memory_entry(entry)
+    except Exception:
+        pass
+
+
+def _record_study(topic: str, user_input: str) -> None:
+    """Record study activity in user graph."""
+    try:
+        from codex_mentis.memory.user_graph import UserGraph
+        from codex_mentis.cli.commands.onboard import load_profile
+        profile = load_profile()
+        if profile:
+            ug = UserGraph()
+            ug.record_study(profile.get("name", "default"), topic, duration_minutes=1)
+    except Exception:
+        pass
+
+
+def _check_due_reviews() -> Optional[str]:
+    """Check if there are cards due for spaced repetition review."""
+    try:
+        from codex_mentis.memory.spaced_repetition import SpacedRepetition
+        sr = SpacedRepetition()
+        due = sr.get_due_reviews()
+        if due and len(due) > 0:
+            return f"📚 You have {len(due)} concepts due for review. Run `codex-mentis review start`."
+    except Exception:
+        pass
+    return None
+
+
 def launch_chat(
     mode: str = "study",
     topic: str = "general",
     system_prompt: Optional[str] = None,
 ) -> None:
-    """Launch the interactive chat REPL."""
+    """Launch the interactive chat REPL with all systems connected."""
     from rich.console import Console
     from rich.markdown import Markdown
     from rich.panel import Panel
-    from rich.text import Text
 
     console = Console()
     config = load_provider_config()
     model = config.get("default_model", "unknown")
 
-    # System prompt for the tutor
+    # Build system prompt with context
     if system_prompt is None:
         system_prompt = (
             "You are Codex Mentis, an expert mathematics and physics tutor. "
@@ -122,27 +260,31 @@ def launch_chat(
             "Use markdown formatting for structure."
         )
 
+    # Inject user context into system prompt
+    user_ctx = _get_user_context()
+    if user_ctx:
+        system_prompt += f"\n\n{user_ctx}"
+
     messages = [{"role": "system", "content": system_prompt}]
 
     # Welcome
     console.print(Panel(
         f"[bold cyan]Codex Mentis[/bold cyan] — {mode.title()} mode\n"
-        f"Model: [dim]{model}[/dim]\n"
-        f"Topic: [dim]{topic}[/dim]\n\n"
-        f"Type your question or topic. Commands:\n"
-        f"  [cyan]/mode <study|explore|reason|verify>[/cyan]  Switch mode\n"
-        f"  [cyan]/topic <name>[/cyan]                        Change topic\n"
-        f"  [cyan]/clear[/cyan]                               Clear history\n"
-        f"  [cyan]/quit[/cyan]                                Exit\n",
+        f"Model: [dim]{model}[/dim] | Topic: [dim]{topic}[/dim]\n\n"
+        f"Commands: [cyan]/mode[/cyan] [cyan]/topic[/cyan] [cyan]/model[/cyan] "
+        f"[cyan]/verify[/cyan] [cyan]/research[/cyan] [cyan]/clear[/cyan] [cyan]/quit[/cyan]",
         title="🧠 Codex Mentis",
         border_style="blue",
     ))
 
+    # Check for due reviews
+    review_msg = _check_due_reviews()
+    if review_msg:
+        console.print(f"[dim]{review_msg}[/dim]")
+
     while True:
         try:
-            # Prompt
-            prompt_text = f"({mode}:{topic}) 🧠 "
-            user_input = console.input(f"[bold green]{prompt_text}[/bold green]")
+            user_input = console.input(f"[bold green]({mode}:{topic}) 🧠 [/bold green]")
             
             if not user_input.strip():
                 continue
@@ -163,12 +305,12 @@ def launch_chat(
                 elif cmd == "/mode":
                     if arg:
                         mode = arg.strip()
-                        console.print(f"[dim]Switched to {mode} mode.[/dim]")
+                        console.print(f"[dim]Mode: {mode}[/dim]")
                     continue
                 elif cmd == "/topic":
                     if arg:
                         topic = arg.strip()
-                        console.print(f"[dim]Topic set to: {topic}[/dim]")
+                        console.print(f"[dim]Topic: {topic}[/dim]")
                     continue
                 elif cmd == "/model":
                     if arg:
@@ -176,39 +318,93 @@ def launch_chat(
                         model = arg.strip()
                         console.print(f"[dim]Model: {model}[/dim]")
                     continue
+                elif cmd == "/verify":
+                    if arg:
+                        with console.status("[cyan]Verifying...[/cyan]"):
+                            from codex_mentis.math_engine.sandbox import SymPySandbox
+                            sandbox = SymPySandbox()
+                            result = sandbox.evaluate(arg)
+                        if result.verified:
+                            console.print(f"[green]✓ {result.value}[/green]")
+                            if result.latex:
+                                console.print(f"  LaTeX: {result.latex}")
+                        else:
+                            console.print(f"[red]✗ {result.error}[/red]")
+                    continue
+                elif cmd == "/research":
+                    if arg:
+                        with console.status("[cyan]Researching...[/cyan]"):
+                            from codex_mentis.knowledge.acquisition import KnowledgeAcquisition
+                            acquirer = KnowledgeAcquisition()
+                            result = acquirer.research_topic(arg, depth="shallow")
+                        if result.get("findings"):
+                            console.print(f"[bold]Found {len(result['findings'])} findings:[/bold]")
+                            for f in result["findings"][:5]:
+                                console.print(f"  • {f}")
+                    continue
                 elif cmd == "/help":
                     console.print(Panel(
                         "[bold]Commands:[/bold]\n"
-                        "  /mode <mode>    Switch mode (study/explore/reason/verify)\n"
-                        "  /topic <name>   Change topic\n"
-                        "  /model <name>   Change model\n"
-                        "  /clear          Clear conversation\n"
-                        "  /quit           Exit\n"
-                        "  /help           Show this help\n\n"
-                        "[bold]Tips:[/bold]\n"
-                        "  Ask anything about math or physics!\n"
-                        "  The tutor uses Socratic method — expect guiding questions.\n"
-                        "  Use $..$ for inline math, $$...$$ for display math.",
+                        "  /mode <mode>     Switch mode (study/explore/reason/verify)\n"
+                        "  /topic <name>    Change topic\n"
+                        "  /model <name>    Change model\n"
+                        "  /verify <expr>   Verify math with SymPy\n"
+                        "  /research <q>    Web research\n"
+                        "  /clear           Clear conversation\n"
+                        "  /quit            Exit\n\n"
+                        "[bold]Features:[/bold]\n"
+                        "  • RAG: Relevant docs are injected automatically\n"
+                        "  • Math verification: Equations checked with SymPy\n"
+                        "  • Concept tracking: Your progress is tracked\n"
+                        "  • Spaced repetition: Reviews scheduled automatically",
                         title="Help",
                         border_style="cyan",
                     ))
                     continue
                 else:
-                    console.print(f"[dim]Unknown command: {cmd}. Type /help for commands.[/dim]")
+                    console.print(f"[dim]Unknown: {cmd}. /help for commands.[/dim]")
                     continue
 
-            # Add context about mode and topic
-            context_msg = f"[Context: Mode={mode}, Topic={topic}] {user_input}"
-            messages.append({"role": "user", "content": context_msg})
+            # ─── MAIN CHAT FLOW ───
+            
+            # 1. RAG: Retrieve relevant context from knowledge base
+            rag_ctx = _get_rag_context(user_input)
+            concept_ctx = _get_concept_context(topic)
+            
+            # 2. Build enriched prompt
+            enriched = user_input
+            if rag_ctx or concept_ctx:
+                context_parts = []
+                if rag_ctx:
+                    context_parts.append(rag_ctx)
+                if concept_ctx:
+                    context_parts.append(concept_ctx)
+                enriched = "\n\n".join(context_parts) + f"\n\nUser question: {user_input}"
 
-            # Get response
+            messages.append({"role": "user", "content": enriched})
+
+            # 3. Get response
             with console.status("[bold cyan]Thinking...[/bold cyan]"):
                 response = chat_completion(messages, model=model, config=config)
 
-            # Display response
             messages.append({"role": "assistant", "content": response})
+
+            # 4. Display response
             console.print()
             console.print(Markdown(response))
+
+            # 5. SymPy verification of equations in response
+            verification = _verify_math(response)
+            if verification:
+                console.print(f"\n[dim]{verification}[/dim]")
+
+            # 6. Save to memory
+            _save_to_memory("user", user_input, topic=topic)
+            _save_to_memory("assistant", response, topic=topic)
+
+            # 7. Record study activity
+            _record_study(topic, user_input)
+
             console.print()
 
         except KeyboardInterrupt:

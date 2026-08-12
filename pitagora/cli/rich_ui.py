@@ -93,71 +93,82 @@ def print_confidence(score: float) -> None:
     """Print the confidence score to the terminal."""
     console.print(get_confidence_indicator(score))
 
-def print_math(latex_str: str) -> None:
-    """Renders math expression in terminal, translating LaTeX symbols and exponents to Unicode."""
-    console.print(f"[bold cyan]Math Formula:[/bold cyan]")
-    try:
-        from sympy.parsing.latex import parse_latex
-        from sympy import pretty
-        expr = parse_latex(latex_str)
-        console.print(pretty(expr))
-    except Exception:
-        # High quality fallback substitution logic mapping to superscript/subscript unicode chars
-        superscript_map = {
-            "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
-            "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹",
-            "+": "⁺", "-": "⁻", "=": "⁼", "(": "⁽", ")": "⁾",
-            "n": "ⁿ", "x": "ˣ", "y": "ʸ", "i": "ⁱ"
-        }
-        subscript_map = {
-            "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄",
-            "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉",
-            "+": "₊", "-": "₋", "=": "₌", "(": "₍", ")": "₎",
-            "i": "ᵢ", "j": "ⱼ", "k": "ₖ", "x": "ₓ", "y": "ᵧ"
-        }
-        
-        clean = (
-            latex_str
-            .replace(r"\int", "∫")
-            .replace(r"\sum", "∑")
-            .replace(r"\alpha", "α")
-            .replace(r"\beta", "β")
-            .replace(r"\gamma", "γ")
-            .replace(r"\theta", "θ")
-            .replace(r"\partial", "∂")
-            .replace(r"\infty", "∞")
-            .replace(r"\hbar", "ħ")
-            .replace(r"\psi", "ψ")
-            .replace(r"\Psi", "Ψ")
-            .replace(r"\phi", "φ")
-            .replace(r"\lambda", "λ")
-            .replace(r"\pi", "π")
-            .replace(r"\nabla", "∇")
-            .replace(r"\Delta", "Δ")
-            .replace(r"\cdot", "·")
-            .replace(r"\sqrt", "√")
-            .replace(r"\approx", "≈")
-            .replace(r"\neq", "≠")
-            .replace(r"\leq", "≤")
-            .replace(r"\geq", "≥")
-            .replace(r"\rightarrow", "→")
-            .replace(r"\infty", "∞")
-        )
-        
-        # Replace superscripts e.g. x^2
-        import re
-        def replace_super(match):
-            val = match.group(1)
-            return "".join(superscript_map.get(c, c) for c in val)
-        clean = re.sub(r"\^\{?([0-9a-zA-Z\+\-\=]+)\}?", replace_super, clean)
-        
-        # Replace subscripts e.g. x_0
-        def replace_sub(match):
-            val = match.group(1)
-            return "".join(subscript_map.get(c, c) for c in val)
-        clean = re.sub(r"\_\{?([0-9a-zA-Z\+\-\=]+)\}?", replace_sub, clean)
+def print_math(latex_str: str, return_str: bool = False):
+    """Renders math expression in terminal, translating LaTeX symbols and exponents to Unicode.
 
-        console.print(f"  [italic]{clean}[/italic]")
+    When return_str=True, return the rendered string instead of printing it.
+    """
+    def _render(latex_str: str) -> str:
+        # Try SymPy pretty-printing first; fall back to Unicode substitution.
+        try:
+            from sympy.parsing.latex import parse_latex
+            from sympy import pretty
+            expr = parse_latex(latex_str)
+            return pretty(expr)
+        except Exception:
+            return _unicode_substitute(latex_str)
+
+    out = _render(latex_str)
+    if return_str:
+        return out
+    console.print(f"[bold cyan]Math Formula:[/bold cyan]")
+    console.print(f"  [italic]{out}[/italic]")
+
+
+def _unicode_substitute(latex_str: str) -> str:
+    # High quality fallback substitution logic mapping to superscript/subscript unicode chars
+    superscript_map = {
+        "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
+        "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹",
+        "+": "⁺", "-": "⁻", "=": "⁼", "(": "⁽", ")": "⁾",
+        "n": "ⁿ", "x": "ˣ", "y": "ʸ", "i": "ⁱ"
+    }
+    subscript_map = {
+        "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄",
+        "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉",
+        "+": "₊", "-": "₋", "=": "₌", "(": "₍", ")": "₎",
+        "i": "ᵢ", "j": "ⱼ", "k": "ₖ", "x": "ₓ", "y": "ᵧ"
+    }
+
+    clean = (
+        latex_str
+        .replace(r"\int", "∫")
+        .replace(r"\sum", "∑")
+        .replace(r"\alpha", "α")
+        .replace(r"\beta", "β")
+        .replace(r"\gamma", "γ")
+        .replace(r"\theta", "θ")
+        .replace(r"\partial", "∂")
+        .replace(r"\infty", "∞")
+        .replace(r"\hbar", "ħ")
+        .replace(r"\psi", "ψ")
+        .replace(r"\Psi", "Ψ")
+        .replace(r"\phi", "φ")
+        .replace(r"\lambda", "λ")
+        .replace(r"\pi", "π")
+        .replace(r"\nabla", "∇")
+        .replace(r"\Delta", "Δ")
+        .replace(r"\cdot", "·")
+        .replace(r"\sqrt", "√")
+        .replace(r"\approx", "≈")
+        .replace(r"\neq", "≠")
+        .replace(r"\leq", "≤")
+        .replace(r"\geq", "≥")
+        .replace(r"\rightarrow", "→")
+        .replace(r"\infty", "∞")
+    )
+
+    import re
+    def replace_super(match):
+        val = match.group(1)
+        return "".join(superscript_map.get(c, c) for c in val)
+    clean = re.sub(r"\^\{?([0-9a-zA-Z\+\-\=]+)\}?", replace_super, clean)
+
+    def replace_sub(match):
+        val = match.group(1)
+        return "".join(subscript_map.get(c, c) for c in val)
+    clean = re.sub(r"\_\{?([0-9a-zA-Z\+\-\=]+)\}?", replace_sub, clean)
+    return clean
 
 def animated_progress(steps: List[str], duration_per_step: float = 0.6) -> None:
     """Displays animated progress bar loading indicator for multi-step derivations."""
@@ -220,23 +231,119 @@ def print_plot(
         console.print(f"X range: {min(x)} to {max(x)}")
         console.print(f"Y range: {min(y)} to {max(y)}")
 
-def print_concept_map(concept_id: str, relations: Dict[str, List[str]], concept_names: Dict[str, str], direction: str = "prerequisites") -> None:
-    """Renders an ASCII concept dependency tree."""
+def print_concept_map(
+    concept_id: str,
+    relations: Dict[str, List[str]],
+    concept_names: Dict[str, str],
+    direction: str = "prerequisites",
+    mastery_scores: Optional[Dict[str, float]] = None,
+    current_concept: Optional[str] = None,
+) -> None:
+    """Renders an ASCII concept dependency tree with mastery colors.
+
+    mastery_scores: optional map of concept_id → 0.0-1.0. When present, nodes
+    are colored green (≥0.8), yellow (≥0.5), red (<0.5), or dim (not started).
+    current_concept: optional concept_id marked with ▸.
+    """
+    mastery_scores = mastery_scores or {}
+
+    def _label(cid: str) -> str:
+        name = concept_names.get(cid, cid)
+        marker = "▸ " if cid == current_concept else ""
+        score = mastery_scores.get(cid)
+        if score is None:
+            return f"{marker}[dim]{name}[/dim] ({cid})"
+        if score >= 0.8:
+            style = "green"
+        elif score >= 0.5:
+            style = "yellow"
+        else:
+            style = "red"
+        return f"{marker}[{style}]{name}[/{style}] ({cid}) [{score*100:.0f}%]"
+
     root_name = concept_names.get(concept_id, concept_id)
     tree = Tree(f"[bold green]{root_name}[/bold green] ({concept_id})")
-    
+
     def add_branches(node: Tree, cid: str, visited: set) -> None:
         if cid in visited:
             return
         visited.add(cid)
         children = relations.get(cid, [])
         for child in children:
-            child_name = concept_names.get(child, child)
-            child_node = node.add(f"[cyan]{child_name}[/cyan] ({child})")
+            child_node = node.add(_label(child))
             add_branches(child_node, child, visited.copy())
-            
+
     add_branches(tree, concept_id, set())
     console.print(tree)
+
+
+def print_equation_block(
+    equations: List[Dict[str, str]],
+    title: str = "Equations",
+    style: str = "cyan",
+) -> None:
+    """Render a sequence of numbered equations in a Rich panel.
+
+    Each item: {"equation": "<latex>", "annotation": "<optional note>"}.
+    """
+    lines = []
+    for i, eq in enumerate(equations, 1):
+        rendered = print_math(eq["equation"], return_str=True)
+        line = f"[bold yellow]({i})[/bold yellow]  {rendered}"
+        ann = eq.get("annotation")
+        if ann:
+            line += f"\n      [dim italic]{ann}[/dim italic]"
+        lines.append(line)
+    content = "\n\n".join(lines)
+    print_panel(content, title=title, style=style)
+
+
+def print_mastery_dashboard(
+    by_domain: Dict[str, Dict[str, Any]],
+    journeys: Optional[List[Dict[str, Any]]] = None,
+) -> None:
+    """Mastery dashboard grouped by domain.
+
+    by_domain: {domain: {"concepts": int, "mastered": int, "avg_score": float}}
+    journeys: optional list of journey summaries (id, topic, status) shown
+    below the table.
+    """
+    table = Table(title="Mastery Dashboard", show_header=True, header_style="bold magenta")
+    table.add_column("Domain")
+    table.add_column("Concepts", justify="right")
+    table.add_column("Mastered", justify="right")
+    table.add_column("Progress")
+    table.add_column("Status")
+
+    for domain, stats in sorted(by_domain.items()):
+        total = int(stats.get("concepts", 0))
+        mastered = int(stats.get("mastered", 0))
+        avg = float(stats.get("avg_score", 0.0))
+        pct = (mastered / total * 100) if total else 0.0
+        bar_width = 16
+        filled = int(round(pct / 100 * bar_width))
+        bar = "█" * filled + "░" * (bar_width - filled)
+        if avg >= 0.8:
+            color = "green"
+        elif avg >= 0.5:
+            color = "yellow"
+        else:
+            color = "red"
+        status = "Mastered" if pct >= 80 else "In progress" if pct > 0 else "Not started"
+        table.add_row(
+            domain, str(total), str(mastered),
+            f"[{color}]{bar}[/{color}] {pct:5.1f}%", status,
+        )
+
+    console.print(table)
+
+    if journeys:
+        console.print("\n[bold]Active journeys:[/bold]")
+        for j in journeys:
+            console.print(
+                f"  • [cyan]{j.get('topic', '?')}[/cyan] "
+                f"({j.get('status', '?')}) — {j.get('interaction_count', 0)} interactions"
+            )
 
 def print_table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None) -> None:
     """Prints tabular data nicely formatted."""

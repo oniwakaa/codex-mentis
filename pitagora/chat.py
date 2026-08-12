@@ -236,6 +236,133 @@ def _check_due_reviews() -> Optional[str]:
     return None
 
 
+# ─── Teaching mode helpers ──────────────────────────────────────────────
+
+SUBCONCEPT_GEN_PROMPT = (
+    "You are a curriculum designer. Break the given topic into 3 to 6 ordered "
+    "sub-concepts that a learner should cover, from foundational to advanced. "
+    "Return ONLY a JSON object: {\"sub_concepts\": [\"name1\", \"name2\", ...]}. "
+    "No extra text, no markdown fences."
+)
+
+STYLE_GUIDES = {
+    "feynman": "Use the Feynman technique: explain as if to a curious beginner, use analogies and plain language before formalism.",
+    "formal": "Use a formal, rigorous style: precise definitions, theorems, and symbolic notation.",
+    "visual": "Use a visual style: describe diagrams, geometric intuition, and spatial relationships in words.",
+    "historical": "Use a historical style: motivate the concept through the problem its inventors were trying to solve.",
+    "socratic": "Use a Socratic style: lead the learner with guiding questions rather than stating answers directly.",
+    "applied": "Use an applied style: ground the concept in a concrete real-world example or computation.",
+}
+
+
+def _generate_sub_concepts(topic: str, config: Dict[str, Any], model: str) -> List[str]:
+    """Ask the LLM to decompose a topic into ordered sub-concepts."""
+    messages = [
+        {"role": "system", "content": SUBCONCEPT_GEN_PROMPT},
+        {"role": "user", "content": f"Topic: {topic}"},
+    ]
+    raw = chat_completion(messages, model=model, config=config)
+    import json as _json
+    try:
+        s = raw.strip()
+        if s.startswith("```"):
+            s = s.split("\n", 1)[-1] if "\n" in s else s
+            if s.endswith("```"):
+                s = s[:-3].strip()
+        obj = _json.loads(s)
+        subs = obj.get("sub_concepts", [])
+        if isinstance(subs, list) and subs:
+            return [str(x) for x in subs][:6]
+    except Exception:
+        pass
+    # ponytail: fallback if LLM unparseable. Add graph-derived path here later.
+    return [f"Foundations of {topic}", f"Core ideas of {topic}", f"Applications of {topic}"]
+
+
+def _build_teaching_prompt(session, action: str, style: str) -> str:
+    """Build the user-side instruction for the next teaching turn."""
+    sc = session.current_subconcept
+    sc_name = sc.name if sc else session.topic
+    guide = STYLE_GUIDES.get(style, STYLE_GUIDES["feynman"])
+    action_intro = {
+        "introduce": f"Introduce the sub-concept '{sc_name}'. Give a short, clear motivation and definition.",
+        "explain": f"Explain the sub-concept '{sc_name}'. {guide}",
+        "check": f"Check the learner's understanding of '{sc_name}'. Pose a focused question or small exercise and wait for their answer.",
+        "adapt": f"The learner needs a different angle on '{sc_name}'. {guide} Address the likely misconception directly.",
+        "visualize": f"Describe a visualization or diagram for '{sc_name}' in words, then explain what it shows.",
+        "quiz": f"Give a short quiz problem on '{sc_name}'. State the problem, then offer hints. Do NOT reveal the solution yet.",
+        "review": f"Review what we covered. Summarize the key ideas of '{session.topic}' and the sub-concepts visited.",
+        "advance": f"We are moving on to the next sub-concept: '{sc_name}'. Introduce it briefly.",
+        "complete": f"Wrap up the session on '{session.topic}'. Summarize and suggest next steps.",
+    }.get(action, f"Continue teaching '{sc_name}'. {guide}")
+    return (
+        f"{action_intro}\n\n"
+        f"[Teaching context] topic: {session.topic} | sub-concept: {sc_name} | "
+        f"comprehension: {session.comprehension_score:.2f} | style: {style} | "
+        f"learner level: {session.user_level}\n"
+        f"Keep it concise and focused. Use LaTeX for any equations."
+    )
+
+
+def _run_teaching_turn(console, session, analyzer, user_input, config, model, messages):
+    """Process one teaching-mode turn: classify, update session, build prompt,
+    call LLM, display response + controls. Mutates `messages` and `session`."""
+    from rich.markdown import Markdown
+    from pitagora.teaching.ui import (
+        show_controls, show_comprehension_gauge, show_subconcept_progress,
+    )
+
+    sc = session.current_subconcept
+    sc_name = sc.name if sc else session.topic
+
+    # Classify (shortcuts bypass the LLM)
+    result = analyzer.classify(user_input, session.topic, sc_name, config=config, model=model)
+    session.apply_classification(result.label, result.delta, style=session.current_style)
+
+    # Decide next action
+    action = session.next_action(result.label)
+    # Pick style: prefer the learner's best style once we have data, else current.
+    style = session.style_effectiveness.best() if any(
+        session.style_effectiveness.attempts.values()
+    ) else session.current_style
+    session.current_style = style
+
+    # State transitions driven by the action
+    from pitagora.teaching.session import TeachingState
+    if action == "adapt":
+        session.transition(TeachingState.adapting)
+    elif action == "check":
+        session.transition(TeachingState.checking)
+    elif action == "visualize":
+        session.transition(TeachingState.visualizing)
+    elif action == "quiz":
+        session.transition(TeachingState.quizzing)
+    elif action == "review":
+        session.transition(TeachingState.reviewing)
+    elif action == "complete":
+        session.complete()
+
+    prompt = _build_teaching_prompt(session, action, style)
+    messages.append({"role": "user", "content": prompt})
+
+    with console.status("[bold cyan]Teaching...[/bold cyan]"):
+        response = chat_completion(messages, model=model, config=config)
+    messages.append({"role": "assistant", "content": response})
+
+    console.print()
+    console.print(Markdown(response))
+    console.print()
+    show_comprehension_gauge(session.comprehension_score, console)
+    show_subconcept_progress(
+        [sc.to_dict() for sc in session.sub_concepts],
+        session.current_index,
+        console,
+    )
+    show_controls(console)
+    console.print()
+    return response
+
+
 def launch_chat(
     mode: str = "study",
     topic: str = "general",
@@ -268,12 +395,18 @@ def launch_chat(
 
     messages = [{"role": "system", "content": system_prompt}]
 
+    # Teaching-mode state. None when in default free-form chat.
+    teaching_session = None
+    teaching_analyzer = None
+    teaching_journey = None  # set in TASK 3 wiring
+
     # Welcome
     console.print(Panel(
         f"[bold cyan]Pitagora[/bold cyan] — {mode.title()} mode\n"
         f"Model: [dim]{model}[/dim] | Topic: [dim]{topic}[/dim]\n\n"
         f"Commands: [cyan]/mode[/cyan] [cyan]/topic[/cyan] [cyan]/model[/cyan] "
-        f"[cyan]/verify[/cyan] [cyan]/research[/cyan] [cyan]/clear[/cyan] [cyan]/quit[/cyan]",
+        f"[cyan]/explore[/cyan] [cyan]/verify[/cyan] [cyan]/research[/cyan] "
+        f"[cyan]/clear[/cyan] [cyan]/quit[/cyan]",
         title="🧠 Pitagora",
         border_style="blue",
     ))
@@ -452,6 +585,102 @@ def launch_chat(
                     else:
                         console.print("[dim]Usage: /ingest <path>[/dim]")
                     continue
+                elif cmd == "/explore":
+                    from pitagora.teaching.session import TeachingSession, TeachingState
+                    from pitagora.teaching.analyzer import ResponseAnalyzer
+                    from pitagora.teaching.ui import show_topic_overview, show_controls, show_comprehension_gauge
+
+                    if arg.strip() == "--continue":
+                        # Resume the most recent paused/active journey for any topic.
+                        try:
+                            from pitagora.journeys.store import list_journeys, load_journey
+                            journeys = [j for j in list_journeys()
+                                         if j.get("status") in ("active", "paused")]
+                            if not journeys:
+                                console.print("[dim]No journeys to continue. Use /explore <topic>.[/dim]")
+                                continue
+                            jid = journeys[0]["id"]
+                            teaching_journey = load_journey(jid)
+                            teaching_session = TeachingSession.from_dict(
+                                teaching_journey.session_state
+                            )
+                            teaching_analyzer = ResponseAnalyzer(chat_completion)
+                            topic = teaching_session.topic
+                            console.print(
+                                f"[green]✓ Resumed journey '{teaching_journey.topic}' "
+                                f"({teaching_session.interaction_count} interactions)[/green]"
+                            )
+                            show_comprehension_gauge(teaching_session.comprehension_score, console)
+                            show_controls(console)
+                        except Exception as e:
+                            console.print(f"[red]Resume failed: {e}[/red]")
+                        continue
+
+                    if not arg.strip():
+                        console.print("[dim]Usage: /explore <topic>  (or /explore --continue)[/dim]")
+                        continue
+
+                    explore_topic = arg.strip()
+                    with console.status("[cyan]Designing learning path...[/cyan]"):
+                        subs = _generate_sub_concepts(explore_topic, config, model)
+                    teaching_session = TeachingSession(
+                        topic=explore_topic, sub_concepts=subs, user_level="intermediate",
+                    )
+                    teaching_session.transition(TeachingState.exploring)
+                    teaching_analyzer = ResponseAnalyzer(chat_completion)
+                    topic = explore_topic
+
+                    # Auto-create or resume a journey (TASK 3 wiring).
+                    try:
+                        from pitagora.journeys.store import get_or_create_journey
+                        teaching_journey = get_or_create_journey(explore_topic, subs)
+                        teaching_journey.session_state = teaching_session.to_dict()
+                    except Exception:
+                        teaching_journey = None
+
+                    show_topic_overview(explore_topic, subs, con=console)
+                    console.print(
+                        "[dim]Teaching mode active. Type a reply, or a shortcut: "
+                        "n/e/d/s/?/v/q/p. /help for all commands.[/dim]\n"
+                    )
+                    # First teaching turn: introduce the first sub-concept.
+                    _run_teaching_turn(
+                        console, teaching_session, teaching_analyzer,
+                        "begin", config, model, messages,
+                    )
+                    continue
+                elif cmd == "/journeys":
+                    try:
+                        from pitagora.journeys.store import list_journeys
+                        journeys = list_journeys()
+                        if not journeys:
+                            console.print("[dim]No journeys yet. Use /explore <topic>.[/dim]")
+                        else:
+                            icons = {"active": "🟢", "paused": "⏸", "completed": "✓", "abandoned": "✗"}
+                            for j in journeys:
+                                icon = icons.get(j.get("status"), "•")
+                                console.print(
+                                    f"  {icon} [cyan]{j['id']}[/cyan] — {j['topic']} "
+                                    f"({j.get('status', '?')}) — {j.get('interaction_count', 0)} interactions"
+                                )
+                    except Exception as e:
+                        console.print(f"[dim]Journeys unavailable: {e}[/dim]")
+                    continue
+                elif cmd == "/dashboard":
+                    try:
+                        from pitagora.journeys.store import list_journeys
+                        from pitagora.teaching.ui import show_journey_map
+                        journeys = list_journeys()
+                        if not journeys:
+                            console.print("[dim]No journeys yet. Use /explore <topic>.[/dim]")
+                        else:
+                            for j in journeys:
+                                subs = j.get("sub_concepts", [])
+                                console.print(f"[bold]{j['topic']}[/bold] ({j.get('status', '?')})")
+                                show_journey_map(j["topic"], subs, console)
+                    except Exception as e:
+                        console.print(f"[dim]Dashboard unavailable: {e}[/dim]")
+                    continue
                 elif cmd == "/latex":
                     if arg:
                         from pitagora.latex_render import latex_to_unicode, render_equation_box
@@ -463,6 +692,10 @@ def launch_chat(
                         "  /mode <mode>      Switch mode (study/explore/reason/verify)\n"
                         "  /topic <name>     Change topic\n"
                         "  /model <name>     Change model\n"
+                        "  /explore <topic>  Start a guided teaching session\n"
+                        "  /explore --continue  Resume the latest journey\n"
+                        "  /journeys         List saved learning journeys\n"
+                        "  /dashboard        Visual journey overview\n"
                         "  /verify <expr>    Verify math with SymPy\n"
                         "  /latex <expr>     Render LaTeX as Unicode\n"
                         "  /quiz             Generate a practice problem\n"
@@ -474,6 +707,9 @@ def launch_chat(
                         "  /resume [id]      Resume a saved session\n"
                         "  /clear            Clear conversation\n"
                         "  /quit             Exit\n\n"
+                        "[bold]Teaching shortcuts (in teaching mode):[/bold]\n"
+                        "  n=next  e=explain differently  d=go deeper  s=skip\n"
+                        "  ?=confused  v=visualize  q=quiz  p=pause\n\n"
                         "[bold]CLI Commands:[/bold]\n"
                         "  pitagora setup      Configure providers\n"
                         "  pitagora onboard     Set up learning profile\n"
@@ -489,7 +725,65 @@ def launch_chat(
                     continue
 
             # ─── MAIN CHAT FLOW ───
-            
+
+            # Teaching mode: route every reply through the analyzer + session.
+            if teaching_session is not None:
+                # Pause shortcut exits teaching back to free-form (session saved).
+                if user_input.strip().lower() == "p":
+                    teaching_session.pause()
+                    if teaching_journey is not None:
+                        try:
+                            from pitagora.journeys.store import save_journey
+                            teaching_journey.session_state = teaching_session.to_dict()
+                            save_journey(teaching_journey)
+                        except Exception:
+                            pass
+                    console.print(
+                        f"[dim]Teaching paused. Resumable with /explore --continue. "
+                        f"Back to free-form chat.[/dim]"
+                    )
+                    teaching_session = None
+                    teaching_analyzer = None
+                    continue
+                response = _run_teaching_turn(
+                    console, teaching_session, teaching_analyzer,
+                    user_input, config, model, messages,
+                )
+                # Auto-save journey after each teaching turn.
+                if teaching_journey is not None:
+                    try:
+                        from pitagora.journeys.store import save_journey
+                        teaching_journey.session_state = teaching_session.to_dict()
+                        teaching_journey.comprehension_history.append(
+                            teaching_session.comprehension_score
+                        )
+                        teaching_journey.sub_concepts = [
+                            sc.to_dict() for sc in teaching_session.sub_concepts
+                        ]
+                        teaching_journey.interaction_count = teaching_session.interaction_count
+                        save_journey(teaching_journey)
+                    except Exception:
+                        pass
+                # If the session completed, drop back to free-form chat.
+                from pitagora.teaching.session import TeachingState as _TS
+                if teaching_session.state == _TS.completed:
+                    from pitagora.teaching.ui import show_session_summary
+                    mastered = [
+                        sc.name for sc in teaching_session.sub_concepts
+                        if sc.mastery >= 0.8
+                    ]
+                    show_session_summary(
+                        teaching_session.topic,
+                        teaching_session.comprehension_score,
+                        teaching_session.interaction_count,
+                        teaching_session.style_effectiveness.best(),
+                        mastered,
+                        console,
+                    )
+                    teaching_session = None
+                    teaching_analyzer = None
+                continue
+
             # 1. RAG: Retrieve relevant context from knowledge base
             rag_ctx = _get_rag_context(user_input)
             concept_ctx = _get_concept_context(topic)

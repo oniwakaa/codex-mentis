@@ -1,0 +1,23 @@
+name: Calculus and Real Analysis
+domain: Calculus
+description: Differentiation, integration, limits, power series expansions, and multi-variable calculus.
+concepts:
+  - Limits and continuity
+  - Derivatives and chain rule
+  - Integrals and Fundamental Theorem of Calculus
+  - Taylor and Maclaurin series expansion
+common_mistakes:
+  - Forgetting the constant of integration (+ C) for indefinite integrals.
+  - Incorrect application of the chain rule when differentiating nested functions.
+  - Ignoring boundary conditions or singularities in definite integrals.
+analogies:
+  - A derivative is like a speedometer reading (instantaneous rate of change).
+  - An integral is like measuring the area of an irregular pool by slicing it into tiny rectangular lanes.
+socratic_questions:
+  - What happens to the function as the variable approaches the limit point from the left vs the right?
+  - Does the function contain any singularities within the interval of integration?
+  - Have you accounted for the inner function derivative when using the chain rule?
+verification_strategies:
+  - Differentiate the obtained antiderivative to verify it matches the integrand.
+  - Perform numerical integration over the bounds using Simpson's rule and compare results.
+  - Check the limits at infinity to make sure they match qualitative behavior.

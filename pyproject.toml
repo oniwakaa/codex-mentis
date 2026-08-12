@@ -1,0 +1,93 @@
+[project]
+name = "codex-mentis"
+version = "0.2.0"
+description = "An AI-powered CLI for studying, exploring, and reasoning through complex mathematics and physics. Multi-agent architecture with specialized tutor, researcher, prover, reviewer, explainer, and self-improving agents."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Carlo Bizzaro", email = "carlobizzarocb@gmail.com"}
+]
+keywords = ["math", "physics", "ai", "tutor", "cli", "agents", "education", "symbolic", "sympy"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Education",
+]
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.5.0",
+    "textual>=0.30.0",
+    "sympy>=1.12",
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "matplotlib>=3.7.0",
+    "plotext>=5.2.8",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "sqlite-utils>=3.35.0",
+    "httpx>=0.24.0",
+    "aiofiles>=23.0",
+    "webfetch-llm>=0.1.0",
+]
+
+[project.optional-dependencies]
+embeddings = [
+    "sentence-transformers>=2.2.0",
+]
+mcp = [
+    "mcp>=0.1.0",
+]
+all = [
+    "sentence-transformers>=2.2.0",
+    "mcp>=0.1.0",
+    "beautifulsoup4>=4.12.0",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+]
+
+[project.scripts]
+codex-mentis = "codex_mentis.cli.app:app"
+cm = "codex_mentis.cli.app:app"
+
+[project.urls]
+Homepage = "https://github.com/nousresearch/codex-mentis"
+Repository = "https://github.com/nousresearch/codex-mentis"
+Documentation = "https://github.com/nousresearch/codex-mentis#readme"
+Issues = "https://github.com/nousresearch/codex-mentis/issues"
+
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["codex_mentis*"]
+
+[tool.setuptools.package-data]
+codex_mentis = ["data/*.yaml", "skills/builtin/*.yaml"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

@@ -1,0 +1,197 @@
+algebra:
+  - id: alg_groups
+    name: Groups
+    prerequisites: []
+  - id: alg_rings
+    name: Rings
+    prerequisites: [alg_groups]
+  - id: alg_fields
+    name: Fields
+    prerequisites: [alg_rings]
+  - id: alg_vector_spaces
+    name: Vector Spaces
+    prerequisites: [alg_fields]
+  - id: alg_galois
+    name: Galois Theory
+    prerequisites: [alg_fields, alg_groups]
+
+calculus:
+  - id: calc_limits
+    name: Limits
+    prerequisites: []
+  - id: calc_derivatives
+    name: Derivatives
+    prerequisites: [calc_limits]
+  - id: calc_integrals
+    name: Integrals
+    prerequisites: [calc_derivatives]
+  - id: calc_sequences_series
+    name: Sequences and Series
+    prerequisites: [calc_limits]
+  - id: calc_multivariable
+    name: Multivariable Calculus
+    prerequisites: [calc_derivatives, calc_integrals]
+
+linear_algebra:
+  - id: la_matrices
+    name: Matrices
+    prerequisites: []
+  - id: la_determinants
+    name: Determinants
+    prerequisites: [la_matrices]
+  - id: la_transformations
+    name: Linear Transformations
+    prerequisites: [la_matrices]
+  - id: la_eigenvalues
+    name: Eigenvalues and Eigenvectors
+    prerequisites: [la_transformations]
+  - id: la_inner_product
+    name: Inner Product Spaces
+    prerequisites: [la_transformations, alg_vector_spaces]
+
+mechanics:
+  - id: mech_kinematics
+    name: Kinematics
+    prerequisites: []
+  - id: mech_newtons_laws
+    name: Newton's Laws
+    prerequisites: [mech_kinematics, calc_derivatives]
+  - id: mech_central_forces
+    name: Central Forces
+    prerequisites: [mech_newtons_laws, calc_integrals]
+  - id: mech_lagrangian
+    name: Lagrangian Mechanics
+    prerequisites: [mech_newtons_laws, calc_multivariable]
+  - id: mech_hamiltonian
+    name: Hamiltonian Mechanics
+    prerequisites: [mech_lagrangian]
+
+electromagnetism:
+  - id: em_electrostatics
+    name: Electrostatics
+    prerequisites: [calc_multivariable]
+  - id: em_magnetostatics
+    name: Magnetostatics
+    prerequisites: [calc_multivariable]
+  - id: em_maxwells_equations
+    name: Maxwell's Equations
+    prerequisites: [em_electrostatics, em_magnetostatics]
+  - id: em_waves
+    name: Electromagnetic Waves
+    prerequisites: [em_maxwells_equations]
+  - id: em_gauge_theory
+    name: Gauge Theory
+    prerequisites: [em_maxwells_equations, la_transformations]
+
+quantum:
+  - id: qm_wave_function
+    name: Wave Function
+    prerequisites: [calc_multivariable, la_inner_product]
+  - id: qm_schrodinger
+    name: Schrödinger Equation
+    prerequisites: [qm_wave_function]
+  - id: qm_operators
+    name: Quantum Operators
+    prerequisites: [qm_wave_function, la_eigenvalues]
+  - id: qm_spin
+    name: Spin and Angular Momentum
+    prerequisites: [qm_operators]
+  - id: qm_perturbation
+    name: Perturbation Theory
+    prerequisites: [qm_schrodinger, qm_operators]
+
+thermodynamics:
+  - id: thermo_laws
+    name: Laws of Thermodynamics
+    prerequisites: [calc_multivariable]
+  - id: thermo_entropy
+    name: Entropy
+    prerequisites: [thermo_laws]
+  - id: thermo_ensembles
+    name: Statistical Ensembles
+    prerequisites: [thermo_entropy]
+  - id: thermo_partition
+    name: Partition Function
+    prerequisites: [thermo_ensembles]
+  - id: thermo_phase_transitions
+    name: Phase Transitions
+    prerequisites: [thermo_partition]
+
+topology:
+  - id: top_metric_spaces
+    name: Metric Spaces
+    prerequisites: [calc_limits]
+  - id: top_topological_spaces
+    name: Topological Spaces
+    prerequisites: [top_metric_spaces]
+  - id: top_compactness
+    name: Compactness
+    prerequisites: [top_topological_spaces]
+  - id: top_connectedness
+    name: Connectedness
+    prerequisites: [top_topological_spaces]
+  - id: top_homotopy
+    name: Homotopy
+    prerequisites: [top_topological_spaces]
+
+probability:
+  - id: prob_variables
+    name: Random Variables
+    prerequisites: [calc_limits]
+  - id: prob_distributions
+    name: Probability Distributions
+    prerequisites: [prob_variables, calc_integrals]
+  - id: prob_clt
+    name: Central Limit Theorem
+    prerequisites: [prob_distributions]
+  - id: prob_markov
+    name: Markov Chains
+    prerequisites: [prob_variables, la_matrices]
+  - id: prob_bayesian
+    name: Bayesian Inference
+    prerequisites: [prob_distributions]
+
+statistics:
+  - id: stat_estimation
+    name: Estimation Theory
+    prerequisites: [prob_distributions]
+  - id: stat_mle
+    name: Maximum Likelihood
+    prerequisites: [stat_estimation, calc_derivatives]
+  - id: stat_testing
+    name: Hypothesis Testing
+    prerequisites: [stat_estimation]
+  - id: stat_regression
+    name: Regression Analysis
+    prerequisites: [stat_estimation, la_matrices]
+
+differential_equations:
+  - id: de_ode
+    name: Ordinary Differential Equations
+    prerequisites: [calc_integrals]
+  - id: de_fourier
+    name: Fourier Analysis
+    prerequisites: [de_ode, calc_sequences_series]
+  - id: de_pde
+    name: Partial Differential Equations
+    prerequisites: [de_ode, calc_multivariable]
+  - id: de_greens_functions
+    name: Green's Functions
+    prerequisites: [de_pde]
+
+complex_analysis:
+  - id: ca_analytic
+    name: Analytic Functions
+    prerequisites: [calc_multivariable]
+  - id: ca_contour_integration
+    name: Contour Integration
+    prerequisites: [ca_analytic]
+  - id: ca_cauchy
+    name: Cauchy's Theorem
+    prerequisites: [ca_contour_integration]
+  - id: ca_laurent
+    name: Laurent Series
+    prerequisites: [ca_cauchy]
+  - id: ca_residue
+    name: Residue Theorem
+    prerequisites: [ca_laurent]

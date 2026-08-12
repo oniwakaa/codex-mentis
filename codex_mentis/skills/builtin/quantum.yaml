@@ -1,0 +1,23 @@
+name: Quantum Mechanics
+domain: Physics
+description: Wave-particle duality, Schrodinger equation, Hilbert spaces, operators, and quantum states.
+concepts:
+  - Wavefunctions and probability densities
+  - Time-independent and dependent Schrodinger equations
+  - Operators, expectation values, and commutators
+  - Quantum harmonic oscillator and Hydrogen atom
+common_mistakes:
+  - Normalizing wavefunctions incorrectly (forgetting to integrate |psi|^2 = 1).
+  - Treating operators like ordinary numbers (e.g. assuming xp = px, forgetting [x, p] = i*hbar).
+  - Confusing eigenvalues with expectation values.
+analogies:
+  - A quantum superposition is like a spinning coin; it is neither heads nor tails until it lands.
+  - The quantum harmonic oscillator is like a child's swing but with quantized energy steps.
+socratic_questions:
+  - Is the Hamiltonian operator Hermitian? What does that guarantee about its eigenvalues?
+  - Do the two operators commute? What does that imply about simultaneous measurements?
+  - What are the boundary conditions of the wavefunction at the boundaries of the potential?
+verification_strategies:
+  - Verify that the wavefunction is normalized over its entire domain.
+  - Check if the commutator of position and momentum is correctly i*hbar.
+  - Ensure expectation values of physical observables are real numbers.

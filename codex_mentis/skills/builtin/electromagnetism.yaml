@@ -1,0 +1,23 @@
+name: Electromagnetism and Maxwell Equations
+domain: Physics
+description: Electrostatics, magnetostatics, electrodynamics, Maxwell's equations, and electromagnetic waves.
+concepts:
+  - Coulomb's Law and Gauss's Law
+  - Biot-Savart Law and Ampere's Law
+  - Faraday's Law of Induction
+  - Maxwell's Equations and Wave propagation
+common_mistakes:
+  - Forgetting the negative sign in Faraday's Law (Lenz's Law representation).
+  - Mixing up magnetic field (B) and magnetic vector potential (A) properties.
+  - Applying electrostatic equations in dynamic conditions.
+analogies:
+  - Electric potential is like height in a landscape, and the electric field is the slope pushing water downhill.
+  - Lenz's law is like mechanical inertia; the loop fights changes in magnetic flow.
+socratic_questions:
+  - Is the system symmetric enough to apply Gauss's or Ampere's law in integral form?
+  - Does the magnetic field do any work on a moving point charge?
+  - How do the boundary conditions behave at the interface between these two media?
+verification_strategies:
+  - Check divergence and curl of fields using Maxwell's differential equations.
+  - Ensure dimensional homogeneity (e.g. check electric field dimensions vs potential/distance).
+  - Verify boundary conditions at infinity (fields must decay to 0 for localized sources).

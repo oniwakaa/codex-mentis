@@ -1,0 +1,23 @@
+name: Linear Algebra and Matrix Operations
+domain: Linear Algebra
+description: Vector spaces, matrix transformations, determinants, eigenvalues, and diagonalizations.
+concepts:
+  - Vector operations and projections
+  - Matrix multiplication and inversion
+  - Determinants and traces
+  - Eigenvalues and eigenvectors
+common_mistakes:
+  - Assuming matrix multiplication is commutative (i.e. AB = BA is generally false).
+  - Calculating the inverse of a singular matrix (det = 0).
+  - Mixing up rows and columns when performing matrix multiplication or transpose.
+analogies:
+  - Matrix multiplication is like applying a sequence of geometric transformations (rotating then stretching).
+  - Eigenvectors are directions that do not change direction during a transformation, only scale.
+socratic_questions:
+  - Is the determinant of this matrix zero? What does that imply about its invertibility?
+  - Does the matrix span the entire vector space or is it rank-deficient?
+  - How does this matrix transformation behave geometrically on the standard basis vectors?
+verification_strategies:
+  - Verify that A * A^-1 yields the Identity matrix.
+  - Verify that the eigenvalue equation holds: A * v = lambda * v.
+  - Check that the sum of eigenvalues matches the trace of the matrix, and the product matches the determinant.

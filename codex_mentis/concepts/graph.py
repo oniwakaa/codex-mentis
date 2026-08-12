@@ -26,6 +26,8 @@ class ConceptGraph:
     def load(self):
         """
         Loads the concept DAG from concepts.yaml.
+        YAML format: domain → list of {id, name, prerequisites, ...}
+        We flatten this into: graph[concept_id] = {name, prerequisites, domain, ...}
         """
         if not os.path.exists(self.yaml_path):
             self._create_seed_graph()
@@ -35,7 +37,30 @@ class ConceptGraph:
             try:
                 with open(self.yaml_path, "r", encoding="utf-8") as f:
                     data = yaml.safe_load(f)
-                    self.graph = data if isinstance(data, dict) else {}
+                
+                if not isinstance(data, dict):
+                    self._create_seed_graph()
+                    return
+
+                # Flatten domain-grouped YAML into flat concept dict
+                self.graph = {}
+                for domain, concepts in data.items():
+                    if isinstance(concepts, list):
+                        for concept in concepts:
+                            if isinstance(concept, dict) and "id" in concept:
+                                cid = concept["id"]
+                                self.graph[cid] = {
+                                    "name": concept.get("name", cid),
+                                    "prerequisites": concept.get("prerequisites", []),
+                                    "domain": domain,
+                                    "description": concept.get("description", ""),
+                                    "difficulty": concept.get("difficulty", 1),
+                                    "estimated_learning_time": concept.get("estimated_learning_time", 60),
+                                }
+                    elif isinstance(concepts, dict):
+                        # Already flat format
+                        self.graph[domain] = concepts
+
             except Exception:
                 self._create_seed_graph()
         else:
@@ -189,22 +214,65 @@ class ConceptGraph:
             except Exception:
                 pass
 
+    def _resolve_concept(self, name_or_id: str) -> Optional[str]:
+        """Resolve a concept by name or ID. Returns the graph key or None."""
+        # Direct key match
+        if name_or_id in self.graph:
+            return name_or_id
+        # Case-insensitive name match
+        lower = name_or_id.lower()
+        for cid, details in self.graph.items():
+            if details.get("name", "").lower() == lower:
+                return cid
+            if cid.lower() == lower:
+                return cid
+        # Partial match (name contains query or query contains name)
+        for cid, details in self.graph.items():
+            name = details.get("name", "").lower()
+            if lower in name or name in lower:
+                return cid
+            if lower in cid.lower():
+                return cid
+        # Domain match — prefer longest domain match
+        best_match = None
+        best_len = 0
+        for cid, details in self.graph.items():
+            domain = details.get("domain", "").lower()
+            if domain and (lower == domain or lower in domain or domain in lower):
+                if len(domain) > best_len:
+                    best_match = cid
+                    best_len = len(domain)
+        if best_match:
+            return best_match
+        return None
+
     def get_prerequisites(self, concept: str) -> List[str]:
         """
         Returns the list of direct prerequisites of a concept.
+        Accepts concept name or ID.
         """
-        return self.graph.get(concept, {}).get("prerequisites", [])
+        cid = self._resolve_concept(concept)
+        if cid:
+            prereq_ids = self.graph.get(cid, {}).get("prerequisites", [])
+            # Return names, not IDs
+            return [self.graph.get(p, {}).get("name", p) for p in prereq_ids if p in self.graph]
+        return []
 
     def get_dependents(self, concept: str) -> List[str]:
         """
         Returns the concepts that require the given concept as a prerequisite.
         """
-        return self.graph.get(concept, {}).get("dependents", [])
+        cid = self._resolve_concept(concept)
+        return self.graph.get(cid, {}).get("dependents", []) if cid else []
 
     def get_learning_path(self, target: str) -> List[str]:
         """
         Computes a topologically sorted list of concepts needed to understand the target.
         """
+        cid = self._resolve_concept(target)
+        if not cid:
+            return []
+        
         visited: Set[str] = set()
         path: List[str] = []
 
@@ -212,13 +280,13 @@ class ConceptGraph:
             if node in visited:
                 return
             visited.add(node)
-            for prereq in self.get_prerequisites(node):
+            for prereq in self.graph.get(node, {}).get("prerequisites", []):
                 if prereq in self.graph:
                     dfs(prereq)
-            path.append(node)
+            name = self.graph.get(node, {}).get("name", node)
+            path.append(name)
 
-        if target in self.graph:
-            dfs(target)
+        dfs(cid)
         return path
 
     def get_optimized_path(self, target: str, mastered_concepts: Optional[List[str]] = None) -> List[str]:

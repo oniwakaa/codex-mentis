@@ -17,15 +17,16 @@ class MasteryTracker:
         Tracks concept mastery scores (0.0 to 1.0) in SQLite.
         """
         self.db_path = os.path.expanduser(db_path)
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        if self.db_path != ":memory:":
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self.concept_graph = concept_graph or ConceptGraph()
         self.decay_rate = decay_rate
+        self.db = Database(self.db_path)
         self._init_db()
 
     def _init_db(self):
-        db = Database(self.db_path)
-        if not db["concept_mastery"].exists():
-            db["concept_mastery"].create({
+        if not self.db["concept_mastery"].exists():
+            self.db["concept_mastery"].create({
                 "concept": str,
                 "mastery_score": float,
                 "attempts": int,
@@ -36,7 +37,7 @@ class MasteryTracker:
         """
         Retrieve mastery score for a concept, applying the forgetting curve decay if requested.
         """
-        db = Database(self.db_path)
+        db = self.db
         try:
             row = db["concept_mastery"].get(concept)
             score = row["mastery_score"]
@@ -60,7 +61,7 @@ class MasteryTracker:
         If spaced_rep is provided, schedules a review dynamically based on performance.
         """
         performance = max(0.0, min(1.0, performance))
-        db = Database(self.db_path)
+        db = self.db
         
         try:
             row = db["concept_mastery"].get(concept)
@@ -96,7 +97,7 @@ class MasteryTracker:
         """
         Get list of concepts with mastery score less than the threshold.
         """
-        db = Database(self.db_path)
+        db = self.db
         try:
             rows = list(db["concept_mastery"].rows)
         except Exception:
@@ -117,7 +118,7 @@ class MasteryTracker:
         """
         Get list of concepts with mastery score greater than or equal to the threshold.
         """
-        db = Database(self.db_path)
+        db = self.db
         try:
             rows = list(db["concept_mastery"].rows)
         except Exception:

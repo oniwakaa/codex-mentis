@@ -342,21 +342,143 @@ def launch_chat(
                             for f in result["findings"][:5]:
                                 console.print(f"  • {f}")
                     continue
+                elif cmd == "/save":
+                    from codex_mentis.sessions import save_session
+                    sid = save_session(messages, topic=topic, mode=mode)
+                    console.print(f"[green]✓ Session saved: {sid}[/green]")
+                    continue
+                elif cmd == "/sessions":
+                    from codex_mentis.sessions import list_sessions
+                    sessions = list_sessions()
+                    if not sessions:
+                        console.print("[dim]No saved sessions.[/dim]")
+                    else:
+                        for s in sessions:
+                            console.print(f"  [cyan]{s['id']}[/cyan] — {s['topic']} ({s['mode']}) — {s['message_count']} msgs")
+                    continue
+                elif cmd == "/resume":
+                    from codex_mentis.sessions import load_session, list_sessions
+                    if arg:
+                        sid = arg.strip()
+                    else:
+                        sessions = list_sessions(limit=1)
+                        sid = sessions[0]["id"] if sessions else None
+                    if sid:
+                        loaded = load_session(sid)
+                        if loaded:
+                            messages = loaded
+                            console.print(f"[green]✓ Resumed session {sid} ({len(messages)} messages)[/green]")
+                        else:
+                            console.print(f"[red]Session not found: {sid}[/red]")
+                    else:
+                        console.print("[dim]No sessions to resume.[/dim]")
+                    continue
+                elif cmd == "/quiz":
+                    quiz_prompt = (
+                        f"Generate a practice problem on '{topic}' at intermediate level. "
+                        f"Format: state the problem clearly, then say HINTS: followed by hints. "
+                        f"Do NOT give the solution."
+                    )
+                    messages.append({"role": "user", "content": quiz_prompt})
+                    with console.status("[cyan]Generating quiz...[/cyan]"):
+                        response = chat_completion(messages, model=model, config=config)
+                    messages.append({"role": "assistant", "content": response})
+                    console.print()
+                    console.print(Markdown(response))
+                    console.print()
+                    continue
+                elif cmd == "/progress":
+                    try:
+                        from codex_mentis.concepts.graph import ConceptGraph
+                        from codex_mentis.memory.user_graph import UserGraph
+                        from codex_mentis.cli.commands.onboard import load_profile
+                        
+                        profile = load_profile()
+                        cg = ConceptGraph()
+                        ug = UserGraph()
+                        
+                        console.print(f"[bold]📊 Progress Dashboard[/bold]\n")
+                        
+                        if profile:
+                            console.print(f"Level: {', '.join(f'{k}: {v}' for k, v in profile.get('levels', {}).items())}")
+                        
+                        console.print(f"Concepts in graph: {len(cg.graph)}")
+                        
+                        stats = ug.get_user_stats(profile.get("name", "default") if profile else "default")
+                        console.print(f"Topics studied: {stats['topics_studied']}")
+                        console.print(f"Concepts mastered: {stats['concepts_mastered']}")
+                        console.print(f"Total study time: {stats['total_hours']}h")
+                        
+                        # Knowledge gaps
+                        gaps = ug.get_knowledge_gaps(profile.get("name", "default") if profile else "default")
+                        if gaps:
+                            console.print(f"\n[yellow]Knowledge gaps ({len(gaps)}):[/yellow]")
+                            for g in gaps[:5]:
+                                console.print(f"  • {g['concept']} (needed for: {g['needed_for']})")
+                    except Exception as e:
+                        console.print(f"[dim]Progress unavailable: {e}[/dim]")
+                    continue
+                elif cmd == "/ingest":
+                    if arg:
+                        from codex_mentis.knowledge.base import KnowledgeBase
+                        from codex_mentis.knowledge.ingester import DocumentIngester
+                        from codex_mentis.knowledge.chunker import SmartChunker
+                        from pathlib import Path
+                        
+                        target = Path(arg.strip()).expanduser()
+                        if target.exists():
+                            kb = KnowledgeBase()
+                            ingester = DocumentIngester()
+                            chunker = SmartChunker()
+                            
+                            files = list(target.glob("**/*")) if target.is_dir() else [target]
+                            exts = {".pdf", ".md", ".txt", ".tex", ".ipynb", ".html"}
+                            files = [f for f in files if f.suffix.lower() in exts]
+                            
+                            count = 0
+                            for f in files[:10]:  # Limit to 10 files
+                                try:
+                                    text = ingester.extract_text(str(f))
+                                    if text and len(text) > 50:
+                                        chunks = chunker.chunk_text(text, source=str(f))
+                                        kb.add_document(str(f), f.stem, topic, chunks=chunks)
+                                        count += 1
+                                except Exception:
+                                    continue
+                            console.print(f"[green]✓ Ingested {count}/{len(files)} documents[/green]")
+                        else:
+                            console.print(f"[red]Path not found: {target}[/red]")
+                    else:
+                        console.print("[dim]Usage: /ingest <path>[/dim]")
+                    continue
+                elif cmd == "/latex":
+                    if arg:
+                        from codex_mentis.latex_render import latex_to_unicode, render_equation_box
+                        console.print(render_equation_box(arg))
+                    continue
                 elif cmd == "/help":
                     console.print(Panel(
-                        "[bold]Commands:[/bold]\n"
-                        "  /mode <mode>     Switch mode (study/explore/reason/verify)\n"
-                        "  /topic <name>    Change topic\n"
-                        "  /model <name>    Change model\n"
-                        "  /verify <expr>   Verify math with SymPy\n"
-                        "  /research <q>    Web research\n"
-                        "  /clear           Clear conversation\n"
-                        "  /quit            Exit\n\n"
-                        "[bold]Features:[/bold]\n"
-                        "  • RAG: Relevant docs are injected automatically\n"
-                        "  • Math verification: Equations checked with SymPy\n"
-                        "  • Concept tracking: Your progress is tracked\n"
-                        "  • Spaced repetition: Reviews scheduled automatically",
+                        "[bold]Chat Commands:[/bold]\n"
+                        "  /mode <mode>      Switch mode (study/explore/reason/verify)\n"
+                        "  /topic <name>     Change topic\n"
+                        "  /model <name>     Change model\n"
+                        "  /verify <expr>    Verify math with SymPy\n"
+                        "  /latex <expr>     Render LaTeX as Unicode\n"
+                        "  /quiz             Generate a practice problem\n"
+                        "  /progress         Show learning progress dashboard\n"
+                        "  /research <q>     Web research\n"
+                        "  /ingest <path>    Ingest documents into knowledge base\n"
+                        "  /save             Save current session\n"
+                        "  /sessions         List saved sessions\n"
+                        "  /resume [id]      Resume a saved session\n"
+                        "  /clear            Clear conversation\n"
+                        "  /quit             Exit\n\n"
+                        "[bold]CLI Commands:[/bold]\n"
+                        "  codex-mentis setup      Configure providers\n"
+                        "  codex-mentis onboard     Set up learning profile\n"
+                        "  codex-mentis doctor      System health check\n"
+                        "  codex-mentis review      Spaced repetition\n"
+                        "  codex-mentis profile     View knowledge map\n",
                         title="Help",
                         border_style="cyan",
                     ))

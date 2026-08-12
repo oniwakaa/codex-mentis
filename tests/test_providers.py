@@ -1,11 +1,11 @@
 import pytest
-from codex_mentis.agents.providers import (
+from pitagora.agents.providers import (
     create_provider,
     get_provider,
     FallbackProvider,
 )
-from codex_mentis.agents.providers.base import ProviderConfig
-from codex_mentis.agents.providers.openai import OpenAIProvider
+from pitagora.agents.providers.base import ProviderConfig
+from pitagora.agents.providers.openai import OpenAIProvider
 from tests.conftest import MockProvider
 
 

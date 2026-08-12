@@ -1,7 +1,7 @@
 import pytest
 import json
 from unittest.mock import MagicMock
-from codex_mentis.agents import ExplainerAgent
+from pitagora.agents import ExplainerAgent
 
 @pytest.mark.asyncio
 async def test_explainer_agent_difficulty_assessor(mock_provider):

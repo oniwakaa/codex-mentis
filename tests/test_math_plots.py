@@ -3,7 +3,7 @@ import os
 import matplotlib
 # Set matplotlib backend to Agg to prevent headless environment errors
 matplotlib.use('Agg')
-from codex_mentis.math_engine.plots import MathPlotter
+from pitagora.math_engine.plots import MathPlotter
 
 def test_plot_function(tmp_path):
     plotter = MathPlotter()

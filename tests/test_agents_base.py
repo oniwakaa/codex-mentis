@@ -1,8 +1,8 @@
 import pytest
 import asyncio
 from pydantic import BaseModel
-from codex_mentis.agents import BaseAgent, AgentResponse
-from codex_mentis.agents.base import validate_json_schema
+from pitagora.agents import BaseAgent, AgentResponse
+from pitagora.agents.base import validate_json_schema
 
 def test_agent_response_creation():
     resp = AgentResponse(content="Hello", confidence=0.8, metadata={"test": "yes"})

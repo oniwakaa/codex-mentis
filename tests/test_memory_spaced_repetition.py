@@ -1,6 +1,6 @@
 import pytest
 from datetime import date, timedelta
-from codex_mentis.memory.spaced_repetition import SpacedRepetition
+from pitagora.memory.spaced_repetition import SpacedRepetition
 
 def test_spaced_repetition_sm2_reps(temp_db):
     sr = SpacedRepetition(db_path=temp_db)

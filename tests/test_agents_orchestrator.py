@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch
-from codex_mentis.agents.orchestrator import Orchestrator, OrchestratorResponse
-from codex_mentis.agents.base import AgentResponse
+from pitagora.agents.orchestrator import Orchestrator, OrchestratorResponse
+from pitagora.agents.base import AgentResponse
 
 
 class MockAgent:
@@ -77,7 +77,7 @@ def test_orchestrator_derive_verify_plot():
 
 def test_orchestrate_standalone():
     """Test the standalone orchestrate function with a mocked provider."""
-    from codex_mentis.agents.orchestrator import orchestrate
+    from pitagora.agents.orchestrator import orchestrate
     from tests.conftest import MockProvider
     
     mock_prov = MockProvider()
@@ -87,7 +87,7 @@ def test_orchestrate_standalone():
         "usage": {"prompt_tokens": 5, "completion_tokens": 5}
     })
     
-    with patch("codex_mentis.agents.providers.get_provider", return_value=mock_prov):
+    with patch("pitagora.agents.providers.get_provider", return_value=mock_prov):
         res = orchestrate(query="Solve algebra", mode="explore", topic="algebra")
     
     assert isinstance(res, str)

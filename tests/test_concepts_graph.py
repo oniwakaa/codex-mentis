@@ -1,6 +1,6 @@
 import pytest
 import os
-from codex_mentis.concepts.graph import ConceptGraph
+from pitagora.concepts.graph import ConceptGraph
 
 def test_concept_graph_load_seed(temp_yaml):
     # Using temp_yaml will load the custom structure written by fixture

@@ -1,8 +1,8 @@
 import pytest
 import os
 import tempfile
-from codex_mentis.skills.engine import SkillsEngine, Skill
-from codex_mentis.skills.evolution import SkillEvolution
+from pitagora.skills.engine import SkillsEngine, Skill
+from pitagora.skills.evolution import SkillEvolution
 
 def test_skills_engine_basic():
     engine = SkillsEngine()

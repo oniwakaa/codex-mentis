@@ -1,13 +1,13 @@
-# 🧠 Codex Mentis
+# 🧠 Pitagora
 
 > **Latin: "Book of the Mind"** — An AI-powered CLI for studying, exploring, and reasoning through complex mathematics and physics.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## ✨ What is Codex Mentis?
+## ✨ What is Pitagora?
 
-Codex Mentis is not just another AI chatbot wrapper. It's a **multi-agent reasoning system** designed specifically for learning and exploring mathematics and physics. It features:
+Pitagora is not just another AI chatbot wrapper. It's a **multi-agent reasoning system** designed specifically for learning and exploring mathematics and physics. It features:
 
 - **🎯 Specialized AI Agents** — Tutor (Socratic teaching), Researcher (deep dives), Prover (formal derivations), Reviewer (adversarial verification), Explainer (multi-level explanations), and Self-Improver (learns what works for YOU)
 - **📐 SymPy Sandbox** — Every mathematical claim is verified computationally in an isolated sandbox
@@ -23,35 +23,35 @@ Codex Mentis is not just another AI chatbot wrapper. It's a **multi-agent reason
 
 ```bash
 # Install from PyPI
-pip install codex-mentis
+pip install pitagora
 
 # With all features (embeddings, MCP, web scraping)
-pip install codex-mentis[all]
+pip install pitagora[all]
 
 # Or with pipx for isolated install
-pipx install codex-mentis
+pipx install pitagora
 ```
 
 ### Quick Start
 
 ```bash
 # Launch the interactive TUI (default)
-codex-mentis
+pitagora
 
 # Or use the short alias
 cm
 
 # Simple readline mode (no TUI)
-codex-mentis --simple
+pitagora --simple
 
 # Direct commands
-codex-mentis study "Lagrangian mechanics"
-codex-mentis explore "What happens if gravity was 2x?"
-codex-mentis derive "Euler-Lagrange equation from principle of least action"
-codex-mentis verify "The eigenvalues of a Hermitian matrix are real"
-codex-mentis explain "Riemann hypothesis" --level beginner
-codex-mentis plot "sin(x) * e^(-x)" --range 0 10
-codex-mentis concept map "quantum mechanics"
+pitagora study "Lagrangian mechanics"
+pitagora explore "What happens if gravity was 2x?"
+pitagora derive "Euler-Lagrange equation from principle of least action"
+pitagora verify "The eigenvalues of a Hermitian matrix are real"
+pitagora explain "Riemann hypothesis" --level beginner
+pitagora plot "sin(x) * e^(-x)" --range 0 10
+pitagora concept map "quantum mechanics"
 ```
 
 ## 🤖 Agents
@@ -81,7 +81,7 @@ Terminal plots, interactive concept maps, proof trees, and equation rendering.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                    Codex Mentis CLI / TUI                       │
+│                    Pitagora CLI / TUI                       │
 ├────────────┬────────────┬────────────┬────────────────────────┤
 │  Study     │  Explore   │  Reason    │  Verify │  Visualize   │
 ├────────────┴────────────┴────────────┴────────────────────────┤
@@ -104,7 +104,7 @@ Terminal plots, interactive concept maps, proof trees, and equation rendering.
 ## ⚙️ Configuration
 
 ```yaml
-# ~/.codex-mentis/config.yaml
+# ~/.pitagora/config.yaml
 providers:
   default: gemini           # General tasks
   reasoning: openai         # Complex proofs
@@ -158,19 +158,19 @@ Run any topic through parallel agents: technical derivation on the left, plain E
 
 ```bash
 # Study with Socratic guidance
-$ codex-mentis study "Euler-Lagrange equation"
+$ pitagora study "Euler-Lagrange equation"
 > Tutor: Let's start with the principle of least action. What do you 
 > think "least action" physically means? Why would nature prefer a 
 > path that minimizes (or extremizes) a quantity?
 
 # Verify a claim  
-$ codex-mentis verify "Every continuous function is differentiable"
+$ pitagora verify "Every continuous function is differentiable"
 > Reviewer: VERDICT: REFUTED (Confidence: 0.99)
 > Counterexample: f(x) = |x| is continuous everywhere but not 
 > differentiable at x=0.
 
 # Side-by-side derivation
-$ codex-mentis derive "Schrödinger equation from de Broglie hypothesis"
+$ pitagora derive "Schrödinger equation from de Broglie hypothesis"
 > ┌─────────────────────────┬──────────────────────────────┐
 > │ TECHNICAL DERIVATION    │ INTUITION                    │
 > │                         │                              │

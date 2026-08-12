@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime
-from codex_mentis.core.models import (
+from pitagora.core.models import (
     Message,
     Conversation,
     Concept,

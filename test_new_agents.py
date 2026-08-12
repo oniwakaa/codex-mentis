@@ -6,9 +6,9 @@ import unittest
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 
-from codex_mentis.agents import BaseAgent, AgentResponse, ExplainerAgent, SelfImproverAgent, Orchestrator
-from codex_mentis.agents.providers.base import BaseProvider, ProviderConfig
-from codex_mentis.agents.providers import create_provider, get_provider, FallbackProvider
+from pitagora.agents import BaseAgent, AgentResponse, ExplainerAgent, SelfImproverAgent, Orchestrator
+from pitagora.agents.providers.base import BaseProvider, ProviderConfig
+from pitagora.agents.providers import create_provider, get_provider, FallbackProvider
 
 class MockProvider(BaseProvider):
     def __init__(self, config: Optional[ProviderConfig] = None):
@@ -228,7 +228,7 @@ class TestCodexMentisAgents(unittest.TestCase):
         self.assertIn("Prover derivation output", res.content)
 
     def test_knowledge_graph(self):
-        from codex_mentis.memory.knowledge_graph import KnowledgeGraph, EntityNode, Relationship
+        from pitagora.memory.knowledge_graph import KnowledgeGraph, EntityNode, Relationship
         db_file = "/tmp/test_kg.db"
         if os.path.exists(db_file):
             os.remove(db_file)
@@ -299,7 +299,7 @@ class TestCodexMentisAgents(unittest.TestCase):
                 os.remove(db_file)
 
     def test_knowledge_graph_remember_recall(self):
-        from codex_mentis.memory.knowledge_graph import KnowledgeGraph
+        from pitagora.memory.knowledge_graph import KnowledgeGraph
         db_file = "/tmp/test_kg_rr.db"
         if os.path.exists(db_file):
             os.remove(db_file)
@@ -328,7 +328,7 @@ class TestCodexMentisAgents(unittest.TestCase):
                 os.remove(db_file)
 
     def test_workflow_engine(self):
-        from codex_mentis.agents.workflows import WorkflowEngine, WorkflowStep, WorkflowDefinition
+        from pitagora.agents.workflows import WorkflowEngine, WorkflowStep, WorkflowDefinition
         
         tutor = BaseAgent("tutor", "Tutor", self.prov, "Tutor prompt")
         researcher = BaseAgent("researcher", "Researcher", self.prov, "Researcher prompt")
@@ -365,7 +365,7 @@ class TestCodexMentisAgents(unittest.TestCase):
         self.assertEqual(res["final_output"], "Final synthesized master report")
 
     def test_debate_agent(self):
-        from codex_mentis.agents.debate import DebateAgent
+        from pitagora.agents.debate import DebateAgent
         prover = BaseAgent("prover", "Prover", self.prov, "Prover prompt")
         reviewer = BaseAgent("reviewer", "Reviewer", self.prov, "Reviewer prompt")
         debate_mgr = DebateAgent(self.prov)
@@ -398,7 +398,7 @@ class TestCodexMentisAgents(unittest.TestCase):
         self.assertIn("Prover Opening statement", res["transcript"][0]["content"])
 
     def test_reasoning_chain(self):
-        from codex_mentis.agents.chain_of_thought import ReasoningChain
+        from pitagora.agents.chain_of_thought import ReasoningChain
         prover = BaseAgent("prover", "Prover", self.prov, "Prover prompt")
         reviewer = BaseAgent("reviewer", "Reviewer", self.prov, "Reviewer prompt")
         

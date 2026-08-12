@@ -4,21 +4,21 @@ import sys
 # Ensure project root is in path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-from codex_mentis.concepts.graph import ConceptGraph
-from codex_mentis.concepts.tracker import MasteryTracker
-from codex_mentis.concepts.curriculum import CurriculumGenerator
-from codex_mentis.memory.store import MemoryStore
-from codex_mentis.memory.layers import ThreeLayerMemory
-from codex_mentis.memory.spaced_repetition import SpacedRepetition
-from codex_mentis.agents.providers import ProviderConfig, get_provider
-from codex_mentis.agents import TutorAgent, ResearchAgent, ProverAgent, ReviewerAgent, VisualizerAgent
-from codex_mentis.agents.orchestrator import Orchestrator
+from pitagora.concepts.graph import ConceptGraph
+from pitagora.concepts.tracker import MasteryTracker
+from pitagora.concepts.curriculum import CurriculumGenerator
+from pitagora.memory.store import MemoryStore
+from pitagora.memory.layers import ThreeLayerMemory
+from pitagora.memory.spaced_repetition import SpacedRepetition
+from pitagora.agents.providers import ProviderConfig, get_provider
+from pitagora.agents import TutorAgent, ResearchAgent, ProverAgent, ReviewerAgent, VisualizerAgent
+from pitagora.agents.orchestrator import Orchestrator
 
 def main():
     print("--- STARTING END-TO-END VALIDATION ---")
     
     # Use temporary locations for safety
-    test_db = "/tmp/test_codex_mentis.db"
+    test_db = "/tmp/test_pitagora.db"
     test_yaml = "/tmp/test_concepts.yaml"
     if os.path.exists(test_db):
         os.remove(test_db)

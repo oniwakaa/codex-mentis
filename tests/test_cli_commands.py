@@ -1,7 +1,7 @@
 """Tests for the doctor and review commands."""
 import pytest
 from typer.testing import CliRunner
-from codex_mentis.cli.app import app
+from pitagora.cli.app import app
 
 runner = CliRunner()
 

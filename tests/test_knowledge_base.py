@@ -1,6 +1,6 @@
 import pytest
 import os
-from codex_mentis.knowledge.base import KnowledgeBase
+from pitagora.knowledge.base import KnowledgeBase
 
 def test_knowledge_base_crud(temp_db):
     kb = KnowledgeBase(db_path=temp_db)

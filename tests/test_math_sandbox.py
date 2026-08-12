@@ -1,5 +1,5 @@
 import pytest
-from codex_mentis.math_engine.sandbox import SymPySandbox
+from pitagora.math_engine.sandbox import SymPySandbox
 
 def test_sandbox_evaluate():
     sandbox = SymPySandbox()

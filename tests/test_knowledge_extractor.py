@@ -1,5 +1,5 @@
 import pytest
-from codex_mentis.knowledge.extractor import KnowledgeExtractor
+from pitagora.knowledge.extractor import KnowledgeExtractor
 
 def test_knowledge_extractor_with_real_math():
     extractor = KnowledgeExtractor()

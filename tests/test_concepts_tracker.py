@@ -2,8 +2,8 @@ import pytest
 import math
 import datetime
 from unittest.mock import MagicMock
-from codex_mentis.concepts.tracker import MasteryTracker
-from codex_mentis.concepts.graph import ConceptGraph
+from pitagora.concepts.tracker import MasteryTracker
+from pitagora.concepts.graph import ConceptGraph
 
 @pytest.fixture
 def dummy_graph(temp_yaml):

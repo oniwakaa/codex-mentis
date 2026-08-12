@@ -1,5 +1,5 @@
 import pytest
-from codex_mentis.knowledge.chunker import SmartChunker
+from pitagora.knowledge.chunker import SmartChunker
 
 def test_smart_chunker_basic():
     chunker = SmartChunker(max_chunk_size=100, min_chunk_size=10, overlap=10)

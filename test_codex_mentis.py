@@ -6,16 +6,16 @@ PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_ROOT)
 
 def run_tests():
-    print("Starting Codex Mentis integration test...")
+    print("Starting Pitagora integration test...")
     print("=" * 60)
 
     # 1. Test Math Engine imports and basic operations
     print("\n[1/4] Testing Math Engine...")
-    from codex_mentis.math_engine.sandbox import SymPySandbox
-    from codex_mentis.math_engine.symbolic import SymbolicMath
-    from codex_mentis.math_engine.numerical import NumericalMath
-    from codex_mentis.math_engine.verification import MathVerifier
-    from codex_mentis.math_engine.latex_render import LatexRenderer
+    from pitagora.math_engine.sandbox import SymPySandbox
+    from pitagora.math_engine.symbolic import SymbolicMath
+    from pitagora.math_engine.numerical import NumericalMath
+    from pitagora.math_engine.verification import MathVerifier
+    from pitagora.math_engine.latex_render import LatexRenderer
     
     sandbox = SymPySandbox()
     res_eval = sandbox.evaluate("x**2 + 2*x + 1")
@@ -54,9 +54,9 @@ def run_tests():
 
     # 2. Test Knowledge Base
     print("\n[2/4] Testing Knowledge Base...")
-    from codex_mentis.knowledge.chunker import SmartChunker
-    from codex_mentis.knowledge.embeddings import EmbeddingEngine
-    from codex_mentis.knowledge.base import KnowledgeBase
+    from pitagora.knowledge.chunker import SmartChunker
+    from pitagora.knowledge.embeddings import EmbeddingEngine
+    from pitagora.knowledge.base import KnowledgeBase
     
     chunker = SmartChunker()
     test_text = """
@@ -105,8 +105,8 @@ QED
 
     # 3. Test Skills
     print("\n[3/4] Testing Skills Engine...")
-    from codex_mentis.skills.engine import SkillsEngine
-    from codex_mentis.skills.evolution import SkillEvolution
+    from pitagora.skills.engine import SkillsEngine
+    from pitagora.skills.evolution import SkillEvolution
     
     engine = SkillsEngine()
     skills = engine.list_skills()
@@ -138,9 +138,9 @@ QED
 
     # 4. Test MCP Integrations
     print("\n[4/4] Testing MCP Integrations...")
-    from codex_mentis.mcp_integration.evermemos import EverMemOSIntegration
-    from codex_mentis.mcp_integration.obsidian import ObsidianIntegration
-    from codex_mentis.mcp_integration.remarkable import RemarkableIntegration
+    from pitagora.mcp_integration.evermemos import EverMemOSIntegration
+    from pitagora.mcp_integration.obsidian import ObsidianIntegration
+    from pitagora.mcp_integration.remarkable import RemarkableIntegration
 
     evermemos = EverMemOSIntegration(local_db_path="test_evermemos.db")
     evermemos.save_memory("Remember to study quantum mechanics", "physics")

@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from codex_mentis.knowledge.acquisition import KnowledgeAcquisition
+from pitagora.knowledge.acquisition import KnowledgeAcquisition
 
 def test_knowledge_acquisition_research_topic():
     # Setup mock KB and CG

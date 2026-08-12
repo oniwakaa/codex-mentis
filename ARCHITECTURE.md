@@ -1,7 +1,7 @@
-# Codex Mentis — Architecture
+# Pitagora — Architecture
 
 ## Name
-**Codex Mentis** (Latin: "Book of the Mind") — a CLI for studying, exploring, and reasoning through complex mathematics and physics.
+**Pitagora** (Latin: "Book of the Mind") — a CLI for studying, exploring, and reasoning through complex mathematics and physics.
 
 ## Design Principles
 1. **CLI-native** — beautiful terminal UI, no browser required
@@ -25,7 +25,7 @@
 
 ## Knowledge Acquisition (Key Differentiator)
 
-Instead of hardcoded knowledge, Codex Mentis **discovers** it:
+Instead of hardcoded knowledge, Pitagora **discovers** it:
 
 ```
 User Query → Intent Classification
@@ -54,7 +54,7 @@ User Query → Intent Classification
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                    Codex Mentis CLI / TUI                       │
+│                    Pitagora CLI / TUI                       │
 ├──────────┬──────────┬──────────┬──────────┬──────────────────┤
 │  Study   │  Explore │  Reason  │  Verify  │  Visualize       │
 ├──────────┴──────────┴──────────┴──────────┴──────────────────┤
@@ -80,7 +80,7 @@ User Query → Intent Classification
 ## Module Structure
 
 ```
-codex_mentis/
+pitagora/
 ├── __init__.py
 ├── __main__.py
 ├── cli/
@@ -195,7 +195,7 @@ Each agent is a specialized LLM call with:
 ## Configuration
 
 ```yaml
-# ~/.codex-mentis/config.yaml
+# ~/.pitagora/config.yaml
 providers:
   default: gemini
   reasoning: openai
@@ -226,20 +226,20 @@ ui:
 ## Installation
 
 ```bash
-pip install codex-mentis[all]
+pip install pitagora[all]
 # or minimal (no embeddings, no MCP):
-pip install codex-mentis
+pip install pitagora
 ```
 
 ## Usage
 
 ```bash
-codex-mentis                              # Launch TUI
-codex-mentis study "Lagrangian mechanics" # Socratic study session
-codex-mentis explore "What if gravity 2x?"
-codex-mentis derive "Euler-Lagrange from least action"
-codex-mentis verify "Hermitian eigenvalues are real"
-codex-mentis research "topological insulators" --depth deep  # Web research!
-codex-mentis plot "sin(x) * e^(-x)" --range 0 10
-codex-mentis concept map "quantum mechanics"
+pitagora                              # Launch TUI
+pitagora study "Lagrangian mechanics" # Socratic study session
+pitagora explore "What if gravity 2x?"
+pitagora derive "Euler-Lagrange from least action"
+pitagora verify "Hermitian eigenvalues are real"
+pitagora research "topological insulators" --depth deep  # Web research!
+pitagora plot "sin(x) * e^(-x)" --range 0 10
+pitagora concept map "quantum mechanics"
 ```

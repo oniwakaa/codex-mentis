@@ -1,8 +1,8 @@
 import pytest
 from typer.testing import CliRunner
 from unittest.mock import MagicMock, patch
-from codex_mentis.cli.app import app
-from codex_mentis.agents.base import AgentResponse
+from pitagora.cli.app import app
+from pitagora.agents.base import AgentResponse
 
 @pytest.fixture
 def runner():
@@ -17,27 +17,27 @@ def test_cli_research_command(runner):
         "citations": [{"title": "Source 1", "url": "https://url1.com"}]
     }
     
-    with patch("codex_mentis.knowledge.acquisition.KnowledgeAcquisition.research_topic", return_value=mock_findings):
+    with patch("pitagora.knowledge.acquisition.KnowledgeAcquisition.research_topic", return_value=mock_findings):
         result = runner.invoke(app, ["research", "quantum gravity", "--depth", "shallow"])
         assert result.exit_code == 0
         assert "Research Results: quantum gravity" in result.stdout
         assert "Finding 1" in result.stdout
 
 def test_cli_explain_command(runner):
-    with patch("codex_mentis.chat.chat_completion", return_value="Feynman explanation text"):
+    with patch("pitagora.chat.chat_completion", return_value="Feynman explanation text"):
         result = runner.invoke(app, ["explain", "General Relativity", "--level", "beginner"])
         assert result.exit_code == 0
         assert "Feynman explanation text" in result.stdout
 
 def test_cli_debate_command(runner):
-    with patch("codex_mentis.chat.chat_completion", return_value="Mocked debate response"):
+    with patch("pitagora.chat.chat_completion", return_value="Mocked debate response"):
         result = runner.invoke(app, ["debate", "Lagrangian mechanics", "--rounds", "1"])
         assert result.exit_code == 0
         assert "Debate" in result.stdout or "Lagrangian" in result.stdout
 
 def test_cli_study_command(runner):
-    with patch("codex_mentis.cli.commands.study.check_prerequisites", return_value=["Algebra"]), \
-         patch("codex_mentis.cli.commands.study.launch_repl") as mock_repl:
+    with patch("pitagora.cli.commands.study.check_prerequisites", return_value=["Algebra"]), \
+         patch("pitagora.cli.commands.study.launch_repl") as mock_repl:
         result = runner.invoke(app, ["study", "Calculus"])
         assert result.exit_code == 0
         assert "Prerequisite concepts identified: Algebra" in result.stdout

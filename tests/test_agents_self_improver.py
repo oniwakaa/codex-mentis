@@ -1,7 +1,7 @@
 import pytest
 import json
 import os
-from codex_mentis.agents import SelfImproverAgent
+from pitagora.agents import SelfImproverAgent
 
 def test_self_improver_init_db(temp_db, mock_provider):
     improver = SelfImproverAgent(mock_provider, db_path=temp_db)

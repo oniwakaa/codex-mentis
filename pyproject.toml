@@ -1,5 +1,5 @@
 [project]
-name = "codex-mentis"
+name = "pitagora"
 version = "0.2.0"
 description = "An AI-powered CLI for studying, exploring, and reasoning through complex mathematics and physics. Multi-agent architecture with specialized tutor, researcher, prover, reviewer, explainer, and self-improving agents."
 readme = "README.md"
@@ -60,14 +60,13 @@ dev = [
 ]
 
 [project.scripts]
-codex-mentis = "codex_mentis.cli.app:app"
-cm = "codex_mentis.cli.app:app"
+pitagora = "pitagora.cli.app:app"
 
 [project.urls]
-Homepage = "https://github.com/nousresearch/codex-mentis"
-Repository = "https://github.com/nousresearch/codex-mentis"
-Documentation = "https://github.com/nousresearch/codex-mentis#readme"
-Issues = "https://github.com/nousresearch/codex-mentis/issues"
+Homepage = "https://github.com/oniwakaa/pitagora"
+Repository = "https://github.com/oniwakaa/pitagora"
+Documentation = "https://github.com/oniwakaa/pitagora#readme"
+Issues = "https://github.com/oniwakaa/pitagora/issues"
 
 [build-system]
 requires = ["setuptools>=61.0.0", "wheel"]
@@ -75,10 +74,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["codex_mentis*"]
+include = ["pitagora*"]
 
 [tool.setuptools.package-data]
-codex_mentis = ["data/*.yaml", "skills/builtin/*.yaml"]
+pitagora = ["data/*.yaml", "skills/builtin/*.yaml"]
 
 [tool.black]
 line-length = 100

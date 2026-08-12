@@ -4,7 +4,7 @@ import pytest
 import os
 import shutil
 from typing import List, Dict, Any, Optional, AsyncIterator, Iterator
-from codex_mentis.agents.providers.base import BaseProvider, ProviderConfig
+from pitagora.agents.providers.base import BaseProvider, ProviderConfig
 
 class MockProvider(BaseProvider):
     def __init__(self, config: Optional[ProviderConfig] = None):
@@ -54,7 +54,7 @@ def mock_provider():
 
 @pytest.fixture
 def temp_db(tmp_path):
-    db_file = tmp_path / "test_codex_mentis.db"
+    db_file = tmp_path / "test_pitagora.db"
     return str(db_file)
 
 @pytest.fixture

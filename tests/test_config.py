@@ -2,18 +2,18 @@ import pytest
 import os
 import yaml
 from pathlib import Path
-from codex_mentis.core import config as core_config
-from codex_mentis.core.config import (
+from pitagora.core import config as core_config
+from pitagora.core.config import (
     get_default_config,
     load_config,
     save_config,
-    CodexMentisConfig
+    PitagoraConfig
 )
 
 @pytest.fixture(autouse=True)
 def mock_config_paths(tmp_path, monkeypatch):
     # Override CONFIG_DIR and CONFIG_PATH in core_config
-    mock_dir = tmp_path / ".codex-mentis"
+    mock_dir = tmp_path / ".pitagora"
     mock_path = mock_dir / "config.yaml"
     
     monkeypatch.setattr(core_config, "CONFIG_DIR", mock_dir)

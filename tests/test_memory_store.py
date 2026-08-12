@@ -2,8 +2,8 @@ import pytest
 import os
 import json
 from datetime import datetime
-from codex_mentis.memory.store import MemoryStore, cosine_similarity
-from codex_mentis.core.models import MemoryEntry
+from pitagora.memory.store import MemoryStore, cosine_similarity
+from pitagora.core.models import MemoryEntry
 from tests.conftest import MockProvider
 
 def test_cosine_similarity():

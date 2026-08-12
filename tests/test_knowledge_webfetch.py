@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from codex_mentis.knowledge.webfetch_bridge import WebfetchBridge
+from pitagora.knowledge.webfetch_bridge import WebfetchBridge
 
 def test_webfetch_bridge_is_available():
     bridge = WebfetchBridge()

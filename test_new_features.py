@@ -5,16 +5,16 @@ import datetime
 # Ensure project root is in path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-from codex_mentis.core.models import MemoryEntry, ReviewCard, ConceptMastery, SkillPerformance, CurriculumPlan, Skill as LegacySkill
-from codex_mentis.memory.store import MemoryStore
-from codex_mentis.memory.layers import ThreeLayerMemory
-from codex_mentis.memory.retrieval import MemoryRetriever
-from codex_mentis.memory.spaced_repetition import SpacedRepetition
-from codex_mentis.concepts.graph import ConceptGraph
-from codex_mentis.concepts.tracker import MasteryTracker
-from codex_mentis.concepts.curriculum import CurriculumGenerator
-from codex_mentis.skills.engine import SkillsEngine, Skill
-from codex_mentis.skills.evolution import SkillEvolution
+from pitagora.core.models import MemoryEntry, ReviewCard, ConceptMastery, SkillPerformance, CurriculumPlan, Skill as LegacySkill
+from pitagora.memory.store import MemoryStore
+from pitagora.memory.layers import ThreeLayerMemory
+from pitagora.memory.retrieval import MemoryRetriever
+from pitagora.memory.spaced_repetition import SpacedRepetition
+from pitagora.concepts.graph import ConceptGraph
+from pitagora.concepts.tracker import MasteryTracker
+from pitagora.concepts.curriculum import CurriculumGenerator
+from pitagora.skills.engine import SkillsEngine, Skill
+from pitagora.skills.evolution import SkillEvolution
 
 def test_all():
     print("--- STARTING NEW FEATURES VALIDATION ---")

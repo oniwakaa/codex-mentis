@@ -1,10 +1,9 @@
 from collections import deque
 from typing import Dict, Any, List, Optional
-from codex_mentis.agents.providers.base import BaseProvider
 from codex_mentis.memory.store import MemoryStore
 
 class ThreeLayerMemory:
-    def __init__(self, store: MemoryStore, provider: Optional[BaseProvider] = None):
+    def __init__(self, store: MemoryStore, provider: Optional[Any] = None, l1_max_len: int = 15):
         """
         Manages the 3-Layer Memory System:
           - L1 (Session): Ephemeral rolling queue of recent message exchanges
@@ -13,13 +12,15 @@ class ThreeLayerMemory:
         """
         self.store = store
         self.provider = provider
-        self.l1: deque = deque(maxlen=15)
+        self.l1_max_len = l1_max_len
+        self.l1: deque = deque(maxlen=l1_max_len)
         self.current_conversation_id: Optional[str] = None
 
     def add_message(self, message: Dict[str, str], conversation_id: Optional[str] = None):
         """
         Adds a message {"role": "...", "content": "..."} to L1, and optionally saves
         the full conversation session to the DB.
+        Additionally, triggers automatic L1 consolidation if the queue grows too long.
         """
         self.l1.append(message)
         if conversation_id:
@@ -30,9 +31,59 @@ class ThreeLayerMemory:
             # Use topic from first message or default
             topic = "General"
             if len(history) > 0:
-                # Truncate first message to get a topic suggestion
                 topic = history[0].get("content", "General")[:30]
             self.store.save_conversation(conversation_id, topic, history)
+            
+        # Automatic consolidation check
+        if len(self.l1) >= self.l1_max_len:
+            self.consolidate(topic=conversation_id or "General")
+
+    def end_session(self, topic: str) -> str:
+        """
+        Promotes the L1 conversation trace to L2 by summarizing it,
+        and resets the L1 ephemeral memory.
+        """
+        summary = self.summarize_session(topic)
+        self.l1.clear()
+        return summary
+
+    def consolidate(self, topic: str) -> str:
+        """
+        Compresses/consolidates older L1 messages into L2 summaries,
+        retaining only the most recent messages in L1.
+        """
+        if len(self.l1) < 5:
+            return "Too few messages in session to consolidate."
+            
+        # Separate the oldest messages to consolidate
+        to_consolidate = list(self.l1)[:-5]
+        # Keep the latest 5 in L1
+        latest_msgs = list(self.l1)[-5:]
+        self.l1.clear()
+        self.l1.extend(latest_msgs)
+        
+        chat_history = "\n".join([f"{msg['role'].upper()}: {msg['content']}" for msg in to_consolidate])
+        prompt = (
+            f"Below is a segment of a chat session on the topic of '{topic}'. "
+            f"Consolidate this segment by summarizing the key concepts, equations (in LaTeX), "
+            f"and explanations. Keep it concise but accurate:\n\n"
+            f"{chat_history}"
+        )
+        
+        summary = ""
+        if self.provider:
+            try:
+                resp = self.provider.complete([{"role": "user", "content": prompt}])
+                summary = resp.get("content", "")
+            except Exception as e:
+                summary = f"Error during consolidation: {str(e)}"
+                
+        if not summary:
+            summary = f"Consolidated summary of {len(to_consolidate)} messages on {topic}."
+            
+        # Save to L2 topic memory
+        self.store.save(layer="L2", content=summary, topic=topic)
+        return summary
 
     def summarize_session(self, topic: str) -> str:
         """
@@ -59,7 +110,6 @@ class ThreeLayerMemory:
                 summary = f"Error generating summary: {str(e)}"
         
         if not summary:
-            # Fallback simple description
             summary = f"Summary of session about {topic} containing {len(self.l1)} messages."
 
         # Save to L2 topic memory

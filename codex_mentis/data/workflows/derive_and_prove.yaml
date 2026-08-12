@@ -1,0 +1,80 @@
+# Derive and Prove Workflow
+# Mathematical derivation with formal verification and adversarial review
+name: derive_and_prove
+description: >
+  Generate a mathematical derivation, verify it computationally with SymPy,
+  have it reviewed adversarially, fix any errors, and visualize the result.
+
+inputs:
+  - name: problem
+    description: The mathematical problem to solve
+    required: true
+  - name: domain
+    description: Mathematical domain (algebra, calculus, physics, etc.)
+    default: mathematics
+
+steps:
+  - id: derive
+    agent: prover
+    prompt: |
+      Derive a step-by-step solution for the following problem:
+      {{ problem }}
+      
+      Show each mathematical transformation clearly.
+      Define all variables. Use correct LaTeX notation.
+      Use SymPy to verify algebraic steps along the way.
+    tools: [sympy_verify]
+    outputs: [derivation, equations]
+
+  - id: review
+    agent: reviewer
+    prompt: |
+      Adversarially review the following mathematical derivation.
+      Check each step for correctness. Test edge cases.
+      Write SymPy code to verify the algebra.
+      
+      Derivation: {{ derive.outputs.derivation }}
+    inputs_from: [derive]
+    tools: [sympy_evaluate]
+    outputs: [verdict, critique, errors_found]
+
+  - id: revise
+    agent: prover
+    prompt: |
+      The derivation has been reviewed. Fix any errors found.
+      
+      Original derivation: {{ derive.outputs.derivation }}
+      Review critique: {{ review.outputs.critique }}
+      Errors found: {{ review.outputs.errors_found }}
+      
+      Produce a corrected derivation. Re-verify with SymPy.
+    inputs_from: [derive, review]
+    tools: [sympy_verify]
+    condition: "{{ review.outputs.verdict }} != CONFIRMED"
+    outputs: [corrected_derivation]
+
+  - id: visualize
+    agent: visualizer
+    prompt: |
+      Visualize the result of the derivation.
+      Plot any functions involved. Create a concept map of the mathematical
+      concepts used. Render key equations in terminal-friendly format.
+      
+      Derivation: {{ revise.outputs.corrected_derivation | default: derive.outputs.derivation }}
+    inputs_from: [derive, revise]
+    outputs: [plot, equation_display]
+
+  - id: explain
+    agent: explainer
+    prompt: |
+      Provide a side-by-side explanation of the derivation:
+      - Technical side: the formal derivation with all steps
+      - Intuition side: plain English explanation of what's happening
+      
+      Derivation: {{ revise.outputs.corrected_derivation | default: derive.outputs.derivation }}
+    inputs_from: [derive, revise]
+    outputs: [technical_explanation, intuition_explanation]
+
+merge_strategy: combine
+parallel_groups:
+  - [visualize, explain]  # These can run in parallel

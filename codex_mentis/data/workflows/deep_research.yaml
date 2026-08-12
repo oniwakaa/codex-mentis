@@ -1,0 +1,66 @@
+# Deep Research Workflow
+# Research a topic end-to-end with web search, extraction, verification, and synthesis
+name: deep_research
+description: >
+  Comprehensive research pipeline: search the web, extract knowledge from
+  papers/articles, verify claims, and synthesize into a cited report.
+  
+inputs:
+  - name: topic
+    description: The topic to research
+    required: true
+  - name: depth
+    description: Research depth (shallow, medium, deep)
+    default: medium
+  - name: max_sources
+    description: Maximum number of sources to crawl
+    default: 5
+
+steps:
+  - id: search
+    agent: researcher
+    prompt: |
+      Research the topic: {{ topic }}
+      Use web search to find relevant papers, articles, and resources.
+      Focus on academic sources and primary literature.
+      Depth: {{ depth }}
+    tools: [web_search, kb_retrieve]
+    outputs: [sources, initial_findings]
+
+  - id: extract
+    agent: researcher
+    prompt: |
+      Extract key knowledge from the discovered sources.
+      Focus on equations, definitions, theorems, and key claims.
+      Source material: {{ search.outputs.initial_findings }}
+    inputs_from: [search]
+    tools: [kb_retrieve]
+    outputs: [equations, concepts, key_points]
+
+  - id: verify
+    agent: reviewer
+    prompt: |
+      Verify the key claims and equations extracted from the research.
+      Check for mathematical correctness using SymPy.
+      Flag any claims that seem dubious or need more evidence.
+      Claims to verify: {{ extract.outputs.key_points }}
+    inputs_from: [extract]
+    tools: [sympy_evaluate]
+    outputs: [verified_claims, flagged_claims]
+
+  - id: synthesize
+    agent: tutor
+    prompt: |
+      Synthesize the verified research into a comprehensive, well-structured report.
+      Include all verified equations with proper LaTeX formatting.
+      Cite all sources with their URLs.
+      Note any flagged claims that couldn't be fully verified.
+      
+      Verified findings: {{ verify.outputs.verified_claims }}
+      Flagged findings: {{ verify.outputs.flagged_claims }}
+      Concepts discovered: {{ extract.outputs.concepts }}
+      Sources: {{ search.outputs.sources }}
+    inputs_from: [verify, extract, search]
+    outputs: [report]
+
+merge_strategy: last  # Use output of final step

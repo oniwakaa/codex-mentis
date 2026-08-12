@@ -227,5 +227,204 @@ class TestCodexMentisAgents(unittest.TestCase):
         self.assertIn("Tutor explanation output", res.content)
         self.assertIn("Prover derivation output", res.content)
 
+    def test_knowledge_graph(self):
+        from codex_mentis.memory.knowledge_graph import KnowledgeGraph, EntityNode, Relationship
+        db_file = "/tmp/test_kg.db"
+        if os.path.exists(db_file):
+            os.remove(db_file)
+        kg = KnowledgeGraph(db_path=db_file)
+        
+        try:
+            # 1. Add entity
+            e1_id = kg.add_entity("Lagrangian Mechanics", "Concept", {"difficulty": "challenging"})
+            e2_id = kg.add_entity("Action Principle", "Concept", {"difficulty": "moderate"})
+            
+            self.assertEqual(e1_id, "lagrangian_mechanics")
+            self.assertEqual(e2_id, "action_principle")
+            
+            # 2. Find entity
+            e1 = kg.find_entity("Lagrangian Mechanics")
+            self.assertIsNotNone(e1)
+            self.assertEqual(e1.name, "Lagrangian Mechanics")
+            self.assertEqual(e1.properties["difficulty"], "challenging")
+            
+            # 3. Add relationship
+            kg.add_relationship("Action Principle", "Lagrangian Mechanics", "prerequisite_of", {"weight": 1.0})
+            
+            # 4. Find related
+            related = kg.find_related("Action Principle", depth=1)
+            self.assertEqual(len(related), 1)
+            self.assertEqual(related[0][0].name, "Lagrangian Mechanics")
+            self.assertEqual(related[0][1].rel_type, "prerequisite_of")
+            
+            # 5. Semantic Search
+            matches = kg.semantic_search("Lagrangian", limit=1)
+            self.assertEqual(len(matches), 1)
+            self.assertEqual(matches[0].id, "lagrangian_mechanics")
+            
+            # 6. Graph traversal
+            subgraph = kg.graph_traversal("Action Principle", max_depth=1)
+            self.assertEqual(len(subgraph["nodes"]), 2)
+            self.assertEqual(len(subgraph["relationships"]), 1)
+            
+            # 7. Merge entities
+            e3_id = kg.add_entity("Lagrange Formalism", "Concept", {"alternate": "yes"})
+            kg.add_relationship("Lagrange Formalism", "Action Principle", "related_to")
+            merged_id = kg.merge_entities("lagrangian_mechanics", "lagrange_formalism")
+            self.assertEqual(merged_id, "lagrangian_mechanics")
+            
+            # The merged relationship should now point to lagrangian_mechanics
+            related_merged = kg.find_related("Action Principle", depth=1)
+            self.assertEqual(len(related_merged), 2)
+            
+            # 8. Forget
+            kg.forget("action_principle")
+            self.assertIsNone(kg.find_entity("action_principle"))
+            
+            # 9. Context window
+            context_str = kg.get_context_window("lagrangian_mechanics")
+            self.assertIn("Lagrangian Mechanics", context_str)
+            
+            # 10. Temporal Query
+            temporal = kg.temporal_query("lagrangian_mechanics")
+            self.assertTrue(len(temporal) > 0)
+            
+            # 11. Improve weight
+            kg.improve("lagrangian_mechanics", "positive test feedback", 0.5)
+            traversed = kg.find_related("lagrangian_mechanics", depth=1)
+            self.assertTrue(any(r[1].weight > 1.0 for r in traversed))
+            
+        finally:
+            if os.path.exists(db_file):
+                os.remove(db_file)
+
+    def test_knowledge_graph_remember_recall(self):
+        from codex_mentis.memory.knowledge_graph import KnowledgeGraph
+        db_file = "/tmp/test_kg_rr.db"
+        if os.path.exists(db_file):
+            os.remove(db_file)
+        kg = KnowledgeGraph(db_path=db_file)
+        
+        try:
+            agent = BaseAgent("TestAgent", "Tester", self.prov, "Mock prompt")
+            
+            # Setup mock response for remember extraction
+            self.prov.responses.append({
+                "content": '{"entities": [{"name": "Hamiltonian", "type": "Concept", "properties": {"description": "Total energy function"}}], "relationships": [{"source": "Hamiltonian", "target": "Lagrangian", "type": "legendre_transform", "properties": {}, "weight": 1.0}]}',
+                "tool_calls": []
+            })
+            
+            res = asyncio.run(kg.remember("Hamiltonian is related to Lagrangian via Legendre transform", agent))
+            self.assertEqual(res["entities_extracted"], 1)
+            self.assertEqual(res["relationships_extracted"], 1)
+            
+            # Recall
+            recalled = kg.recall("Hamiltonian")
+            self.assertEqual(recalled["primary_entity"], "Hamiltonian")
+            self.assertTrue(any(n.name == "Hamiltonian" for n in recalled["nodes"]))
+            
+        finally:
+            if os.path.exists(db_file):
+                os.remove(db_file)
+
+    def test_workflow_engine(self):
+        from codex_mentis.agents.workflows import WorkflowEngine, WorkflowStep, WorkflowDefinition
+        
+        tutor = BaseAgent("tutor", "Tutor", self.prov, "Tutor prompt")
+        researcher = BaseAgent("researcher", "Researcher", self.prov, "Researcher prompt")
+        reviewer = BaseAgent("reviewer", "Reviewer", self.prov, "Reviewer prompt")
+        explainer = BaseAgent("explainer", "Explainer", self.prov, "Explainer prompt")
+        
+        agents = {
+            "tutor": tutor,
+            "researcher": researcher,
+            "reviewer": reviewer,
+            "explainer": explainer
+        }
+        
+        engine = WorkflowEngine(agents=agents)
+        
+        self.prov.responses.extend([
+            {"content": "Research result content", "tool_calls": []},
+            {"content": "Extracted concepts content", "tool_calls": []},
+            {"content": "Verified feedback content", "tool_calls": []},
+            {"content": "Final synthesized master report", "tool_calls": []}
+        ])
+        
+        res = asyncio.run(engine.execute(
+            inputs={"topic": "Quantum Gravity"},
+            workflow_name_or_def="deep_research"
+        ))
+        
+        self.assertEqual(res["workflow_name"], "deep_research")
+        self.assertIn("synthesize", engine.workflow.merge_strategy)
+        self.assertIn("research", res["step_outputs"])
+        self.assertEqual(res["step_outputs"]["research"], "Research result content")
+        self.assertEqual(res["step_outputs"]["extract"], "Extracted concepts content")
+        self.assertEqual(res["step_outputs"]["verify"], "Verified feedback content")
+        self.assertEqual(res["final_output"], "Final synthesized master report")
+
+    def test_debate_agent(self):
+        from codex_mentis.agents.debate import DebateAgent
+        prover = BaseAgent("prover", "Prover", self.prov, "Prover prompt")
+        reviewer = BaseAgent("reviewer", "Reviewer", self.prov, "Reviewer prompt")
+        debate_mgr = DebateAgent(self.prov)
+        
+        self.prov.responses.extend([
+            {"content": "Prover Opening statement", "tool_calls": []},
+            {"content": "Reviewer Opening statement", "tool_calls": []},
+            {"content": "Reviewer critique", "tool_calls": []},
+            {"content": "Prover response to critique", "tool_calls": []},
+            {"content": "Prover critique of Reviewer", "tool_calls": []},
+            {"content": "Reviewer response", "tool_calls": []},
+            {"content": "Prover rebuttal", "tool_calls": []},
+            {"content": "Reviewer rebuttal", "tool_calls": []},
+            {"content": "Prover closing", "tool_calls": []},
+            {"content": "Reviewer closing", "tool_calls": []},
+            {
+                "content": '{"verdict": "FOR", "confidence": 0.85, "strongest_arguments_pro": ["axiom A holds"], "strongest_arguments_con": ["edge case B exists"], "synthesis_summary": "Reconciliation summary."}',
+                "tool_calls": []
+            }
+        ])
+        
+        res = asyncio.run(debate_mgr.run_debate(
+            statement="P = NP",
+            prover=prover,
+            reviewer=reviewer
+        ))
+        
+        self.assertEqual(res["verdict"], "FOR")
+        self.assertEqual(res["confidence"], 0.85)
+        self.assertIn("Prover Opening statement", res["transcript"][0]["content"])
+
+    def test_reasoning_chain(self):
+        from codex_mentis.agents.chain_of_thought import ReasoningChain
+        prover = BaseAgent("prover", "Prover", self.prov, "Prover prompt")
+        reviewer = BaseAgent("reviewer", "Reviewer", self.prov, "Reviewer prompt")
+        
+        chain = ReasoningChain(prover=prover, reviewer=reviewer, max_depth=3, max_branches=2, max_revisions=1)
+        
+        self.prov.responses.extend([
+            {"content": "Thought 1", "tool_calls": []},
+            {"content": "FAILED: error in definition", "tool_calls": []},
+            {"content": "Thought 1 Revised", "tool_calls": []},
+            {"content": "FAILED: still incorrect", "tool_calls": []},
+            {"content": "Thought 2 alternative", "tool_calls": []},
+            {"content": "VERIFIED: correct approach", "tool_calls": []},
+            {"content": "Thought 3 QED", "tool_calls": []},
+            {"content": "VERIFIED: correct", "tool_calls": []}
+        ])
+        
+        res = asyncio.run(chain.solve("Prove theorem X"))
+        
+        self.assertTrue(res["success"])
+        self.assertIn("Thought 2 alternative", res["solution"])
+        self.assertIn("Thought 3 QED", res["solution"])
+        
+        tree_vis = res["tree_visualization"]
+        self.assertIn("Step 1: Thought 1 [FAILED]", tree_vis)
+        self.assertIn("Step 2: Thought 2 alternative [VERIFIED]", tree_vis)
+        self.assertIn("Step 2.1: Thought 3 QED [VERIFIED]", tree_vis)
+
 if __name__ == "__main__":
     unittest.main()

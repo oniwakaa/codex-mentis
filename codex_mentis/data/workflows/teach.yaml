@@ -1,0 +1,74 @@
+# Teach Workflow
+# Multi-agent teaching pipeline: explain → guide → quiz → feedback
+name: teach
+description: >
+  Teaching pipeline that adapts to the learner: Explainer breaks down the topic,
+  Tutor guides via Socratic method, then quizzes and tracks progress.
+
+inputs:
+  - name: topic
+    description: Topic to teach
+    required: true
+  - name: level
+    description: Student level (child, beginner, intermediate, advanced, expert)
+    default: intermediate
+  - name: student_response
+    description: Student's initial response or question (optional)
+    default: ""
+
+steps:
+  - id: breakdown
+    agent: explainer
+    prompt: |
+      Break down the topic "{{ topic }}" for a {{ level }} student.
+      Use the Feynman technique:
+      1. Explain in simple terms
+      2. Use analogies and mental models
+      3. Identify the key sub-concepts needed
+      4. Map the intuition (what does this concept FEEL like?)
+    outputs: [explanation, sub_concepts, analogies]
+
+  - id: socratic_guide
+    agent: tutor
+    prompt: |
+      You are a Socratic tutor teaching "{{ topic }}" to a {{ level }} student.
+      
+      Here's the concept breakdown:
+      {{ breakdown.outputs.explanation }}
+      
+      Sub-concepts needed: {{ breakdown.outputs.sub_concepts }}
+      
+      {{ "The student said: " + student_response if student_response else "Begin with an engaging question that tests prior knowledge." }}
+      
+      Guide the student through the concept using questions, not lectures.
+      Ask ONE question at a time. Build on their answers.
+    inputs_from: [breakdown]
+    outputs: [guiding_question]
+
+  - id: quiz
+    agent: tutor
+    prompt: |
+      Generate a practice problem on "{{ topic }}" at {{ level }} level.
+      The problem should test understanding, not just memorization.
+      Don't provide the solution — embed hints only.
+      
+      Concept breakdown: {{ breakdown.outputs.explanation }}
+    inputs_from: [breakdown]
+    outputs: [exercise]
+
+  - id: feedback_tracker
+    agent: self_improver
+    prompt: |
+      Track this teaching interaction for future improvement:
+      Topic: {{ topic }}
+      Level: {{ level }}
+      Explanation approach: {{ breakdown.outputs.explanation }}
+      Analogy used: {{ breakdown.outputs.analogies }}
+      
+      Record the strategy used so we can track which approaches work
+      best for different topics and levels.
+    inputs_from: [breakdown]
+    tools: [track_outcome]
+    outputs: [strategy_recorded]
+
+merge_strategy: combine

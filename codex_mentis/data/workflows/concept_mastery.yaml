@@ -1,0 +1,95 @@
+# Concept Mastery Workflow
+# Full learning pipeline: research → extract concepts → update graph → generate exercises
+name: concept_mastery
+description: >
+  End-to-end concept mastery: research a topic, extract its concepts,
+  update the concept dependency graph, generate exercises, and track mastery.
+
+inputs:
+  - name: topic
+    description: The topic to master
+    required: true
+  - name: current_knowledge
+    description: What the student already knows about this topic
+    default: ""
+
+steps:
+  - id: research
+    agent: researcher
+    prompt: |
+      Research the mathematical/physical topic: "{{ topic }}"
+      Find the key concepts, prerequisites, and how this topic connects to others.
+      Focus on: definitions, theorems, equations, and practical applications.
+      {{ "The student already knows: " + current_knowledge if current_knowledge else "" }}
+    tools: [web_search, kb_retrieve]
+    outputs: [raw_knowledge, sources]
+
+  - id: extract_concepts
+    agent: researcher
+    prompt: |
+      From the research findings, extract the key concepts:
+      {{ research.outputs.raw_knowledge }}
+      
+      For each concept, identify:
+      1. Name
+      2. Prerequisites (what must be understood first)
+      3. Domain (mathematics, physics, etc.)
+      4. Difficulty level
+      5. Key equations (if any)
+    inputs_from: [research]
+    outputs: [concept_list, prerequisites]
+
+  - id: explain_concepts
+    agent: explainer
+    prompt: |
+      Explain the core concepts of "{{ topic }}" at intermediate level:
+      {{ extract_concepts.outputs.concept_list }}
+      
+      For each concept:
+      - Simple explanation (Feynman technique)
+      - Key equation with intuition
+      - How it connects to prerequisites
+    inputs_from: [extract_concepts]
+    outputs: [explanations]
+
+  - id: verify_understanding
+    agent: reviewer
+    prompt: |
+      Verify that the concept explanations are mathematically correct:
+      {{ explain_concepts.outputs.explanations }}
+      
+      Check each equation with SymPy. Ensure no mathematical errors
+      in the explanations.
+    inputs_from: [explain_concepts]
+    tools: [sympy_evaluate]
+    outputs: [verified_explanations, corrections]
+
+  - id: generate_exercises
+    agent: tutor
+    prompt: |
+      Generate 3 practice exercises for "{{ topic }}" at intermediate level:
+      1. Easy — tests basic understanding
+      2. Medium — requires applying concepts
+      3. Hard — requires connecting multiple concepts
+      
+      Concepts: {{ extract_concepts.outputs.concept_list }}
+      Verified explanations: {{ verify_understanding.outputs.verified_explanations }}
+      
+      Don't provide solutions. Include hints only.
+    inputs_from: [extract_concepts, verify_understanding]
+    outputs: [exercises]
+
+  - id: track_progress
+    agent: self_improver
+    prompt: |
+      Record this concept mastery session:
+      Topic: {{ topic }}
+      Concepts covered: {{ extract_concepts.outputs.concept_list }}
+      Exercises generated: {{ generate_exercises.outputs.exercises }}
+      
+      Track which explanation strategies were used for future optimization.
+    inputs_from: [extract_concepts, generate_exercises]
+    tools: [track_outcome]
+    outputs: [progress_recorded]
+
+merge_strategy: combine

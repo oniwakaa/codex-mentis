@@ -24,6 +24,11 @@ try:
 except ImportError:
     doctor = None
 
+try:
+    from codex_mentis.cli.commands import profile, session, onboard, ingest
+except ImportError:
+    profile = session = onboard = ingest = None
+
 app = typer.Typer(
     name="codex-mentis",
     help="Codex Mentis: An AI-powered CLI for studying math and physics with multi-agent reasoning",
@@ -42,6 +47,23 @@ if review:
     app.add_typer(review.app, name="review")
 if doctor:
     app.add_typer(doctor.app, name="doctor")
+if profile:
+    app.add_typer(profile.app, name="profile")
+if session:
+    app.add_typer(session.app, name="session")
+
+# Register single commands
+if onboard:
+    @app.command("onboard")
+    def onboard_cmd(
+        skip: bool = typer.Option(False, "--skip", help="Skip interactive assessment"),
+        level: str = typer.Option(None, "--level", help="Set level directly: beginner/intermediate/advanced"),
+    ):
+        """First-run onboarding with level assessment."""
+        onboard.run_onboarding(skip=skip, level_override=level)
+
+if ingest:
+    app.add_typer(ingest.app, name="ingest")
 
 # Register single commands
 app.command("study")(study.study)

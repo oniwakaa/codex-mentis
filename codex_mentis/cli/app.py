@@ -13,6 +13,17 @@ from codex_mentis.cli.commands import (
     skills,
 )
 
+# New commands — lazy import to avoid loading heavy deps at import time
+try:
+    from codex_mentis.cli.commands import review
+except ImportError:
+    review = None
+
+try:
+    from codex_mentis.cli.commands import doctor
+except ImportError:
+    doctor = None
+
 app = typer.Typer(
     name="codex-mentis",
     help="Codex Mentis: An AI-powered CLI for studying math and physics with multi-agent reasoning",
@@ -25,6 +36,12 @@ app.add_typer(memory.app, name="memory")
 app.add_typer(kb.app, name="kb")
 app.add_typer(config.app, name="config")
 app.add_typer(skills.app, name="skills")
+
+# Register new command groups
+if review:
+    app.add_typer(review.app, name="review")
+if doctor:
+    app.add_typer(doctor.app, name="doctor")
 
 # Register single commands
 app.command("study")(study.study)

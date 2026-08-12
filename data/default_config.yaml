@@ -1,0 +1,19 @@
+providers:
+  default: cliproxy
+  config:
+    name: cliproxy
+    type: openai_compatible
+    base_url: http://localhost:8317/v1
+    api_key: cliproxy-sk-local
+    default_model: google/gemini-3.6-flash-high
+model: google/gemini-3.6-flash-high
+features:
+  tui: true
+  embeddings: true
+  spaced_repetition: true
+memory:
+  backend: sqlite
+  spaced_repetition: true
+ui:
+  theme: dark
+  latex: true

@@ -195,3 +195,35 @@ complex_analysis:
   - id: ca_residue
     name: Residue Theorem
     prerequisites: [ca_laurent]
+
+philosophy:
+  - id: phil_formal_logic
+    name: Formal Logic
+    prerequisites: []
+  - id: phil_propositional_logic
+    name: Propositional Logic
+    prerequisites: [phil_formal_logic]
+  - id: phil_predicate_logic
+    name: Predicate Logic
+    prerequisites: [phil_propositional_logic]
+  - id: phil_modal_logic
+    name: Modal Logic
+    prerequisites: [phil_predicate_logic]
+  - id: phil_epistemology
+    name: Epistemology
+    prerequisites: [phil_formal_logic]
+  - id: phil_metaphysics
+    name: Metaphysics
+    prerequisites: [phil_epistemology]
+  - id: phil_ethics
+    name: Ethics
+    prerequisites: [phil_epistemology]
+  - id: phil_phil_math
+    name: Philosophy of Mathematics
+    prerequisites: [phil_epistemology, calc_limits]
+  - id: phil_phil_science
+    name: Philosophy of Science
+    prerequisites: [phil_epistemology]
+  - id: phil_aesthetics
+    name: Aesthetics
+    prerequisites: [phil_metaphysics]

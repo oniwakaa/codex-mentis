@@ -1,0 +1,90 @@
+# Philosophical Reasoning Workflow
+# 5-step pipeline: clarify → argue_for → argue_against → synthesize → connect
+name: philosophical_reasoning
+description: >
+  A dialectical pipeline for reasoning about a philosophical thesis: define
+  terms and assumptions, build the strongest argument for the thesis, mount
+  an adversarial challenge with counter-examples, synthesize a nuanced
+  position at the crux of disagreement, then connect to math, science, and
+  other philosophical traditions.
+
+inputs:
+  - name: thesis
+    description: The philosophical thesis or question to examine
+    required: true
+  - name: tradition
+    description: Optional philosophical tradition to anchor (e.g. analytic, continental, classical)
+    default: ""
+
+steps:
+  - id: clarify
+    agent: explainer
+    prompt: |
+      Clarify the philosophical thesis: "{{ thesis }}".
+      {{ "Tradition to anchor in: " + tradition if tradition else "" }}
+      1. Define every key term precisely, noting ambiguity.
+      2. Surface the hidden assumptions the thesis depends on.
+      3. Distinguish the thesis from nearby theses it could be confused with.
+      4. State the thesis in one sharp sentence.
+    outputs: [definitions, assumptions, sharp_thesis]
+
+  - id: argue_for
+    agent: prover
+    prompt: |
+      Build the strongest argument you can FOR this thesis:
+      {{ clarify.outputs.sharp_thesis }}
+
+      Definitions: {{ clarify.outputs.definitions }}
+      Assumptions: {{ clarify.outputs.assumptions }}
+
+      Construct a rigorous argument: premises, inference rules, conclusion.
+      Anticipate and preempt the most obvious objection. Steel-man the position.
+    inputs_from: [clarify]
+    outputs: [argument_for, key_premises]
+
+  - id: argue_against
+    agent: reviewer
+    prompt: |
+      Mount the strongest adversarial challenge AGAINST this thesis:
+      {{ clarify.outputs.sharp_thesis }}
+
+      The strongest argument for it was:
+      {{ argue_for.outputs.argument_for }}
+
+      Find the weakest premise, the hidden assumption, or a counter-example.
+      Be adversarial but fair: do not attack strawmen. Identify the crux —
+      the point on which the whole disagreement turns.
+    inputs_from: [clarify, argue_for]
+    outputs: [argument_against, crux, counter_examples]
+
+  - id: synthesize
+    agent: tutor
+    prompt: |
+      Synthesize a nuanced position out of this disagreement.
+
+      Argument for: {{ argue_for.outputs.argument_for }}
+      Argument against: {{ argue_against.outputs.argument_against }}
+      Crux of disagreement: {{ argue_against.outputs.crux }}
+
+      Find common ground between the two sides. State where each side is right.
+      Then articulate a nuanced position that respects the crux — not a wishy-washy
+      compromise, but a sharper thesis that survives the strongest objection.
+    inputs_from: [argue_for, argue_against]
+    outputs: [common_ground, nuanced_position]
+
+  - id: connect
+    agent: researcher
+    prompt: |
+      Connect the synthesized position to the wider intellectual landscape.
+
+      Nuanced position: {{ synthesize.outputs.nuanced_position }}
+
+      Link it to:
+      1. Relevant mathematics (any formal structures, theorems, or models).
+      2. Relevant science (any empirical results or frameworks).
+      3. Other philosophical traditions and the history of this question.
+      4. One concrete real-world consequence of holding this position.
+    inputs_from: [synthesize]
+    outputs: [connections, real_world_consequence]
+
+merge_strategy: combine

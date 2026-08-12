@@ -221,9 +221,14 @@ class BaseAgent:
             try:
                 # If the handler is async, run in a loop
                 if asyncio.iscoroutinefunction(handler):
-                    loop = asyncio.get_event_loop()
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_closed():
+                            raise RuntimeError("loop closed")
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
                     if loop.is_running():
-                        # We are inside an running event loop, we must run it in a thread or task
                         import nest_asyncio
                         nest_asyncio.apply()
                     return asyncio.run(handler(**args))
@@ -266,7 +271,13 @@ class BaseAgent:
         Sends the prompt and optional context to the LLM provider synchronously.
         """
         try:
-            loop = asyncio.get_event_loop()
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    raise RuntimeError("loop closed")
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
             if loop.is_running():
                 import nest_asyncio
                 nest_asyncio.apply()

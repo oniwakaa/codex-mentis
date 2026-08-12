@@ -166,31 +166,43 @@ def _get_user_context() -> str:
 
 
 def _verify_math(response: str) -> Optional[str]:
-    """Check if response contains math claims and verify with SymPy."""
+    """Check if response contains math claims and verify with SymPy.
+
+    Logs unexpected errors instead of silently swallowing them; only the
+    narrow SymPy sandbox failures (parse/evaluate) are treated as 'no
+    verification available'.
+    """
+    import logging
     import re
-    
-    # Look for simple equations in the response
+
+    log = logging.getLogger(__name__)
+
     equations = re.findall(r'\$([^$]+)\$', response)
     if not equations:
         return None
-    
+
     try:
         from pitagora.math_engine.sandbox import SymPySandbox
         sandbox = SymPySandbox()
-        
-        verified = []
-        for eq in equations[:3]:  # Check up to 3 equations
-            # Try to evaluate
+    except Exception as e:
+        # Sandbox unavailable — log and bail, don't swallow silently.
+        log.warning("SymPy sandbox unavailable for verification: %s", e)
+        return None
+
+    verified = []
+    for eq in equations[:3]:  # Check up to 3 equations
+        try:
             result = sandbox.evaluate(eq)
             if result.verified:
                 verified.append(f"  ✓ {eq} = {result.value}")
             elif result.error:
                 verified.append(f"  ⚠ {eq}: {result.error}")
-        
-        if verified:
-            return "[SymPy verification:]\n" + "\n".join(verified)
-    except Exception:
-        pass
+        except Exception as e:
+            # Per-equation failure: log and skip, keep verifying the rest.
+            log.warning("verification failed for '%s': %s", eq, e)
+            verified.append(f"  ⚠ {eq}: verification error")
+    if verified:
+        return "[SymPy verification:]\n" + "\n".join(verified)
     return None
 
 
@@ -681,6 +693,61 @@ def launch_chat(
                     except Exception as e:
                         console.print(f"[dim]Dashboard unavailable: {e}[/dim]")
                     continue
+                elif cmd == "/workflow":
+                    import asyncio as _asyncio
+                    from pitagora.agents.providers.base import ProviderConfig
+                    from pitagora.agents.providers import get_provider
+                    from pitagora.agents.tutor import TutorAgent
+                    from pitagora.agents.researcher import ResearchAgent
+                    from pitagora.agents.prover import ProverAgent
+                    from pitagora.agents.reviewer import ReviewerAgent
+                    from pitagora.agents.visualizer import VisualizerAgent
+                    from pitagora.agents.explainer import ExplainerAgent
+                    from pitagora.agents.self_improver import SelfImproverAgent
+                    from pitagora.agents.workflows import WorkflowEngine
+
+                    AVAILABLE_WORKFLOWS = (
+                        "teach", "derive_and_prove", "concept_mastery",
+                        "debate", "deep_research", "philosophical_reasoning",
+                    )
+                    parts = arg.strip().split(" ", 1)
+                    wf_name = parts[0] if parts else ""
+                    wf_arg = parts[1] if len(parts) > 1 else ""
+                    if not wf_name or wf_name not in AVAILABLE_WORKFLOWS:
+                        console.print(
+                            f"[red]Usage: /workflow <name> <args...>[/red]\n"
+                            f"[dim]Workflows: {', '.join(AVAILABLE_WORKFLOWS)}[/dim]"
+                        )
+                        continue
+                    try:
+                        prov_cfg = ProviderConfig(
+                            api_key=config.get("api_key", "cliproxy-sk-local"),
+                            model=model,
+                            base_url=config.get("base_url", "http://localhost:8317/v1"),
+                            max_tokens=4096,
+                        )
+                        prov = get_provider("openai", prov_cfg)
+                        agents = {
+                            "tutor": TutorAgent(prov),
+                            "researcher": ResearchAgent(prov),
+                            "prover": ProverAgent(prov),
+                            "reviewer": ReviewerAgent(prov),
+                            "visualizer": VisualizerAgent(prov),
+                            "explainer": ExplainerAgent(prov),
+                            "self_improver": SelfImproverAgent(prov),
+                            "debate": TutorAgent(prov),  # ponytail: debate agent reused; add DebateAgent if workflow needs its specific methods
+                        }
+                        engine = WorkflowEngine(agents=agents)
+                        inputs = {"topic": wf_arg or topic, "level": "intermediate"}
+                        with console.status(f"[cyan]Running workflow '{wf_name}'...[/cyan]"):
+                            result = _asyncio.run(engine.execute(inputs, workflow_name_or_def=wf_name))
+                        final = result.get("final_output") or ""
+                        console.print()
+                        console.print(Markdown(final or "(no output)"))
+                        console.print()
+                    except Exception as e:
+                        console.print(f"[red]Workflow failed: {e}[/red]")
+                    continue
                 elif cmd == "/latex":
                     if arg:
                         from pitagora.latex_render import latex_to_unicode, render_equation_box
@@ -696,6 +763,9 @@ def launch_chat(
                         "  /explore --continue  Resume the latest journey\n"
                         "  /journeys         List saved learning journeys\n"
                         "  /dashboard        Visual journey overview\n"
+                        "  /workflow <name> <args>  Run a multi-agent workflow\n"
+                        "                    (teach, derive_and_prove, concept_mastery,\n"
+                        "                     debate, deep_research, philosophical_reasoning)\n"
                         "  /verify <expr>    Verify math with SymPy\n"
                         "  /latex <expr>     Render LaTeX as Unicode\n"
                         "  /quiz             Generate a practice problem\n"

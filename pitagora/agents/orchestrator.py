@@ -126,19 +126,25 @@ class Orchestrator:
         return {"route_type": "agent", "name": "researcher"}
 
     def process(
-        self, 
-        user_input: str, 
-        mode: str = "explore", 
+        self,
+        user_input: str,
+        mode: str = "explore",
         context: Optional[str] = None,
         session_id: Optional[str] = None
     ) -> OrchestratorResponse:
         """
-        Synchronous wrapper for process.
+        Synchronous wrapper for aprocess. Python 3.12-safe: avoids the
+        deprecated asyncio.get_event_loop() which warns when no loop exists.
         """
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            import nest_asyncio
-            nest_asyncio.apply()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is None:
+            return asyncio.run(self.aprocess(user_input, mode, context, session_id))
+        # We're already inside a running loop — nest_asyncio lets us re-enter.
+        import nest_asyncio
+        nest_asyncio.apply()
         return loop.run_until_complete(self.aprocess(user_input, mode, context, session_id))
 
     async def aprocess(

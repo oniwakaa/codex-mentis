@@ -9,23 +9,28 @@ from pitagora.core.constants import SESSIONS_DIR
 
 
 def save_session(messages: List[Dict], topic: str = "general", mode: str = "study") -> str:
-    """Save current conversation to disk. Returns session ID."""
+    """Save current conversation to disk. Returns session ID.
+
+    ID includes microseconds so two saves in the same second don't collide
+    (the old second-resolution timestamp silently overwrote the prior file).
+    """
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-    
-    session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    now = datetime.now()
+    session_id = now.strftime("%Y%m%d_%H%M%S_%f")
     session_data = {
         "id": session_id,
         "topic": topic,
         "mode": mode,
-        "created_at": datetime.now().isoformat(),
+        "created_at": now.isoformat(),
         "message_count": len(messages),
         "messages": messages,
     }
-    
+
     path = SESSIONS_DIR / f"{session_id}.json"
     with open(path, "w") as f:
         json.dump(session_data, f, indent=2)
-    
+
     return session_id
 
 

@@ -281,6 +281,15 @@ class BaseAgent:
             content = raw_response.get("content", "")
             tool_calls = raw_response.get("tool_calls", [])
             
+            # Parse token usage
+            usage = raw_response.get("usage") or {}
+            p_tok = usage.get("prompt_tokens", 0)
+            c_tok = usage.get("completion_tokens", 0)
+            t_tok = usage.get("total_tokens", p_tok + c_tok)
+            self.token_usage["prompt_tokens"] += p_tok
+            self.token_usage["completion_tokens"] += c_tok
+            self.token_usage["total_tokens"] += t_tok
+            
             return AgentResponse(
                 content=content,
                 tool_calls=tool_calls,

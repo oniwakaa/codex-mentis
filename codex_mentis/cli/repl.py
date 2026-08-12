@@ -4,6 +4,7 @@ import os
 import sqlite3
 from pathlib import Path
 from typing import Optional, Dict, Any
+
 from codex_mentis.core.config import load_config, CONFIG_DIR
 from codex_mentis.cli.rich_ui import print_markdown, print_panel, create_spinner
 
@@ -145,7 +146,6 @@ def execute_slash_command(command_str: str, current_state: Dict[str, Any]) -> bo
             
     elif cmd == "/concept":
         from codex_mentis.cli.commands.concept import app as concept_app
-        # Run subcommands using Typer context runner or direct invocation
         subparts = arg.split(" ", 1)
         subcmd = subparts[0]
         subarg = subparts[1] if len(subparts) > 1 else ""
@@ -227,14 +227,14 @@ def execute_slash_command(command_str: str, current_state: Dict[str, Any]) -> bo
         
     return True
 
-def launch_repl(
+def launch_simple_repl(
     mode: str = "STUDY",
     topic: str = "general",
     context: str = "",
     domain: str = "general",
     difficulty: int = 2
 ) -> None:
-    """Launch the interactive REPL shell."""
+    """Fallback basic readline-based REPL shell."""
     current_state = {
         "mode": mode,
         "topic": topic,
@@ -246,7 +246,7 @@ def launch_repl(
     load_repl_history()
     
     print_panel(
-        f"Codex Mentis Interactive Agent Shell (v0.1.0)\n"
+        f"Codex Mentis Readline Agent Shell (Simple Mode)\n"
         f"Active Mode: [bold yellow]{current_state['mode']}[/bold yellow]\n"
         f"Topic: [bold green]{current_state['topic']}[/bold green]\n"
         f"Type [bold cyan]/help[/bold cyan] for commands, [bold cyan]/quit[/bold cyan] to exit.",
@@ -257,7 +257,7 @@ def launch_repl(
     while True:
         try:
             # Build prompt indicator
-            prompt = f"({current_state['mode']}:{current_state['topic']}) CM> "
+            prompt = f"({current_state['mode']}:{current_state['topic']}) CM-simple> "
             user_input = input(prompt).strip()
             
             if not user_input:
@@ -289,3 +289,20 @@ def launch_repl(
             break
         except Exception as e:
             print_panel(f"An unexpected error occurred: {e}", "REPL Error", style="red")
+
+def launch_repl(
+    mode: str = "STUDY",
+    topic: str = "general",
+    context: str = "",
+    domain: str = "general",
+    difficulty: int = 2,
+    simple: bool = False
+) -> None:
+    """Unified entrypoint for Codex Mentis REPL."""
+    # Check command-line args for --simple as well to remain fully compatible
+    if simple or "--simple" in sys.argv:
+        launch_simple_repl(mode, topic, context, domain, difficulty)
+    else:
+        from codex_mentis.cli.tui import TuiApp
+        app = TuiApp(mode=mode, topic=topic)
+        app.run()

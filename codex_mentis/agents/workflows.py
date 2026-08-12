@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import yaml
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional, Union
@@ -26,6 +27,41 @@ class WorkflowDefinition:
     parallel_groups: List[List[str]] = field(default_factory=field)
     merge_strategy: str = "concat"
 
+def format_template(template: str, inputs: Dict[str, Any], step_outputs: Dict[str, str]) -> str:
+    """
+    Parses and formats double-curly braces {{ variable }} including step references.
+    """
+    pattern = re.compile(r"\{\{\s*(.*?)\s*\}\}")
+    
+    def replacement(match):
+        expr = match.group(1).strip()
+        
+        # Check if it exists in inputs
+        if expr in inputs:
+            return str(inputs[expr])
+            
+        # Check if it is step_name.outputs.var_name
+        if ".outputs." in expr:
+            parts = expr.split(".outputs.")
+            step_name = parts[0].strip()
+            if step_name in step_outputs:
+                return str(step_outputs[step_name])
+                
+        # Fallback to step_outputs
+        if expr in step_outputs:
+            return str(step_outputs[expr])
+            
+        # Try evaluating simple python expressions
+        try:
+            val = eval(expr, {}, inputs)
+            return str(val)
+        except Exception:
+            pass
+            
+        return ""
+        
+    return pattern.sub(replacement, template)
+
 class WorkflowEngine:
     def __init__(
         self, 
@@ -47,10 +83,12 @@ class WorkflowEngine:
 
         steps = []
         for s in data.get("steps", []):
+            name = s.get("id") or s.get("name")
+            prompt_template = s.get("prompt") or s.get("prompt_template")
             steps.append(WorkflowStep(
-                name=s["name"],
+                name=name,
                 agent=s["agent"],
-                prompt_template=s["prompt_template"],
+                prompt_template=prompt_template,
                 inputs_from=s.get("inputs_from", []),
                 tools=s.get("tools"),
                 retry_count=s.get("retry_count", 3)
@@ -100,9 +138,8 @@ class WorkflowEngine:
                         raise ValueError(f"Step '{step.name}' depends on non-existent step '{dep_name}'")
                     dep_results[dep_name] = await step_futures[dep_name]
 
-                # 2. Construct prompt by formatting template with inputs + dependency results
-                fmt_args = {**inputs, **dep_results}
-                prompt = step.prompt_template.format(**fmt_args)
+                # 2. Construct prompt by formatting template
+                prompt = format_template(step.prompt_template, inputs, step_outputs)
 
                 # 3. Resolve agent
                 agent = self.agents.get(step.agent)
@@ -148,7 +185,10 @@ class WorkflowEngine:
             for step in w_def.steps:
                 sections.append(f"### {step.name.replace('_', ' ').title()}\n{step_outputs[step.name]}")
             final_output = "\n\n".join(sections)
-        elif w_def.merge_strategy == "synthesize":
+        elif w_def.merge_strategy == "last":
+            if w_def.steps:
+                final_output = step_outputs[w_def.steps[-1].name]
+        elif w_def.merge_strategy in ("synthesize", "combine"):
             # Reconcile via an agent (default to tutor or explainer)
             synthesizer = self.agents.get("tutor") or self.agents.get("explainer") or list(self.agents.values())[0]
             synth_prompt = (

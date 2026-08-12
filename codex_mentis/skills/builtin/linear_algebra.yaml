@@ -19,5 +19,5 @@ socratic_questions:
   - How does this matrix transformation behave geometrically on the standard basis vectors?
 verification_strategies:
   - Verify that A * A^-1 yields the Identity matrix.
-  - Verify that the eigenvalue equation holds: A * v = lambda * v.
+  - "Verify that the eigenvalue equation holds: A * v = lambda * v."
   - Check that the sum of eigenvalues matches the trace of the matrix, and the product matches the determinant.

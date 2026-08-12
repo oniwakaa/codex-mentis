@@ -388,27 +388,30 @@ class KnowledgeGraph:
         merged_properties = {**e2.properties, **e1.properties}
         merged_properties_json = json.dumps(merged_properties)
         
+        # 1. Fetch relationships to migrate
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT target_id, rel_type, properties, weight FROM relationships WHERE source_id = ? AND is_deleted = 0", (id2,))
+            source_rels = cursor.fetchall()
+            cursor.execute("SELECT source_id, rel_type, properties, weight FROM relationships WHERE target_id = ? AND is_deleted = 0", (id2,))
+            target_rels = cursor.fetchall()
+            
+        # 2. Add migrated relationships outside of connection transaction to avoid locks
+        for tgt, r_type, r_props_json, weight in source_rels:
+            if tgt != id1:
+                self.add_relationship(id1, tgt, r_type, json.loads(r_props_json or "{}"), weight)
+                
+        for src, r_type, r_props_json, weight in target_rels:
+            if src != id1:
+                self.add_relationship(src, id1, r_type, json.loads(r_props_json or "{}"), weight)
+                
+        # 3. Soft-delete the absorbed node and original relationships, and update merged properties
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE entities SET properties = ?, updated_at = ? WHERE id = ?",
                 (merged_properties_json, now, id1)
             )
-            
-            # Reconnect all relationships involving id2 to id1
-            cursor.execute("SELECT target_id, rel_type, properties, weight FROM relationships WHERE source_id = ? AND is_deleted = 0", (id2,))
-            source_rels = cursor.fetchall()
-            for tgt, r_type, r_props_json, weight in source_rels:
-                if tgt != id1:
-                    self.add_relationship(id1, tgt, r_type, json.loads(r_props_json or "{}"), weight)
-                    
-            cursor.execute("SELECT source_id, rel_type, properties, weight FROM relationships WHERE target_id = ? AND is_deleted = 0", (id2,))
-            target_rels = cursor.fetchall()
-            for src, r_type, r_props_json, weight in target_rels:
-                if src != id1:
-                    self.add_relationship(src, id1, r_type, json.loads(r_props_json or "{}"), weight)
-                    
-            # Soft-delete the absorbed node and original relationships
             cursor.execute("UPDATE entities SET is_deleted = 1, updated_at = ? WHERE id = ?", (now, id2))
             cursor.execute("UPDATE relationships SET is_deleted = 1, updated_at = ? WHERE source_id = ? OR target_id = ?", (now, id2, id2))
             conn.commit()

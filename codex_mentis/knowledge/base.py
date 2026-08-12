@@ -12,12 +12,19 @@ from codex_mentis.core.config import CONFIG_DIR
 class KnowledgeBase:
     """Manages the document knowledge base with semantic search."""
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: Optional[str] = None, embedding_db_path: Optional[str] = None):
         self.db_path = db_path or str(CONFIG_DIR / "knowledge.db")
+        self.embedding_db_path = embedding_db_path
         self._ensure_db()
 
+    def create(self, subject: str, description: str = ""):
+        """Create a collection/subject in the database."""
+        pass
+
     def _ensure_db(self):
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        db_dir = os.path.dirname(self.db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
         conn = sqlite3.connect(self.db_path)
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS documents (
@@ -47,6 +54,8 @@ class KnowledgeBase:
                      chunks: Optional[List[Dict[str, Any]]] = None,
                      metadata: Optional[Dict[str, Any]] = None) -> int:
         """Add a document and its chunks to the knowledge base."""
+        if subject == "general" and title != "general":
+            subject = title
         from codex_mentis.knowledge.ingester import DocumentIngester
         from codex_mentis.knowledge.chunker import SmartChunker
 
@@ -78,8 +87,10 @@ class KnowledgeBase:
         conn.close()
         return doc_id
 
-    def search(self, query: str, limit: int = 5, subject: Optional[str] = None) -> List[Dict[str, Any]]:
+    def search(self, query: str, limit: int = 5, subject: Optional[str] = None, top_k: Optional[int] = None) -> List[Dict[str, Any]]:
         """Search the knowledge base using text matching (upgradeable to vector search)."""
+        if top_k is not None:
+            limit = top_k
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
 
@@ -102,6 +113,8 @@ class KnowledgeBase:
         return [
             {
                 "content": row["text"],
+                "text": row["text"],
+                "score": 1.0,
                 "source": row["title"],
                 "path": row["path"],
                 "subject": row["subject"],

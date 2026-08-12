@@ -4,6 +4,37 @@ from textual.widgets import Static
 from rich.text import Text
 from rich.panel import Panel
 
+def latex_to_unicode(latex_str: str) -> str:
+    """Helper to convert LaTeX symbols to readable unicode characters."""
+    if not latex_str:
+        return ""
+    return (
+        latex_str
+        .replace(r"\int", "∫")
+        .replace(r"\sum", "∑")
+        .replace(r"\alpha", "α")
+        .replace(r"\beta", "β")
+        .replace(r"\gamma", "γ")
+        .replace(r"\theta", "θ")
+        .replace(r"\partial", "∂")
+        .replace(r"\infty", "∞")
+        .replace(r"\hbar", "ħ")
+        .replace(r"\psi", "ψ")
+        .replace(r"\Psi", "Ψ")
+        .replace(r"\phi", "φ")
+        .replace(r"\lambda", "λ")
+        .replace(r"\pi", "π")
+        .replace(r"\nabla", "∇")
+        .replace(r"\Delta", "Δ")
+        .replace(r"\cdot", "·")
+        .replace(r"\sqrt", "√")
+        .replace(r"\dot", "̇")
+        .replace(r"\ddot", "̈")
+        .replace(r"\\", "\n")
+        .replace(r"$$", "")
+        .replace(r"$", "")
+    )
+
 class EquationDisplay(Static):
     """Widget that renders LaTeX equations as beautiful Unicode or pretty-printed SymPy math."""
     
@@ -38,32 +69,7 @@ class EquationDisplay(Static):
             renderable = Text(pretty_text, style="bold cyan")
         except Exception:
             # Fallback unicode conversion logic
-            clean = (
-                self.latex_str
-                .replace(r"\int", "∫")
-                .replace(r"\sum", "∑")
-                .replace(r"\alpha", "α")
-                .replace(r"\beta", "β")
-                .replace(r"\gamma", "γ")
-                .replace(r"\theta", "θ")
-                .replace(r"\partial", "∂")
-                .replace(r"\infty", "∞")
-                .replace(r"\hbar", "ħ")
-                .replace(r"\psi", "ψ")
-                .replace(r"\Psi", "Ψ")
-                .replace(r"\phi", "φ")
-                .replace(r"\lambda", "λ")
-                .replace(r"\pi", "π")
-                .replace(r"\nabla", "∇")
-                .replace(r"\Delta", "Δ")
-                .replace(r"\cdot", "·")
-                .replace(r"\sqrt", "√")
-                .replace(r"\dot", "̇")
-                .replace(r"\ddot", "̈")
-                .replace(r"\\", "\n")
-                .replace(r"$$", "")
-                .replace(r"$", "")
-            )
+            clean = latex_to_unicode(self.latex_str)
             renderable = Text(clean.strip(), style="bold italic cyan")
 
         return Panel(

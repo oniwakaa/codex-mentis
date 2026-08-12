@@ -1,586 +1,580 @@
-import os
-import re
 import asyncio
-import sqlite3
-from typing import Optional, List, Dict, Any
+import os
+import sys
+from typing import Dict, Any, List, Optional
+from datetime import datetime
 
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical, ContentSwitcher
-from textual.widgets import Static, Input, Button
+from textual.containers import Container, Horizontal, Vertical
+from textual.widgets import Header, Footer, Static, Input, Button, Select, TabbedContent, TabPane, Label, Markdown
 from textual.reactive import reactive
-from textual.command import Provider, Hit, Hits
-from rich.text import Text
-from rich.markdown import Markdown
+from textual.worker import get_current_worker, Worker
 
-from codex_mentis.cli.widgets import (
-    ConceptGraphWidget,
-    SplitReasoningPanel,
-    ProofTreeWidget,
-    PlotWidget,
-    AgentPanel,
-    MemoryViewer,
-)
-from codex_mentis.core.config import load_config
+from codex_mentis.core.config import load_config, CONFIG_DIR
+from codex_mentis.cli.widgets.concept_graph import ConceptGraphWidget, ConceptSelected
+from codex_mentis.cli.widgets.equation_display import EquationDisplay
+from codex_mentis.cli.widgets.split_reasoning import SplitReasoning
+from codex_mentis.cli.widgets.proof_tree import ProofTreeWidget
+from codex_mentis.cli.widgets.plot_widget import PlotWidget
+from codex_mentis.cli.widgets.agent_panel import AgentPanel
+from codex_mentis.cli.widgets.memory_viewer import MemoryViewer
 
-class CodexCommandProvider(Provider):
-    """Fuzzy-search command palette provider for Codex Mentis."""
-    
-    async def search(self, query: str) -> Hits:
-        matcher = self.matcher(query)
-        
-        # Define available commands
-        commands = [
-            ("Switch to Study Mode", lambda: self.app.switch_mode_action("STUDY"), "F1 - View concept DAG"),
-            ("Switch to Explore Mode", lambda: self.app.switch_mode_action("EXPLORE"), "F2 - Learn new domains"),
-            ("Switch to Reason Mode", lambda: self.app.switch_mode_action("REASON"), "F3 - Step-by-step derivation"),
-            ("Switch to Verify Mode", lambda: self.app.switch_mode_action("VERIFY"), "F4/Ctrl+V - Audit claims"),
-            ("Switch to Visualize Mode", lambda: self.app.switch_mode_action("VISUALIZE"), "F5 - Mathematical plots"),
-            ("Switch to Research Mode", lambda: self.app.switch_mode_action("RESEARCH"), "Ctrl+R - Literature search"),
-            ("Clear Conversation Log", self.app.clear_chat, "Resets conversation logs"),
-            ("Reset Tool Logs", self.app.clear_tool_logs, "Resets operations panel logs"),
-        ]
-        
-        for name, callback, desc in commands:
-            score = matcher.match(name)
-            if score > 0:
-                yield Hit(
-                    score=score,
-                    match_display=matcher.highlight(name),
-                    callback=callback,
-                    help=desc
-                )
+from codex_mentis.agents.providers import ProviderConfig, get_provider
+from codex_mentis.agents import TutorAgent, ResearchAgent, ProverAgent, ReviewerAgent, VisualizerAgent
+from codex_mentis.agents.explainer import ExplainerAgent
+from codex_mentis.agents.self_improver import SelfImproverAgent
+from codex_mentis.agents.orchestrator import Orchestrator, OrchestratorResponse, AgentResponse
 
-class CodexMentisTUI(App):
-    """The central Textual TUI Application for Codex Mentis."""
-    
-    TITLE = "Codex Mentis math & physics IDE"
-    COMMANDS = App.COMMANDS | {CodexCommandProvider}
+class TuiApp(App):
+    """
+    Main Codex Mentis Textual TUI application.
+    Features a split-screen layout with interactive widgets and real-time streaming agent dialogue.
+    """
     
     DEFAULT_CSS = """
-    Screen {
-        background: #0f172a;
-        color: #cbd5e1;
+    TuiApp {
+        background: $background;
+        color: $text;
+        font-size: 100%;
     }
-    #top_bar {
+    
+    #top-bar {
         height: 3;
-        background: #1e293b;
-        border-bottom: solid #334155;
-        padding: 0 1;
+        background: $panel;
         layout: horizontal;
+        align: left middle;
+        padding-left: 2;
+        border-bottom: solid $accent;
     }
-    #mode_selectors {
-        width: 65fr;
-        height: 3;
-        layout: horizontal;
-        align-vertical: middle;
-    }
-    #topic_input_container {
-        width: 35fr;
-        height: 3;
-        layout: horizontal;
-        align-vertical: middle;
-        align-horizontal: right;
-    }
-    #topic_label {
-        color: #94a3b8;
-        margin-top: 1;
+    
+    #top-bar Label {
         margin-right: 1;
-        text-style: bold;
+        content-align: center center;
     }
-    #topic_input {
-        width: 25;
-        height: 1;
+    
+    #top-bar Select {
+        width: 20;
+        margin-right: 3;
     }
-    #main_split {
-        height: 1fr;
-        width: 100%;
+    
+    #top-bar Input {
+        width: 40;
+    }
+    
+    #main-container {
         layout: horizontal;
-    }
-    #left_panel {
-        width: 45fr;
+        width: 100%;
         height: 1fr;
-        border-right: solid #334155;
+    }
+    
+    #left-pane {
+        width: 40%;
+        height: 100%;
+        border-right: tall $accent;
         layout: vertical;
     }
-    #chat_history {
+    
+    #chat-log {
         height: 1fr;
-        overflow-y: scroll;
+        scrollbar-gutter: stable;
         padding: 1 2;
+        overflow-y: scroll;
         layout: vertical;
     }
-    .user-msg {
-        margin-top: 1;
-        margin-bottom: 1;
-        padding: 1;
-        background: #1e293b;
-        border-left: solid #22c55e 3;
+    
+    .chat-bubble {
+        margin: 1 0;
+        padding: 1 2;
+        border-radius: 4;
+        width: auto;
+        max-width: 90%;
     }
-    .agent-msg {
-        margin-top: 1;
-        margin-bottom: 1;
-        padding: 1;
-        background: #0f172a;
+    
+    .user-bubble {
+        background: $boost;
+        border: solid $primary;
+        align-self: flex-end;
     }
-    .system-msg {
-        margin-top: 1;
-        margin-bottom: 1;
-        padding: 0 1;
-        color: #94a3b8;
-        text-style: italic;
+    
+    .assistant-bubble {
+        background: $panel;
+        border: solid $accent;
+        align-self: flex-start;
     }
-    #input_container {
-        height: 4;
-        padding: 1;
-        background: #1e293b;
-        border-top: solid #334155;
+    
+    #chat-input-bar {
+        height: 3;
+        layout: horizontal;
+        border-top: solid $accent;
+        background: $boost;
     }
-    #chat_input {
-        width: 100%;
+    
+    #chat-input-bar Input {
+        width: 1fr;
+    }
+    
+    #chat-input-bar Button {
+        width: 10;
+    }
+    
+    #right-pane {
+        width: 60%;
+        height: 100%;
+    }
+    
+    #bottom-bar {
         height: 1;
-    }
-    #right_panel {
-        width: 55fr;
-        height: 1fr;
-        layout: vertical;
-    }
-    #right_switcher {
-        height: 3fr;
-        width: 100%;
-    }
-    #operation_panel_container {
-        height: 1fr;
-        width: 100%;
-        border-top: solid #334155;
-    }
-    #bottom_bar {
-        height: 1;
-        background: #0284c7;
-        color: #ffffff;
+        background: $primary-darken-3;
+        color: white;
+        layout: horizontal;
         padding: 0 2;
-        text-style: bold;
     }
-    Button {
-        background: #334155;
-        color: #cbd5e1;
-        border: none;
-        height: 1;
-        margin-right: 1;
-        min-width: 11;
-        padding: 0 1;
-    }
-    Button:hover {
-        background: #475569;
-    }
-    Button.active-mode {
-        background: #0284c7;
-        color: #ffffff;
-        text-style: bold;
+    
+    .status-item {
+        margin-right: 4;
     }
     """
 
     BINDINGS = [
-        ("f1", "switch_mode_study", "Study Mode"),
-        ("f2", "switch_mode_explore", "Explore Mode"),
-        ("f3", "switch_mode_reason", "Reason Mode"),
-        ("f4", "switch_mode_verify", "Verify Mode"),
-        ("f5", "switch_mode_visualize", "Visualize Mode"),
-        ("ctrl+r", "switch_mode_research", "Research Mode"),
-        ("ctrl+v", "switch_mode_verify", "Verify Mode"),
-        ("ctrl+p", "command_palette", "Commands"),
+        ("f1", "switch_mode('STUDY')", "Study Mode"),
+        ("f2", "switch_mode('EXPLORE')", "Explore Mode"),
+        ("f3", "switch_mode('REASON')", "Reason Mode"),
+        ("f4", "switch_mode('VERIFY')", "Verify Mode"),
+        ("f5", "switch_mode('VISUALIZE')", "Visualize Mode"),
+        ("ctrl+t", "toggle_theme", "Toggle Theme"),
+        ("ctrl+q", "exit_app", "Quit"),
     ]
 
-    active_mode = reactive("STUDY")
-    active_topic = reactive("general")
-
-    def __init__(self, **kwargs):
+    def __init__(self, mode: str = "STUDY", topic: str = "general", **kwargs):
         super().__init__(**kwargs)
-        # Initialize dependencies
-        from codex_mentis.concepts.graph import ConceptGraph
-        from codex_mentis.concepts.tracker import MasteryTracker
-        from codex_mentis.memory.store import MemoryStore
+        self.initial_mode = mode.upper()
+        self.initial_topic = topic
+        self.orchestrator: Optional[Orchestrator] = None
+        self.provider_name = "gemini"
         
-        self.concept_graph = ConceptGraph()
-        self.mastery_tracker = MasteryTracker(concept_graph=self.concept_graph)
-        self.memory_store = MemoryStore()
-        
-        # Load active provider details
-        self.config_obj = load_config()
-        self.default_provider_name = self.config_obj.providers.default
-        
-        # Socratic fallback default initialization (will load full orchestrator if available)
-        self.orchestrator = None
-        self._init_orchestrator()
+        # Configure and bootstrap orchestrator
+        self.initialize_orchestrator()
 
-    def _init_orchestrator(self) -> None:
-        """Initializes actual Orchestrator and specialized agents using provider configs."""
+    def initialize_orchestrator(self) -> None:
+        """Loads configuration and builds the orchestrator agent pipeline."""
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or "mock"
+        
+        # Default model settings
+        self.provider_name = "gemini"
+        default_model = "gemini-1.5-flash"
+        
         try:
-            from codex_mentis.agents.providers import ProviderConfig, get_provider
-            from codex_mentis.agents.tutor import TutorAgent
-            from codex_mentis.agents.researcher import ResearchAgent
-            from codex_mentis.agents.prover import ProverAgent
-            from codex_mentis.agents.reviewer import ReviewerAgent
-            from codex_mentis.agents.visualizer import VisualizerAgent
-            from codex_mentis.agents.explainer import ExplainerAgent
-            from codex_mentis.agents.self_improver import SelfImproverAgent
-            from codex_mentis.agents.orchestrator import Orchestrator
-            
-            api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or "mock"
-            
-            default_model = "gemini-1.5-flash"
-            if self.default_provider_name == "openai":
+            config_obj = load_config()
+            self.provider_name = config_obj.providers.default
+            if self.provider_name == "openai":
                 default_model = "gpt-4o"
-            elif self.default_provider_name == "anthropic":
+            elif self.provider_name == "anthropic":
                 default_model = "claude-3-5-sonnet-20240620"
-            elif self.default_provider_name == "local":
+            elif self.provider_name == "local":
                 default_model = "local-model"
-                
-            prov_config = ProviderConfig(
-                api_key=api_key,
-                model=default_model,
-                max_tokens=4096
-            )
-            
-            provider = get_provider(self.default_provider_name, prov_config)
-            
-            agents = {
-                "tutor": TutorAgent(provider),
-                "researcher": ResearchAgent(provider),
-                "prover": ProverAgent(provider),
-                "reviewer": ReviewerAgent(provider),
-                "visualizer": VisualizerAgent(provider),
-                "explainer": ExplainerAgent(provider),
-                "self_improver": SelfImproverAgent(provider)
-            }
-            
-            self.orchestrator = Orchestrator(
-                agents=agents,
-                memory=self.memory_store,
-                concept_graph=self.concept_graph
-            )
         except Exception:
-            # Fallback to simulated Socratic mock
-            self.orchestrator = None
+            pass
+            
+        config = ProviderConfig(
+            api_key=api_key,
+            model=default_model,
+            max_tokens=4096
+        )
+        
+        prov = get_provider(self.provider_name, config)
+        
+        # Build core agents
+        agents = {
+            "tutor": TutorAgent(prov),
+            "researcher": ResearchAgent(prov),
+            "prover": ProverAgent(prov),
+            "reviewer": ReviewerAgent(prov),
+            "visualizer": VisualizerAgent(prov),
+            "explainer": ExplainerAgent(prov),
+            "self_improver": SelfImproverAgent(prov)
+        }
+        
+        from codex_mentis.concepts.graph import ConceptGraph
+        from codex_mentis.memory.store import MemoryStore
+        from codex_mentis.memory.layers import ThreeLayerMemory
+        
+        # Build support infrastructure
+        try:
+            concept_graph = ConceptGraph()
+            db_store = MemoryStore(db_path=str(CONFIG_DIR / "memory.db"))
+            memory_store = ThreeLayerMemory(db_store, prov)
+        except Exception:
+            concept_graph = None
+            memory_store = None
+            
+        self.orchestrator = Orchestrator(
+            agents=agents,
+            memory=memory_store,
+            concept_graph=concept_graph
+        )
 
     def compose(self) -> ComposeResult:
-        # Top Bar
-        with Horizontal(id="top_bar"):
-            with Horizontal(id="mode_selectors"):
-                yield Button("Study (F1)", id="btn_study")
-                yield Button("Explore (F2)", id="btn_explore")
-                yield Button("Reason (F3)", id="btn_reason")
-                yield Button("Verify (F4)", id="btn_verify")
-                yield Button("Visualize (F5)", id="btn_visualize")
-                yield Button("Research (^R)", id="btn_research")
-            with Horizontal(id="topic_input_container"):
-                yield Static("Topic:", id="topic_label")
-                yield Input(value=self.active_topic, placeholder="Current topic...", id="topic_input")
-                
-        # Main Split Panel
-        with Horizontal(id="main_split"):
-            # Left panel (chat log)
-            with Vertical(id="left_panel"):
-                with Vertical(id="chat_history"):
-                    yield Static("[bold magenta]Codex Mentis Math & Physics Workspace[/bold magenta]\n"
-                                 "Type a query below to prompt the AI agent reasoning loops.\n"
-                                 "Press [bold cyan]Ctrl+P[/bold cyan] to open command palette fuzzy search.", classes="system-msg")
-                with Container(id="input_container"):
-                    yield Input(placeholder="Ask a question or input a derivation query...", id="chat_input")
-            
-            # Right panel (switching visualizations + operations logger)
-            with Vertical(id="right_panel"):
-                with ContentSwitcher(initial="concept_graph_view", id="right_switcher"):
-                    yield ConceptGraphWidget(
-                        concept_graph=self.concept_graph,
-                        mastery_tracker=self.mastery_tracker,
-                        id="concept_graph_view"
-                    )
-                    yield SplitReasoningPanel(id="split_reasoning_view")
-                    yield ProofTreeWidget(id="proof_tree_view")
-                    yield PlotWidget(id="plot_view")
-                    yield MemoryViewer(memory_store=self.memory_store, id="memory_view")
-                    
-                with Container(id="operation_panel_container"):
-                    yield AgentPanel(id="operation_panel")
-                    
-        # Bottom status bar
-        yield Static(id="bottom_bar")
+        yield Header()
+        
+        # Top panel modes and topics
+        mode_options = [
+            ("Tutoring/Study", "STUDY"),
+            ("Research/Explore", "EXPLORE"),
+            ("Proof Derivation", "REASON"),
+            ("Logical Verification", "VERIFY"),
+            ("Mathematical Plotting", "VISUALIZE")
+        ]
+        
+        yield Horizontal(
+            Label("Mode:"),
+            Select(mode_options, value=self.initial_mode, id="mode-select"),
+            Label("Topic:"),
+            Input(value=self.initial_topic, placeholder="Enter math/physics topic...", id="topic-input"),
+            id="top-bar"
+        )
+        
+        # Main splitscreen
+        yield Horizontal(
+            Vertical(
+                # Chat History Logs
+                Vertical(id="chat-log"),
+                # Message input bar
+                Horizontal(
+                    Input(placeholder="Ask a question or enter a /command...", id="chat-input"),
+                    Button("Send", variant="primary", id="send-btn"),
+                    id="chat-input-bar"
+                ),
+                id="left-pane"
+            ),
+            Vertical(
+                TabbedContent(
+                    TabPane("Concept Graph", ConceptGraphWidget(id="tui-concept-graph")),
+                    TabPane("Split Reasoning", SplitReasoning(id="tui-split-reasoning")),
+                    TabPane("Proof Tree", ProofTreeWidget(id="tui-proof-tree")),
+                    TabPane("Equation Display", EquationDisplay(latex_str="\\mathcal{L} = T - V", title="Lagrangian", id="tui-equation-display")),
+                    TabPane("Plot", PlotWidget(expr="x**2", id="tui-plot")),
+                    TabPane("Memory Viewer", MemoryViewer(id="tui-memory-viewer")),
+                    TabPane("Agent Monitor", AgentPanel(id="tui-agent-panel")),
+                    id="tabs"
+                ),
+                id="right-pane"
+            ),
+            id="main-container"
+        )
+        
+        # Bottom status indicators
+        yield Horizontal(
+            Label("Status: Idle", id="status-agent", classes="status-item"),
+            Label("Confidence: 100%", id="status-confidence", classes="status-item"),
+            Label("Tools: None", id="status-tools", classes="status-item"),
+            Label(f"Provider: {self.provider_name.upper()}", id="status-provider", classes="status-item"),
+            Label("Memory: Clean", id="status-memory", classes="status-item"),
+            Label("Theme: Dark", id="status-theme", classes="status-item"),
+            id="bottom-bar"
+        )
+        
+        yield Footer()
 
     def on_mount(self) -> None:
-        self.update_bottom_bar()
-        self.switch_mode_action("STUDY")
+        self.title = "Codex Mentis CLI"
+        self.sub_title = "Dynamic Math & Physics Agent TUI"
         
-        # Attach graph click callbacks to update active topic
-        graph_widget = self.query_one("#concept_graph_view", ConceptGraphWidget)
-        graph_widget.set_click_callback(self.on_concept_selected)
+        # Add welcome greeting in chat log
+        chat_log = self.query_one("#chat-log", Vertical)
+        welcome_md = (
+            f"### Welcome to **Codex Mentis**!\n\n"
+            f"Collaborative AI agents are ready to assist you. Mode is set to **{self.initial_mode}** for topic **{self.initial_topic}**.\n\n"
+            f"- Try typing a formula, or ask a tutor guidance question.\n"
+            f"- Type `/help` to see all available slash commands.\n"
+            f"- Use shortcuts `F1`-`F5` to switch modes, or click tabs to explore visualizers."
+        )
+        chat_log.mount(Markdown(welcome_md, classes="chat-bubble assistant-bubble"))
+        self.update_memory_status()
 
-    def on_concept_selected(self, concept_name: str) -> None:
-        """Triggered when user clicks a node in the interactive concept graph."""
-        self.active_topic = concept_name
-        self.query_one("#topic_input", Input).value = concept_name
-        self.append_system_message(f"Selected concept: [bold cyan]{concept_name}[/bold cyan] for study.")
+    def update_memory_status(self) -> None:
+        """Check L1/L2/L3 entry counts to display in status bar."""
+        try:
+            conn = sqlite3.connect(CONFIG_DIR / "memory.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM memory_entries")
+            cnt = cursor.fetchone()[0]
+            conn.close()
+            self.query_one("#status-memory", Label).update(f"Memory entries: {cnt}")
+        except Exception:
+            self.query_one("#status-memory", Label).update("Memory: Unavailable")
 
-    def on_input_changed(self, event: Input.Changed) -> None:
-        if event.input.id == "topic_input":
-            self.active_topic = event.value
-            self.update_bottom_bar()
+    def action_switch_mode(self, mode: str) -> None:
+        """Keyboard action shortcut to switch agent study mode."""
+        self.query_one("#mode-select", Select).value = mode
+        self.add_system_message(f"Switched mode to {mode}.")
+
+    def action_toggle_theme(self) -> None:
+        """Swap light and dark theme styles."""
+        self.theme = "light" if self.theme == "dark" else "dark"
+        theme_lbl = self.query_one("#status-theme", Label)
+        theme_lbl.update(f"Theme: {self.theme.upper()}")
+
+    def action_exit_app(self) -> None:
+        self.exit()
+
+    def add_system_message(self, text: str) -> None:
+        chat_log = self.query_one("#chat-log", Vertical)
+        chat_log.mount(Static(f"[italic grey50]System: {text}[/italic grey50]", classes="chat-bubble"))
+        # Scroll to bottom
+        chat_log.scroll_end(animate=False)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id == "chat_input":
-            user_text = event.value.strip()
-            if not user_text:
-                return
-            event.input.value = ""
-            # Run async agent queries without blocking TUI drawing
-            self.run_worker(self.process_agent_query(user_text))
+        if event.input.id == "chat-input":
+            self.process_chat_input()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        # Match button IDs to switch modes
-        btn_id = event.button.id
-        if btn_id == "btn_study":
-            self.switch_mode_action("STUDY")
-        elif btn_id == "btn_explore":
-            self.switch_mode_action("EXPLORE")
-        elif btn_id == "btn_reason":
-            self.switch_mode_action("REASON")
-        elif btn_id == "btn_verify":
-            self.switch_mode_action("VERIFY")
-        elif btn_id == "btn_visualize":
-            self.switch_mode_action("VISUALIZE")
-        elif btn_id == "btn_research":
-            self.switch_mode_action("RESEARCH")
+        if event.button.id == "send-btn":
+            self.process_chat_input()
 
-    # Bindings action hooks
-    def action_switch_mode_study(self) -> None:
-        self.switch_mode_action("STUDY")
-    def action_switch_mode_explore(self) -> None:
-        self.switch_mode_action("EXPLORE")
-    def action_switch_mode_reason(self) -> None:
-        self.switch_mode_action("REASON")
-    def action_switch_mode_verify(self) -> None:
-        self.switch_mode_action("VERIFY")
-    def action_switch_mode_visualize(self) -> None:
-        self.switch_mode_action("VISUALIZE")
-    def action_switch_mode_research(self) -> None:
-        self.switch_mode_action("RESEARCH")
-
-    def switch_mode_action(self, mode: str) -> None:
-        """Central mode-switching logic updates buttons, switcher, and layouts."""
-        self.active_mode = mode
-        
-        # 1. Update mode selector button states
-        for m in ["study", "explore", "reason", "verify", "visualize", "research"]:
-            btn = self.query_one(f"#btn_{m}", Button)
-            if m.upper() == mode:
-                btn.add_class("active-mode")
-            else:
-                btn.remove_class("active-mode")
-                
-        # 2. Transition content switcher
-        switcher = self.query_one("#right_switcher", ContentSwitcher)
-        if mode == "STUDY":
-            switcher.current = "concept_graph_view"
-            self.query_one("#concept_graph_view", ConceptGraphWidget).redraw()
-        elif mode == "REASON":
-            switcher.current = "split_reasoning_view"
-        elif mode == "VERIFY":
-            switcher.current = "proof_tree_view"
-        elif mode == "VISUALIZE":
-            switcher.current = "plot_view"
-        elif mode in ("EXPLORE", "RESEARCH"):
-            switcher.current = "memory_view"
-            self.query_one("#memory_view", MemoryViewer).refresh_all()
+    def process_chat_input(self) -> None:
+        chat_input = self.query_one("#chat-input", Input)
+        user_text = chat_input.value.strip()
+        if not user_text:
+            return
             
-        self.update_bottom_bar()
-
-    def update_bottom_bar(self) -> None:
-        """Refresh stats and configuration labels displayed on the bottom bar."""
-        try:
-            with sqlite3.connect(self.memory_store.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM memories")
-                mem_count = cursor.fetchone()[0]
-        except Exception:
-            mem_count = 0
+        chat_input.value = ""
+        
+        # Print user message to chat log
+        chat_log = self.query_one("#chat-log", Vertical)
+        chat_log.mount(Markdown(f"**You:** {user_text}", classes="chat-bubble user-bubble"))
+        chat_log.scroll_end(animate=False)
+        
+        # Intercept slash commands
+        if user_text.startswith("/"):
+            self.execute_slash_command(user_text)
+            return
             
-        footer = self.query_one("#bottom_bar", Static)
-        status_text = (
-            f" 🧠 MODE: {self.active_mode} | "
-            f"📂 TOPIC: {self.active_topic} | "
-            f"🔌 PROVIDER: {self.default_provider_name} | "
-            f"💾 MEMORY: {mem_count} entries"
-        )
-        footer.update(status_text)
-
-    def append_system_message(self, text: str) -> None:
-        chat_history = self.query_one("#chat_history", Vertical)
-        msg = Static(text, classes="system-msg")
-        chat_history.mount(msg)
-        chat_history.scroll_end(animate=False)
-
-    async def append_agent_message(self, text: str) -> None:
-        """Types out agent response typewriter style in real-time, completing with markdown rendering."""
-        chat_history = self.query_one("#chat_history", Vertical)
-        msg_widget = Static("", classes="agent-msg")
-        chat_history.mount(msg_widget)
-        chat_history.scroll_end(animate=False)
+        # Get mode and topic settings
+        mode = str(self.query_one("#mode-select", Select).value or "STUDY").lower()
+        topic = self.query_one("#topic-input", Input).value.strip() or "general"
         
-        # Type out characters in chunks to keep rendering fast but interactive
-        chunk_size = 5
-        current_text = ""
-        for i in range(0, len(text), chunk_size):
-            current_text += text[i:i+chunk_size]
-            msg_widget.update(current_text)
-            chat_history.scroll_end(animate=False)
-            await asyncio.sleep(0.01)
+        # Reset agent panels status monitor
+        self.query_one("#tui-agent-panel", AgentPanel).set_all_idle()
+        
+        # Run async agent orchestrator query in background worker
+        self.run_worker(self.execute_orchestration(user_text, mode, topic), exclusive=True)
+
+    def execute_slash_command(self, command_str: str) -> None:
+        """Parses and executes slash commands in the TUI app."""
+        parts = command_str.split(" ", 1)
+        cmd = parts[0].lower()
+        arg = parts[1] if len(parts) > 1 else ""
+        
+        chat_log = self.query_one("#chat-log", Vertical)
+        tabs = self.query_one("#tabs", TabbedContent)
+        
+        if cmd in ("/quit", "/exit"):
+            self.exit()
             
-        # Final update using markdown formatting for equations and tables
-        msg_widget.update(Markdown(text))
-        chat_history.scroll_end(animate=False)
-
-    async def process_agent_query(self, user_text: str) -> None:
-        """Executes the agent orchestrator response chain asynchronously."""
-        # 1. Display user query
-        chat_history = self.query_one("#chat_history", Vertical)
-        user_msg = Static(f"[bold green]You:[/bold green] {user_text}", classes="user-msg")
-        chat_history.mount(user_msg)
-        chat_history.scroll_end(animate=False)
-        
-        # 2. Show operations thinking logger status
-        agent_panel = self.query_one("#operation_panel", AgentPanel)
-        agent_panel.active_agent = "Orchestrator"
-        agent_panel.current_tool = "aprocess"
-        agent_panel.confidence = 0.5
-        
-        self.append_system_message("Thinking...")
-        
-        # 3. Call agent processes
-        try:
-            if self.orchestrator:
-                response = await self.orchestrator.aprocess(
-                    user_input=user_text,
-                    mode=self.active_mode.lower(),
-                    context=f"Topic: {self.active_topic}"
-                )
-                response_content = response.content
-                routed_agent = response.metadata.get("routed_agent", "tutor")
-                workflow = response.metadata.get("workflow", "single-agent")
-                agent_responses = response.agent_responses
-            else:
-                # Socratic mock fallback
-                await asyncio.sleep(1.0)
-                from codex_mentis.cli.repl import orchestrate
-                response_content = orchestrate(
-                    query=user_text,
-                    mode=self.active_mode,
-                    topic=self.active_topic
-                )
-                routed_agent = "tutor"
-                workflow = "socratic-mock"
-                agent_responses = []
-
-            # Remove thinking indicators
-            thinking_msg = self.query(".system-msg").last()
-            if thinking_msg:
-                thinking_msg.remove()
-
-            # 4. Process token and operation metadata
-            prompt_tokens = 0
-            completion_tokens = 0
-            for r in agent_responses:
-                if hasattr(r, "token_usage") and r.token_usage:
-                    prompt_tokens += r.token_usage.get("prompt_tokens", 0)
-                    completion_tokens += r.token_usage.get("completion_tokens", 0)
-                    
-            if prompt_tokens == 0:
-                # Mock token increments
-                prompt_tokens = len(user_text) // 2
-                completion_tokens = len(response_content) // 2
-
-            confidence = 0.95 if self.active_mode in ("VERIFY", "VISUALIZE") else 0.85
-
-            agent_panel.update_status(
-                agent=f"{routed_agent.title()} ({workflow})",
-                tool="None",
-                confidence=confidence,
-                prompt_t=prompt_tokens,
-                completion_t=completion_tokens
+        elif cmd == "/clear":
+            for child in list(chat_log.children):
+                child.remove()
+            self.add_system_message("Chat history cleared.")
+            
+        elif cmd == "/help":
+            help_md = (
+                "#### Available Slash Commands:\n"
+                "- `/mode <MODE> <topic>` - Switch mode (STUDY/EXPLORE/REASON) and topic\n"
+                "- `/plot <expression>` - Plot function & open Plot tab\n"
+                "- `/concept map` - Open concept DAG graph visualizer\n"
+                "- `/memory show` - Open memory auditor layers viewer\n"
+                "- `/verify <claim>` - Run SymPy verification check\n"
+                "- `/clear` - Clear chat history logs\n"
+                "- `/help` - Show this dialogue manual\n"
+                "- `/quit` or `/exit` - Exit app"
             )
-
-            # Log tool calls in operational panel
-            for r in agent_responses:
-                if hasattr(r, "metadata") and r.metadata:
-                    for k, v in r.metadata.items():
-                        agent_panel.log_tool_call(k, str(v)[:30])
-
-            # 5. Output response and sync widgets
-            await self.append_agent_message(response_content)
-            self.parse_response_and_update_widgets(response_content)
-            self.update_bottom_bar()
-
-            # Refresh memory viewer if open
-            self.query_one("#memory_view", MemoryViewer).refresh_all()
-
-        except Exception as e:
-            thinking_msg = self.query(".system-msg").last()
-            if thinking_msg:
-                thinking_msg.remove()
-            self.append_system_message(f"[bold red]System Error:[/bold red] {e}")
-            agent_panel.active_agent = "Idle"
-            agent_panel.current_tool = "None"
-            agent_panel.confidence = 0.0
-
-    def parse_response_and_update_widgets(self, response_text: str) -> None:
-        """Route parts of agent response content to the appropriate specialized widgets."""
-        # Update derivation reasoning panel
-        split_panel = self.query_one("#split_reasoning_view", SplitReasoningPanel)
-        split_panel.parse_and_update(response_text)
-        
-        # Update proof trees
-        proof_tree = self.query_one("#proof_tree_view", ProofTreeWidget)
-        proof_tree.parse_and_load(response_text)
-        
-        # Check for LaTeX plot equations
-        plot_widget = self.query_one("#plot_view", PlotWidget)
-        equations = re.findall(r"\$\$(.*?)\$\$", response_text)
-        if not equations:
-            equations = re.findall(r"\$(.*?)\$", response_text)
+            chat_log.mount(Markdown(help_md, classes="chat-bubble assistant-bubble"))
+            chat_log.scroll_end(animate=False)
             
-        plot_expr = None
-        for eq in equations:
-            if "=" in eq and "x" in eq:
-                parts = eq.split("=")
-                clean_rhs = parts[1].replace("\\sin", "sin").replace("\\cos", "cos").replace("\\exp", "exp").strip()
-                plot_expr = clean_rhs
-                break
+        elif cmd == "/mode":
+            mode_parts = arg.split(" ", 1)
+            new_mode = mode_parts[0].upper()
+            new_topic = mode_parts[1] if len(mode_parts) > 1 else "general"
+            if new_mode not in ("STUDY", "EXPLORE", "REASON", "VERIFY", "VISUALIZE"):
+                self.add_system_message(f"Unknown mode: {new_mode}. Use STUDY, EXPLORE, REASON, VERIFY, or VISUALIZE.")
+            else:
+                self.query_one("#mode-select", Select).value = new_mode
+                self.query_one("#topic-input", Input).value = new_topic
+                self.add_system_message(f"Switched mode to {new_mode} for topic: {new_topic}")
                 
-        if not plot_expr:
-            # Check for explicit plot string matches
-            expr_match = re.search(r"plot\s+([a-zA-Z0-9\s\+\-\*\/\(\)\^]+)", response_text, re.IGNORECASE)
-            if expr_match:
-                plot_expr = expr_match.group(1).strip()
+        elif cmd == "/plot":
+            if not arg:
+                self.add_system_message("Usage: /plot <expression> (e.g. sin(x))")
+            else:
+                plot_widget = self.query_one("#tui-plot", PlotWidget)
+                plot_widget.set_expression(arg)
+                tabs.active = "tab-5"  # Tab index for Plot
+                self.add_system_message(f"Plotting function: {arg}")
                 
-        if plot_expr:
+        elif cmd == "/concept":
+            tabs.active = "tab-1"  # Concept Graph
+            self.add_system_message("Opened Concept Graph.")
+            
+        elif cmd == "/memory":
+            tabs.active = "tab-6"  # Memory Viewer
+            self.add_system_message("Opened Memory Layers Auditor.")
+            
+        elif cmd == "/verify":
+            if not arg:
+                self.add_system_message("Usage: /verify <claim> (e.g. sin(x)**2 + cos(x)**2 = 1)")
+            else:
+                self.add_system_message(f"Verifying claim: {arg}")
+                self.run_worker(self.execute_orchestration(f"Verify claim: {arg}", "verify", "general"), exclusive=True)
+                
+        else:
+            self.add_system_message(f"Unknown slash command: {cmd}")
+
+    async def execute_orchestration(self, query: str, mode: str, topic: str) -> None:
+        """Asynchronous background worker task that streams response token-by-token."""
+        chat_log = self.query_one("#chat-log", Vertical)
+        status_lbl = self.query_one("#status-agent", Label)
+        conf_lbl = self.query_one("#status-confidence", Label)
+        tools_lbl = self.query_one("#status-tools", Label)
+        agent_panel = self.query_one("#tui-agent-panel", AgentPanel)
+        
+        # 1. Update UI Status: Active Agent Thinking
+        active_agent = "Tutor"
+        if mode == "explore":
+            active_agent = "Researcher"
+        elif mode == "reason":
+            active_agent = "Prover"
+        elif mode == "verify":
+            active_agent = "Reviewer"
+        elif mode == "visualize":
+            active_agent = "Visualizer"
+            
+        status_lbl.update(f"Status: {active_agent} (Thinking...)")
+        agent_panel.update_agent(active_agent, "Thinking", thoughts="Formulating response...")
+        
+        # 2. Add empty streaming block to chat log
+        bubble = Markdown("", classes="chat-bubble assistant-bubble")
+        chat_log.mount(bubble)
+        chat_log.scroll_end(animate=False)
+        
+        # Find active agent based on mode
+        agent_key = None
+        if "study" in mode:
+            agent_key = "tutor"
+        elif "explore" in mode:
+            agent_key = "researcher"
+        elif mode in ("derive", "reason", "prover"):
+            agent_key = "prover"
+        elif "verify" in mode or "review" in mode:
+            agent_key = "reviewer"
+        elif mode in ("plot", "visualize", "visualizer"):
+            agent_key = "visualizer"
+            
+        agent = self.orchestrator.agents.get(agent_key)
+        if not agent:
+            # Fallback
+            agent = list(self.orchestrator.agents.values())[0] if self.orchestrator.agents else None
+            
+        if not agent or self.orchestrator is None:
+            bubble.update("Error: No active agent or orchestrator initialized.")
+            status_lbl.update("Status: Idle")
+            return
+
+        # Build prompt messages
+        context_str = f"Topic: {topic}"
+        messages = [
+            {"role": "system", "content": agent.system_prompt},
+            {"role": "user", "content": f"--- CONTEXT ---\n{context_str}\n---------------\n\n{query}"}
+        ]
+        
+        full_response = ""
+        
+        # 3. Stream tokens
+        try:
+            agent_panel.update_agent(active_agent, "Working", thoughts="Streaming token output...")
+            tools_lbl.update(f"Tools: {', '.join([t['function']['name'] for t in agent.tools]) if agent.tools else 'None'}")
+            
+            async for token in agent.provider.astream(messages):
+                # Ensure worker hasn't been cancelled/replaced
+                if get_current_worker().is_cancelled:
+                    return
+                full_response += token
+                bubble.update(full_response)
+                # Keep scroll down
+                chat_log.scroll_end(animate=False)
+                await asyncio.sleep(0.01) # Yield execution for UI loop responsiveness
+                
+            # If successful, calculate confidence heuristic from content
+            confidence = 1.0
+            import re
+            conf_match = re.search(r"<confidence>\s*(0\.\d+|1\.0|1)\s*</confidence>", full_response, re.IGNORECASE)
+            if conf_match:
+                confidence = float(conf_match.group(1))
+            elif any(w in full_response.lower() for w in ["unsure", "maybe", "not certain"]):
+                confidence = 0.7
+                
+            conf_lbl.update(f"Confidence: {confidence * 100:.0f}%")
+            agent_panel.update_agent(active_agent, "Idle", confidence=confidence, thoughts="Idle. Final response delivered.")
+            
+        except Exception as e:
+            full_response += f"\n\n*Error during streaming: {str(e)}*"
+            bubble.update(full_response)
+            agent_panel.update_agent(active_agent, "Error", thoughts=f"Execution failed: {str(e)}")
+            
+        status_lbl.update("Status: Idle")
+        self.update_memory_status()
+        
+        # Save dialogue to L1 memory database
+        if self.orchestrator.memory:
             try:
-                clean_expr = plot_expr.replace("{", "").replace("}", "")
-                plot_widget.add_expression(clean_expr)
+                self.orchestrator.memory.add_message({"role": "user", "content": query})
+                self.orchestrator.memory.add_message({"role": "assistant", "content": full_response})
             except Exception:
                 pass
+                
+        # 4. Smart update of visualizer widgets based on response content
+        tabs = self.query_one("#tabs", TabbedContent)
+        
+        # Check LaTeX formulas
+        formulas = re.findall(r"\$\$(.*?)\$\$", full_response)
+        if not formulas:
+            formulas = re.findall(r"\$(.*?)\$", full_response)
+        if formulas:
+            eq_widget = self.query_one("#tui-equation-display", EquationDisplay)
+            eq_widget.set_equation(formulas[0], title=f"Formula on {topic.title()}")
+            tabs.active = "tab-4" # Switch to Equation display
+            
+        # Check equations to plot
+        if "plot" in query.lower() or "visualize" in query.lower():
+            plot_expr = None
+            for eq in formulas:
+                if "=" in eq and "x" in eq:
+                    parts = eq.split("=")
+                    plot_expr = parts[1].replace("\\sin", "sin").replace("\\cos", "cos").replace("\\exp", "exp").strip()
+                    break
+            if not plot_expr:
+                plot_expr = "x**2"
+            plot_widget = self.query_one("#tui-plot", PlotWidget)
+            plot_widget.set_expression(plot_expr)
+            tabs.active = "tab-5" # Switch to Plot
+            
+        # Check proof trees/derivations
+        if "prove" in query.lower() or "derive" in query.lower() or "proof" in query.lower() or mode == "reason":
+            # Populate split reasoning widget
+            split_widget = self.query_one("#tui-split-reasoning", SplitReasoning)
+            split_widget.split_and_set_text(full_response)
+            
+            # Populate proof tree step widget
+            steps = [line.strip() for line in full_response.splitlines() if line.strip().startswith(("Step", "* Step", "- Step"))]
+            if steps:
+                tree_widget = self.query_one("#tui-proof-tree", ProofTreeWidget)
+                tree_widget.set_proof_steps(steps, title=f"Proof for {topic.title()}")
+                tabs.active = "tab-3" # Switch to Proof Tree
+            else:
+                tabs.active = "tab-2" # Switch to Split Reasoning
 
-    def clear_chat(self) -> None:
-        """Action callback to purge chat log layout."""
-        chat_history = self.query_one("#chat_history", Vertical)
-        # Remove all children except the initial welcome system message
-        for child in list(chat_history.children)[1:]:
-            child.remove()
-
-    def clear_tool_logs(self) -> None:
-        """Action callback to clear agent panel logs."""
-        agent_panel = self.query_one("#operation_panel", AgentPanel)
-        agent_panel.clear_logs()
-
-def launch_tui() -> None:
-    app = CodexMentisTUI()
-    app.run()
-
-if __name__ == "__main__":
-    launch_tui()
+    def on_concept_selected(self, event: ConceptSelected) -> None:
+        """Triggered when user clicks a concept node in the DAG visualizer."""
+        self.query_one("#topic-input", Input).value = event.concept_id
+        self.add_system_message(f"Selected concept from graph: {event.concept_name} ({event.concept_id})")
+        # Trigger Socratic explanation of that concept
+        self.run_worker(self.execute_orchestration(f"Explain the concept of {event.concept_name}.", "study", event.concept_id), exclusive=True)

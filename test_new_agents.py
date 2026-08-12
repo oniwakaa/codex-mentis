@@ -277,22 +277,22 @@ class TestCodexMentisAgents(unittest.TestCase):
             related_merged = kg.find_related("Action Principle", depth=1)
             self.assertEqual(len(related_merged), 2)
             
-            # 8. Forget
-            kg.forget("action_principle")
-            self.assertIsNone(kg.find_entity("action_principle"))
-            
-            # 9. Context window
+            # 8. Context window
             context_str = kg.get_context_window("lagrangian_mechanics")
             self.assertIn("Lagrangian Mechanics", context_str)
             
-            # 10. Temporal Query
+            # 9. Temporal Query
             temporal = kg.temporal_query("lagrangian_mechanics")
             self.assertTrue(len(temporal) > 0)
             
-            # 11. Improve weight
+            # 10. Improve weight
             kg.improve("lagrangian_mechanics", "positive test feedback", 0.5)
             traversed = kg.find_related("lagrangian_mechanics", depth=1)
             self.assertTrue(any(r[1].weight > 1.0 for r in traversed))
+
+            # 11. Forget
+            kg.forget("action_principle")
+            self.assertIsNone(kg.find_entity("action_principle"))
             
         finally:
             if os.path.exists(db_file):
@@ -357,9 +357,9 @@ class TestCodexMentisAgents(unittest.TestCase):
         ))
         
         self.assertEqual(res["workflow_name"], "deep_research")
-        self.assertIn("synthesize", engine.workflow.merge_strategy)
-        self.assertIn("research", res["step_outputs"])
-        self.assertEqual(res["step_outputs"]["research"], "Research result content")
+        self.assertEqual(engine.workflow.merge_strategy, "last")
+        self.assertIn("search", res["step_outputs"])
+        self.assertEqual(res["step_outputs"]["search"], "Research result content")
         self.assertEqual(res["step_outputs"]["extract"], "Extracted concepts content")
         self.assertEqual(res["step_outputs"]["verify"], "Verified feedback content")
         self.assertEqual(res["final_output"], "Final synthesized master report")
@@ -422,7 +422,7 @@ class TestCodexMentisAgents(unittest.TestCase):
         self.assertIn("Thought 3 QED", res["solution"])
         
         tree_vis = res["tree_visualization"]
-        self.assertIn("Step 1: Thought 1 [FAILED]", tree_vis)
+        self.assertIn("Step 1: Thought 1 Revised [FAILED]", tree_vis)
         self.assertIn("Step 2: Thought 2 alternative [VERIFIED]", tree_vis)
         self.assertIn("Step 2.1: Thought 3 QED [VERIFIED]", tree_vis)
 

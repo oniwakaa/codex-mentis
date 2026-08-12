@@ -10,11 +10,16 @@ from collections import Counter
 class EmbeddingEngine:
     """Generates text embeddings for semantic search."""
 
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2", cache_dir: Optional[str] = None):
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2", cache_dir: Optional[str] = None, db_path: Optional[str] = None):
         self.model_name = model_name
         self.cache_dir = cache_dir
+        self.db_path = db_path
         self._model = None
         self._use_transformer = None
+
+    def embed(self, text: str) -> List[float]:
+        """Generate embedding for a single text (alias for encode_single)."""
+        return self.encode_single(text)
 
     def _try_load_model(self):
         """Try to load sentence-transformers model."""

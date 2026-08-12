@@ -163,8 +163,9 @@ class MemoryStore:
         if entry.timestamp:
             row["timestamp"] = entry.timestamp.strftime("%Y-%m-%d %H:%M:%S")
             
-        db["memory_entries"].insert(row)
-        return db["memory_entries"].last_pk
+        table = db["memory_entries"]
+        table.insert(row)
+        return table.last_pk
 
     def get_memory_entry(self, entry_id: int) -> Optional[MemoryEntry]:
         """Read a memory entry by ID."""

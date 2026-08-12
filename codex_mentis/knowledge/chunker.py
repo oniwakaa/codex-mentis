@@ -3,6 +3,13 @@ import re
 from typing import List, Dict, Any, Optional
 
 
+class Chunk:
+    """Represents a chunk of document text with associated metadata."""
+    def __init__(self, text: str, metadata: dict):
+        self.text = text
+        self.metadata = metadata
+
+
 class SmartChunker:
     """Chunks text intelligently, preserving mathematical expressions and context."""
 
@@ -18,6 +25,11 @@ class SmartChunker:
         self.overlap = overlap
         self.preserve_equations = preserve_equations
 
+    def chunk(self, text: str, max_tokens: int = 100) -> List[Chunk]:
+        """Backward compatibility for tests expecting Chunk objects with metadata attributes."""
+        dict_chunks = self.chunk_text(text)
+        return [Chunk(c["text"], c["metadata"]) for c in dict_chunks]
+
     def chunk_text(self, text: str, source: str = "") -> List[Dict[str, Any]]:
         """Chunk text into semantically meaningful pieces."""
         # First, split into sections by headers
@@ -25,6 +37,7 @@ class SmartChunker:
 
         chunks = []
         for section_title, section_text in sections:
+            has_eq = bool(re.search(r"\$\$.*?\$\$|\\begin\{(?:equation|align|eqnarray)", section_text, re.DOTALL))
             if len(section_text) <= self.max_chunk_size:
                 chunks.append({
                     "text": section_text,
@@ -32,6 +45,7 @@ class SmartChunker:
                         "source": source,
                         "section": section_title,
                         "char_count": len(section_text),
+                        "has_equation": has_eq,
                     }
                 })
             else:

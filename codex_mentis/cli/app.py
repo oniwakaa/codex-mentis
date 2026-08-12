@@ -222,8 +222,6 @@ def chat_cmd(
 @app.callback(invoke_without_command=True)
 def main_callback(
     ctx: typer.Context,
-    tui: bool = typer.Option(False, "--tui", "-t", help="Launch Textual TUI"),
-    simple: bool = typer.Option(False, "--simple", "-s", help="Simple readline mode"),
     model: str = typer.Option(None, "--model", "-m", help="Override model"),
 ):
     """Codex Mentis — AI-powered math & physics learning.
@@ -233,7 +231,6 @@ def main_callback(
     if ctx.invoked_subcommand is not None:
         return
 
-    # Default: launch chat
     from codex_mentis.chat import launch_chat, load_provider_config
 
     config = load_provider_config()

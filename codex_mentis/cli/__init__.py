@@ -1,5 +1,4 @@
 """Codex Mentis CLI module."""
-# Lazy imports to avoid loading TUI/Textual when not needed
 from codex_mentis.cli.rich_ui import (
     print_markdown,
     print_panel,
@@ -13,15 +12,14 @@ from codex_mentis.cli.rich_ui import (
 
 
 def launch_repl(**kwargs):
-    """Launch the REPL (lazy import)."""
-    from codex_mentis.cli.repl import launch_repl as _launch
-    return _launch(**kwargs)
+    """Launch the chat REPL (lazy import)."""
+    from codex_mentis.chat import launch_chat
+    return launch_chat(**kwargs)
 
 
 def get_tui_app():
-    """Get the TUI app class (lazy import to avoid Textual dependency at import time)."""
-    from codex_mentis.cli.tui import TuiApp
-    return TuiApp
+    """TUI removed — use chat.py REPL instead."""
+    raise ImportError("TUI removed. Use `codex-mentis` (chat REPL) instead.")
 
 
 __all__ = [

@@ -1,5 +1,6 @@
+"""Memory system — SQLite-backed memory store, spaced repetition, user graph."""
 from codex_mentis.memory.store import MemoryStore
-from codex_mentis.memory.layers import ThreeLayerMemory
-from codex_mentis.memory.retrieval import MemoryRetriever
 from codex_mentis.memory.spaced_repetition import SpacedRepetition
-from codex_mentis.memory.knowledge_graph import KnowledgeGraph, EntityNode, Relationship
+from codex_mentis.memory.user_graph import UserGraph
+
+__all__ = ["MemoryStore", "SpacedRepetition", "UserGraph"]

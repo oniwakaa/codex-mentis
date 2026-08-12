@@ -3,7 +3,7 @@ import sqlite3
 from typing import Optional
 from codex_mentis.core.config import CONFIG_DIR
 from codex_mentis.cli.rich_ui import print_panel, print_table
-from codex_mentis.cli.repl import launch_repl
+from codex_mentis.chat import launch_chat as launch_repl
 
 app = typer.Typer(help="Initiate Socratic study mode for a math/physics topic")
 

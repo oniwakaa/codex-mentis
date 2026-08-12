@@ -3,7 +3,7 @@ import httpx
 import xml.etree.ElementTree as ET
 from typing import Optional, List, Dict, Any
 from codex_mentis.cli.rich_ui import print_panel, print_table
-from codex_mentis.cli.repl import launch_repl
+from codex_mentis.chat import launch_chat as launch_repl
 
 app = typer.Typer(help="Explore open-ended questions using researcher agents")
 

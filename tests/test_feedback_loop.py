@@ -9,6 +9,7 @@ from pitagora.agents.self_improver import (
 )
 from pitagora.teaching.session import TeachingSession, ALL_STYLES
 from tests.conftest import MockProvider
+from tests.test_strategy import MockTutor
 
 
 # ─── quality mapping ─────────────────────────────────────────────────────────
@@ -134,5 +135,76 @@ def test_teaching_turn_records_real_quality():
         for r in report:
             if r["uses"] >= 1:
                 assert r["avg_quality"] == 5.0  # correct → quality 5
+    finally:
+        os.unlink(db_path)
+
+
+# ─── rate_explanation (orchestrator one-shot path) ───────────────────────────
+
+@pytest.mark.asyncio
+async def test_rate_explanation_parses_digit():
+    """rate_explanation returns the integer the LLM emits."""
+    improver = SelfImproverAgent(MockProvider())
+    improver.provider.responses.append({"content": "4", "tool_calls": []})
+    q = await improver.rate_explanation("limits", "beginner", "socratic", "A clear intro.")
+    assert q == 4
+
+
+@pytest.mark.asyncio
+async def test_rate_explanation_parses_embedded_digit():
+    """rate_explanation finds the integer in a longer response."""
+    improver = SelfImproverAgent(MockProvider())
+    improver.provider.responses.append({"content": "Rating: 5", "tool_calls": []})
+    q = await improver.rate_explanation("limits", "beginner", "socratic", "Great.")
+    assert q == 5
+
+
+@pytest.mark.asyncio
+async def test_rate_explanation_fallback_no_digit():
+    """No digit in the response → neutral 3."""
+    improver = SelfImproverAgent(MockProvider())
+    # default MockProvider response has no 1-5 digit
+    q = await improver.rate_explanation("limits", "beginner", "socratic", "Some text.")
+    assert q == 3
+
+
+@pytest.mark.asyncio
+async def test_rate_explanation_empty():
+    """Empty explanation → neutral 3 without an LLM call."""
+    improver = SelfImproverAgent(MockProvider())
+    q = await improver.rate_explanation("limits", "beginner", "socratic", "")
+    assert q == 3
+
+
+@pytest.mark.asyncio
+async def test_rate_explanation_rejects_out_of_range():
+    """An out-of-range digit (7) is ignored → neutral 3."""
+    improver = SelfImproverAgent(MockProvider())
+    improver.provider.responses.append({"content": "7", "tool_calls": []})
+    q = await improver.rate_explanation("limits", "beginner", "socratic", "x")
+    assert q == 3
+
+
+def test_orchestrator_records_rated_quality():
+    """The orchestrator one-shot tutor path records the LLM-rated quality."""
+    import tempfile, os
+    fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        improver = SelfImproverAgent(MockProvider(), db_path=db_path)
+        # rate_explanation will pop this → quality 5
+        improver.provider.responses.append({"content": "5", "tool_calls": []})
+        from pitagora.agents.orchestrator import Orchestrator
+        orch = Orchestrator(agents={"tutor": MockTutor()}, self_improver=improver)
+        resp = orch.process("Explain calculus", mode="study")
+        assert resp.content.startswith("athink")
+        report = improver.strategy_report()
+        # The recorded quality should be 5 (from rate_explanation), not 3.
+        for r in report:
+            if r["uses"] >= 1:
+                assert r["avg_quality"] == 5.0
+                break
+        else:
+            assert False, "no interaction recorded"
     finally:
         os.unlink(db_path)

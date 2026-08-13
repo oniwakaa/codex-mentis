@@ -269,19 +269,26 @@ class Orchestrator:
                         agent_response = await agent.athink(prompt)
                     else:
                         agent_response = await agent.explain_concept(user_input)
-                    # ponytail: the orchestrator free-form tutor path has no
-                    # ResponseAnalyzer classifier, so quality defaults to neutral
-                    # 3 here. The chat REPL teaching path (_run_teaching_turn)
-                    # records real quality derived from the learner's classified
-                    # reply, and free-form chat there supports explicit /rate N.
-                    # Upgrade this path by passing a classifier in if the
-                    # standalone orchestrate() REPL needs real feedback.
+                    # The orchestrator one-shot tutor path has no learner reply
+                    # to classify, so quality is a content-derived self-assessment:
+                    # the self-improver rates its own explanation 1-5 via the LLM.
+                    # The chat REPL teaching path (_run_teaching_turn) remains the
+                    # source of real learner-derived quality; this is a heuristic
+                    # fallback for the standalone orchestrate() path.
+                    try:
+                        quality = await self.self_improver.rate_explanation(
+                            topic=user_input, level=level,
+                            strategy=strategy or "socratic",
+                            explanation=agent_response.content,
+                        )
+                    except Exception:
+                        quality = 3
                     try:
                         self.self_improver.record_interaction(
                             topic=user_input,
                             level=level,
                             strategy_used=strategy or "socratic",
-                            response_quality=3,
+                            response_quality=quality,
                         )
                     except Exception:
                         pass

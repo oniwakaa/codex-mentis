@@ -716,3 +716,42 @@ class SelfImproverAgent(BaseAgent):
         # Focus = bottom strategies' topics
         focus = [r["strategy_used"] for r in bottom]
         return {"top": top, "bottom": bottom, "trending": trending, "focus": focus}
+
+    async def rate_explanation(
+        self, topic: str, level: str, strategy: str, explanation: str
+    ) -> int:
+        """Content-derived self-assessment of a produced explanation.
+
+        The orchestrator one-shot tutor path has no learner reply to classify,
+        so this asks the model to rate the explanation it just produced on a
+        1-5 pedagogical-quality scale. Returns 3 (neutral) on any failure.
+        This is a heuristic, not a student signal — the chat REPL teaching path
+        remains the source of real learner-derived quality.
+        """
+        if not explanation or not explanation.strip():
+            return 3
+        prompt = (
+            f"<role>Pedagogical quality assessor.</role>\n"
+            f"<context>A tutor explained '{topic}' to a {level} student using a "
+            f"{strategy} style.</context>\n"
+            f"<explanation>\n{explanation[:1500]}\n</explanation>\n"
+            f"<instructions>Rate the explanation's pedagogical quality on a "
+            f"1-5 scale (1=confusing/wrong, 3=adequate, 5=clear, accurate, "
+            f"well-paced). Reply with ONLY a single integer 1-5.</instructions>"
+        )
+        try:
+            resp = await self.athink(prompt)
+            text = (resp.content or "").strip()
+            # Take the first integer found in the response.
+            for tok in text.split():
+                if tok.isdigit():
+                    q = int(tok)
+                    if 1 <= q <= 5:
+                        return q
+            # Fallback: scan for a digit anywhere.
+            for ch in text:
+                if ch.isdigit() and 1 <= int(ch) <= 5:
+                    return int(ch)
+        except Exception as e:
+            logger.debug("rate_explanation failed: %s", e)
+        return 3

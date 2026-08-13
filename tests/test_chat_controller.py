@@ -181,7 +181,7 @@ def test_unknown_command_is_visible():
 # ─── Teaching mode tests (Task 5) ───
 
 from pitagora.teaching.analyzer import ResponseClassification
-from pitagora.teaching.session import TeachingState
+from pitagora.teaching.session import TeachingSession, TeachingState
 from pitagora.journeys.model import LearningJourney
 
 
@@ -205,6 +205,15 @@ def test_explore_starts_teaching_and_emits_inline_widgets(monkeypatch):
         "pitagora.chat_controller.ResponseAnalyzer",
         lambda completion: CorrectAnalyzer(),
     )
+    monkeypatch.setattr(
+        "pitagora.journeys.store.get_or_create_journey",
+        lambda topic, subs: LearningJourney(
+            topic=topic,
+            sub_concepts=[
+                {"name": n, "mastery": 0.0, "visited": False} for n in subs
+            ],
+        ),
+    )
 
     events = list(controller.handle_input("/explore limits"))
 
@@ -220,9 +229,7 @@ def test_explore_starts_teaching_and_emits_inline_widgets(monkeypatch):
 
 def test_pause_shortcut_saves_and_leaves_teaching(monkeypatch):
     controller = make_controller()
-    controller.teaching_session = __import__(
-        "pitagora.teaching.session", fromlist=["TeachingSession"]
-    ).TeachingSession("limits", ["Definition"])
+    controller.teaching_session = TeachingSession("limits", ["Definition"])
     controller.teaching_session.transition(TeachingState.exploring)
     controller.teaching_journey = LearningJourney(
         topic="limits",
@@ -240,3 +247,4 @@ def test_pause_shortcut_saves_and_leaves_teaching(monkeypatch):
 
     assert controller.teaching_session is None
     assert events[-1].kind == "state_changed"
+    assert len(saved) == 1 and saved[0].topic == "limits"

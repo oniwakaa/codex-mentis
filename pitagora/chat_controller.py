@@ -734,9 +734,16 @@ class ChatController:
         prompt = chat_runtime._build_teaching_prompt(session, action, style)
         self.messages.append({"role": "user", "content": prompt})
         yield ChatEvent("status", "Teaching...", {"busy": True})
-        response = self.completion(
-            self.messages, model=self.model, config=self.config,
-        )
+        try:
+            response = self.completion(
+                self.messages, model=self.model, config=self.config,
+            )
+        except Exception:
+            # Roll back the teaching prompt so retries leave the conversation
+            # in a consistent state (no orphan user turn without a reply),
+            # mirroring _handle_freeform_turn.
+            self.messages.pop()
+            raise
         self.messages.append({"role": "assistant", "content": response})
 
         yield ChatEvent("markdown", response)

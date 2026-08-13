@@ -6,6 +6,12 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Static, OptionList
+from textual import work
+from pitagora.chat_controller import ChatEvent
+from pitagora.cli.tui_widgets import split_math, EquationWidget
+from pitagora.teaching.ui import build_comprehension_gauge, build_subconcept_progress, build_controls
+from textual.widgets import Markdown
+
 
 from pitagora.cli.repl_input import COMMAND_TREE
 from pitagora.cli.tui_widgets import (
@@ -126,6 +132,7 @@ class PitagoraApp(App):
         super().__init__(**kwargs)
         self.controller = controller
         self.active_journeys = []
+        self._turn_worker = None
         self.due_reviews = []
 
     def compose(self) -> ComposeResult:
@@ -207,14 +214,82 @@ class PitagoraApp(App):
         self.toggle_class("compact")
         self._apply_sidebar_layout(self.size.width)
 
+    def _quit_callback(self, confirm: bool) -> None:
+        if confirm:
+            if self._turn_worker and self._turn_worker.is_running:
+                self._turn_worker.cancel()
+            self.exit()
+
     async def action_request_quit(self) -> None:
-        quit_screen = QuitScreen()
-        result = await self.push_screen_wait(quit_screen)
-        if result:
+        if self.controller.context.get("teaching"):
+            self.push_screen(QuitScreen(), self._quit_callback)
+        else:
+            if self._turn_worker and self._turn_worker.is_running:
+                self._turn_worker.cancel()
             self.exit()
             
     def action_clear_visible(self) -> None:
-        pass
+        conversation = self.query_one("#conversation")
+        conversation.remove_children()
+        conversation.mount(Static("[dim]Conversation cleared visually.[/dim]"))
+        self.query_one("#composer").focus()
+
+
+    @work(thread=True, exclusive=True, group="chat-turn")
+    def run_turn(self, text: str) -> None:
+        try:
+            for event in self.controller.handle_input(text):
+                self.call_from_thread(self.render_event, event)
+        except Exception as exc:
+            self.call_from_thread(
+                self.render_event,
+                ChatEvent("error", f"Error: {exc}"),
+            )
+        finally:
+            self.call_from_thread(self.finish_turn)
+
+    def finish_turn(self) -> None:
+        composer = self.query_one("#composer")
+        composer.read_only = False
+        footer = self.query_one("#footer", Static)
+        footer.update("Ctrl+B sidebar  Ctrl+X compact  / commands")
+        composer.focus()
+        conversation = self.query_one("#conversation")
+        conversation.scroll_end(animate=False)
+
+    def render_event(self, event: ChatEvent) -> None:
+        conversation = self.query_one("#conversation")
+        if event.kind == "user":
+            conversation.mount(Static(f"[dim]△ you>[/dim] {event.content}", classes="user-msg"))
+        elif event.kind == "markdown":
+            parts = split_math(event.content)
+            for p_type, p_text, _ in parts:
+                if p_type == "markdown":
+                    conversation.mount(Markdown(p_text, classes="markdown-msg"))
+                elif p_type == "equation":
+                    conversation.mount(EquationWidget(p_text, classes="equation-msg"))
+        elif event.kind == "renderable":
+            conversation.mount(Static(event.content, expand=True))
+        elif event.kind == "error":
+            conversation.mount(Static(f"[red]{event.content}[/red]", classes="error-msg"))
+        elif event.kind == "status":
+            if self._turn_worker and self._turn_worker.is_running:
+                footer = self.query_one("#footer", Static)
+                footer.update(f"[cyan]{event.content}[/cyan]")
+            else:
+                conversation.mount(Static(f"[dim]{event.content}[/dim]"))
+        elif event.kind == "comprehension":
+            conversation.mount(Static(build_comprehension_gauge(event.content)))
+        elif event.kind == "subconcepts":
+            conversation.mount(Static(build_subconcept_progress(event.content, event.metadata["current_index"], compact=True)))
+        elif event.kind == "controls":
+            conversation.mount(Static(build_controls()))
+        elif event.kind == "state_changed":
+            header_context = self.query_one("#header-context", Static)
+            sidebar = self.query_one("#sidebar", ContextSidebar)
+            sidebar.update_context(event.metadata["context"])
+            if event.metadata.get("quit"):
+                self.exit()
 
     def _refresh_elapsed(self) -> None:
         elapsed = self.controller.context.get("elapsed_seconds", 0)
@@ -259,6 +334,9 @@ class PitagoraApp(App):
 
     def on_chat_text_area_autocomplete_requested(self, event: ChatTextArea.AutocompleteRequested) -> None:
         popup = self.query_one("#command-popup")
+        if not event.accept:
+            popup.display = False
+            return
         if popup.display and popup.highlighted is not None:
             composer = self.query_one("#composer")
             option = popup.get_option_at_index(popup.highlighted)
@@ -276,15 +354,21 @@ class PitagoraApp(App):
             composer.focus()
             
     def on_chat_text_area_submitted(self, event: ChatTextArea.Submitted) -> None:
+        if self._turn_worker and self._turn_worker.is_running:
+            return
+
         popup = self.query_one("#command-popup")
         popup.display = False
         
         composer = self.query_one("#composer")
         composer.input_history.add(event.text)
         composer.text = ""
+        composer.read_only = True
         
-        for _ in self.controller.handle_input(event.text):
-            pass
+        footer = self.query_one("#footer", Static)
+        footer.update("[cyan]Processing...[/cyan]")
+        
+        self._turn_worker = self.run_turn(event.text)
 
 
 def launch_tui(

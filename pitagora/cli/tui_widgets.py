@@ -166,6 +166,19 @@ def split_math(text: str) -> List[Tuple[str, str, int]]:
     return [p for p in parts if p[1]] if parts else []
 
 
+
+class EquationWidget(Static):
+    def __init__(self, equation: str, *args, **kwargs):
+        from rich.panel import Panel
+        from rich.text import Text
+        super().__init__(*args, **kwargs)
+        self.equation = equation
+        self.panel = Panel(Text(equation, justify="center", style="cyan"), border_style="cyan")
+        
+    def render(self):
+        return self.panel
+
+
 class CommandPopup(OptionList):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -203,6 +216,19 @@ class ChatTextArea(TextArea):
         self.input_history = InputHistory()
 
     async def _on_key(self, event: events.Key) -> None:
+
+        if event.key == "escape":
+            from textual.css.query import NoMatches
+            popup = None
+            try:
+                popup = self.app.query_one("#command-popup")
+            except NoMatches:
+                pass
+            if popup and popup.display:
+                self.post_message(self.AutocompleteRequested(self, accept=False))
+                event.prevent_default()
+                return
+
         if event.key == "shift+enter":
             self.insert("\n")
             event.prevent_default()

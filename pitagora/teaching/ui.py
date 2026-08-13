@@ -17,9 +17,9 @@ console = Console()
 
 # Controls shown after each agent message in teaching mode.
 CONTROLS_LINE = (
-    "[cyan][n][/cyan] next  [cyan][e][/cyan] explain differently  "
-    "[cyan][d][/cyan] go deeper  [cyan][s][/cyan] skip  [cyan][?][/cyan] confused  "
-    "[cyan][v][/cyan] visualize  [cyan][q][/cyan] quiz  [cyan][p][/cyan] pause  "
+    "[cyan]\\[n][/cyan] next  [cyan]\\[e][/cyan] explain differently  "
+    "[cyan]\\[d][/cyan] go deeper  [cyan]\\[s][/cyan] skip  [cyan]\\[?][/cyan] confused  "
+    "[cyan]\\[v][/cyan] visualize  [cyan]\\[q][/cyan] quiz  [cyan]\\[p][/cyan] pause  "
     "[cyan]/help[/cyan]"
 )
 

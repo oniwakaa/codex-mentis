@@ -1,12 +1,13 @@
-from typing import List, Dict, Any, Optional, Tuple
 import time
+from typing import Any
+
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.table import Table
 from rich.panel import Panel
-from rich.tree import Tree
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
+from rich.table import Table
 from rich.text import Text
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.tree import Tree
 
 console = Console()
 
@@ -21,7 +22,7 @@ _PITAGORA_BANNER = r"""
 """
 
 
-def show_pitagora_banner(con: Optional[Console] = None) -> None:
+def show_pitagora_banner(con: Console | None = None) -> None:
     """Print the gold ASCII Pitagora banner."""
     con = con or console
     con.print(f"[bold yellow]{_PITAGORA_BANNER}[/bold yellow]")
@@ -31,7 +32,7 @@ def show_welcome(
     mode: str = "study",
     topic: str = "general",
     model: str = "unknown",
-    con: Optional[Console] = None,
+    con: Console | None = None,
 ) -> None:
     """Print the banner plus a welcome panel with mode/model/topic/commands."""
     con = con or console
@@ -82,8 +83,8 @@ def print_math(latex_str: str, return_str: bool = False):
     def _render(latex_str: str) -> str:
         # Try SymPy pretty-printing first; fall back to Unicode substitution.
         try:
-            from sympy.parsing.latex import parse_latex
             from sympy import pretty
+            from sympy.parsing.latex import parse_latex
             expr = parse_latex(latex_str)
             return pretty(expr)
         except Exception:
@@ -92,7 +93,7 @@ def print_math(latex_str: str, return_str: bool = False):
     out = _render(latex_str)
     if return_str:
         return out
-    console.print(f"[bold cyan]Math Formula:[/bold cyan]")
+    console.print("[bold cyan]Math Formula:[/bold cyan]")
     console.print(f"  [italic]{out}[/italic]")
 
 
@@ -150,7 +151,7 @@ def _unicode_substitute(latex_str: str) -> str:
     clean = re.sub(r"\_\{?([0-9a-zA-Z\+\-\=]+)\}?", replace_sub, clean)
     return clean
 
-def animated_progress(steps: List[str], duration_per_step: float = 0.6) -> None:
+def animated_progress(steps: list[str], duration_per_step: float = 0.6) -> None:
     """Displays animated progress bar loading indicator for multi-step derivations."""
     with Progress(
         SpinnerColumn(),
@@ -177,34 +178,46 @@ def print_split_reasoning(derivation: str, intuition: str) -> None:
     grid.add_row(left_panel, right_panel)
     console.print(grid)
 
-def print_plot(
-    x: List[float], 
-    y: List[float], 
+def build_plot(
+    x: list[float], 
+    y: list[float], 
     title: str, 
     xlabel: str, 
     ylabel: str, 
     plot_type: str = "function", 
-    x_range: Optional[Tuple[float, float]] = None
+    x_range: tuple[float, float] | None = None
+) -> Panel:
+    import plotext as plt
+    plt.clf()
+    plt.theme("dark")
+    
+    if plot_type == "scatter":
+        plt.scatter(x, y)
+    else:
+        plt.plot(x, y)
+        
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    
+    if x_range:
+        plt.xlim(x_range[0], x_range[1])
+        
+    ansi = plt.build()
+    return Panel(Text.from_ansi(ansi), title=title, expand=False)
+
+def print_plot(
+    x: list[float], 
+    y: list[float], 
+    title: str, 
+    xlabel: str, 
+    ylabel: str, 
+    plot_type: str = "function", 
+    x_range: tuple[float, float] | None = None
 ) -> None:
     """Renders a terminal plot using plotext."""
     try:
-        import plotext as plt
-        plt.clf()
-        plt.theme("dark")
-        
-        if plot_type == "scatter":
-            plt.scatter(x, y)
-        else:
-            plt.plot(x, y)
-            
-        plt.title(title)
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        
-        if x_range:
-            plt.xlim(x_range[0], x_range[1])
-            
-        plt.show()
+        console.print(build_plot(x, y, title, xlabel, ylabel, plot_type, x_range))
     except Exception as e:
         console.print(f"[yellow]Plotext execution failed: {e}[/yellow]")
         console.print(f"[bold]Plot: {title}[/bold]")
@@ -213,11 +226,11 @@ def print_plot(
 
 def print_concept_map(
     concept_id: str,
-    relations: Dict[str, List[str]],
-    concept_names: Dict[str, str],
+    relations: dict[str, list[str]],
+    concept_names: dict[str, str],
     direction: str = "prerequisites",
-    mastery_scores: Optional[Dict[str, float]] = None,
-    current_concept: Optional[str] = None,
+    mastery_scores: dict[str, float] | None = None,
+    current_concept: str | None = None,
 ) -> None:
     """Renders an ASCII concept dependency tree with mastery colors.
 
@@ -257,15 +270,11 @@ def print_concept_map(
     console.print(tree)
 
 
-def print_equation_block(
-    equations: List[Dict[str, str]],
+def build_equation_block(
+    equations: list[dict[str, str]],
     title: str = "Equations",
     style: str = "cyan",
-) -> None:
-    """Render a sequence of numbered equations in a Rich panel.
-
-    Each item: {"equation": "<latex>", "annotation": "<optional note>"}.
-    """
+) -> Panel:
     lines = []
     for i, eq in enumerate(equations, 1):
         rendered = print_math(eq["equation"], return_str=True)
@@ -275,12 +284,23 @@ def print_equation_block(
             line += f"\n      [dim italic]{ann}[/dim italic]"
         lines.append(line)
     content = "\n\n".join(lines)
-    print_panel(content, title=title, style=style)
+    return Panel(content, title=title, border_style=style, expand=False)
+
+def print_equation_block(
+    equations: list[dict[str, str]],
+    title: str = "Equations",
+    style: str = "cyan",
+) -> None:
+    """Render a sequence of numbered equations in a Rich panel.
+
+    Each item: {"equation": "<latex>", "annotation": "<optional note>"}.
+    """
+    console.print(build_equation_block(equations, title, style))
 
 
 def print_mastery_dashboard(
-    by_domain: Dict[str, Dict[str, Any]],
-    journeys: Optional[List[Dict[str, Any]]] = None,
+    by_domain: dict[str, dict[str, Any]],
+    journeys: list[dict[str, Any]] | None = None,
 ) -> None:
     """Mastery dashboard grouped by domain.
 
@@ -301,7 +321,7 @@ def print_mastery_dashboard(
         avg = float(stats.get("avg_score", 0.0))
         pct = (mastered / total * 100) if total else 0.0
         bar_width = 16
-        filled = int(round(pct / 100 * bar_width))
+        filled = round(pct / 100 * bar_width)
         bar = "█" * filled + "░" * (bar_width - filled)
         if avg >= 0.8:
             color = "green"
@@ -325,20 +345,23 @@ def print_mastery_dashboard(
                 f"({j.get('status', '?')}) — {j.get('interaction_count', 0)} interactions"
             )
 
-def print_table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None) -> None:
-    """Prints tabular data nicely formatted."""
-    table = Table(title=title, show_header=True, header_style="bold magenta")
+def build_table(headers: list[str], rows: list[list[Any]], title: str | None = None) -> Table:
+    table = Table(title=title, show_header=True, header_style="bold magenta", expand=True, row_styles=["none", "dim"])
     for header in headers:
         table.add_column(header)
     for row in rows:
         table.add_row(*[str(item) for item in row])
-    console.print(table)
+    return table
+
+def print_table(headers: list[str], rows: list[list[Any]], title: str | None = None) -> None:
+    """Prints tabular data nicely formatted."""
+    console.print(build_table(headers, rows, title))
 
 def create_spinner(text: str):
     """Creates a loading spinner context manager."""
     return console.status(text, spinner="dots")
 
-def format_proof(steps: List[str], title: str = "Proof Derivation") -> None:
+def format_proof(steps: list[str], title: str = "Proof Derivation") -> None:
     """Formats a step-by-step mathematical proof."""
     formatted_steps = []
     for idx, step in enumerate(steps, 1):

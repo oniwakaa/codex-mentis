@@ -1,20 +1,22 @@
 """Pitagora CLI — the main entry point."""
-import os
 import logging
+import os
+
 import typer
+
 from pitagora.cli.commands import (
-    study,
-    explore,
-    reason,
-    verify,
-    visualize,
     concept,
-    memory,
-    kb,
     config,
+    data,
+    explore,
+    kb,
+    memory,
+    reason,
     skills,
     strategy,
-    data,
+    study,
+    verify,
+    visualize,
 )
 
 log = logging.getLogger(__name__)
@@ -33,7 +35,7 @@ except ImportError as e:
     doctor = None
 
 try:
-    from pitagora.cli.commands import profile, session, onboard, ingest, setup
+    from pitagora.cli.commands import ingest, onboard, profile, session, setup
 except ImportError as e:
     log.warning("Failed to import %s: %s", "profile, session, onboard, ingest, setup", e)
     profile = session = onboard = ingest = setup = None
@@ -92,8 +94,8 @@ def research_cmd(
 ):
     """Research a topic using web-acquired knowledge with full citations."""
     from rich.console import Console
-    from rich.panel import Panel
     from rich.markdown import Markdown
+
     from pitagora.knowledge.acquisition import KnowledgeAcquisition
     from pitagora.knowledge.base import KnowledgeBase
 
@@ -130,9 +132,9 @@ def explain_cmd(
     side_by_side: bool = typer.Option(False, "--side-by-side", "-s", help="Technical + intuition side by side"),
 ):
     """Explain a complex topic at your level using the Feynman technique."""
-    import asyncio
     from rich.console import Console
     from rich.markdown import Markdown
+
     from pitagora.chat import chat_completion, load_provider_config
 
     console = Console()
@@ -163,6 +165,7 @@ def debate_cmd(
     """Run a structured debate between Prover and Reviewer agents."""
     from rich.console import Console
     from rich.markdown import Markdown
+
     from pitagora.chat import chat_completion, load_provider_config
 
     console = Console()
@@ -213,7 +216,7 @@ def debate_cmd(
     with console.status("[cyan]Synthesizing...[/cyan]"):
         verdict = chat_completion([{"role": "user", "content": synthesis_prompt}], config=config)
     
-    console.print(f"\n[bold]Verdict:[/bold]\n")
+    console.print("\n[bold]Verdict:[/bold]\n")
     console.print(Markdown(verdict))
 
 
@@ -222,6 +225,7 @@ def chat_cmd(
     mode: str = typer.Option("study", help="Mode: study/explore/reason/verify"),
     topic: str = typer.Option("general", help="Initial topic"),
     model: str = typer.Option(None, help="Override model"),
+    simple: bool = typer.Option(False, "--simple", help="Launch the simple Rich REPL instead of the Textual TUI"),
 ):
     """Launch the interactive chat REPL — the main experience."""
     from pitagora.chat import launch_chat
@@ -229,13 +233,14 @@ def chat_cmd(
     if model:
         os.environ["PITAGORA_MODEL"] = model
 
-    launch_chat(mode=mode, topic=topic)
+    launch_chat(mode=mode, topic=topic, simple=simple)
 
 
 @app.callback(invoke_without_command=True)
 def main_callback(
     ctx: typer.Context,
     model: str = typer.Option(None, "--model", "-m", help="Override model"),
+    simple: bool = typer.Option(False, "--simple", help="Launch the simple Rich REPL instead of the Textual TUI"),
 ):
     """Pitagora — AI-powered math & physics learning.
 
@@ -244,13 +249,13 @@ def main_callback(
     if ctx.invoked_subcommand is not None:
         return
 
-    from pitagora.chat import launch_chat
-
     # WS4b: first-run wizard. Launch the interactive setup wizard when no
     # config exists AND stdin is a TTY (interactive use). In non-interactive
     # contexts (CI, pipes), fall back to a one-line hint + defaults so the
     # command never blocks on a prompt.
     import sys
+
+    from pitagora.chat import launch_chat
     from pitagora.core.constants import CONFIG_PATH
     if not CONFIG_PATH.exists():
         if sys.stdin and sys.stdin.isatty():
@@ -270,7 +275,7 @@ def main_callback(
     if model:
         os.environ["PITAGORA_MODEL"] = model
 
-    launch_chat()
+    launch_chat(simple=simple)
 
 
 if __name__ == "__main__":

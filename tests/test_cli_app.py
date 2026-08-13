@@ -1,8 +1,10 @@
+from unittest.mock import patch
+
 import pytest
 from typer.testing import CliRunner
-from unittest.mock import MagicMock, patch
+
 from pitagora.cli.app import app
-from pitagora.agents.base import AgentResponse
+
 
 @pytest.fixture
 def runner():
@@ -52,3 +54,13 @@ def test_cli_verify_command(runner):
     """Test the verify command."""
     result = runner.invoke(app, ["verify", "1 + 1 = 2"])
     assert result.exit_code == 0
+
+def test_chat_help_shows_simple_option(runner):
+    result = runner.invoke(app, ["chat", "--help"])
+    assert result.exit_code == 0
+    assert "--simple" in result.stdout
+
+def test_root_help_shows_simple_option(runner):
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "--simple" in result.stdout

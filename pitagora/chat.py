@@ -9,22 +9,24 @@ This is the core chat loop. It connects ALL systems:
 - Memory (save/load conversations)
 - Spaced repetition (trigger reviews)
 """
-import os
 import logging
-from typing import Optional, Dict, Any, List
+import os
+from typing import Any
 
 import httpx
 
 from pitagora.core.constants import (
-    CONFIG_PATH, DEFAULT_BASE_URL, DEFAULT_API_KEY, DEFAULT_MODEL,
+    CONFIG_PATH,
+    DEFAULT_API_KEY,
+    DEFAULT_BASE_URL,
+    DEFAULT_MODEL,
 )
 
 log = logging.getLogger(__name__)
 
 
-def load_provider_config() -> Dict[str, Any]:
+def load_provider_config() -> dict[str, Any]:
     """Load provider configuration from config.yaml or environment."""
-    from pathlib import Path
     import yaml
 
     config_path = CONFIG_PATH
@@ -60,8 +62,8 @@ def load_provider_config() -> Dict[str, Any]:
 
 def chat_completion(
     messages: list,
-    model: Optional[str] = None,
-    config: Optional[Dict] = None,
+    model: str | None = None,
+    config: dict | None = None,
     stream: bool = False,
 ) -> str:
     """Send a chat completion request and return the response."""
@@ -145,8 +147,8 @@ def _build_feedback_loop():
         log.debug("feedback loop improver unavailable: %s", e)
 
     try:
-        from pitagora.skills.evolution import SkillEvolution
         from pitagora.skills.engine import SkillsEngine
+        from pitagora.skills.evolution import SkillEvolution
         skill_evo = SkillEvolution()
         skills_engine = SkillsEngine()
     except Exception as e:
@@ -214,7 +216,7 @@ def _get_concept_context(topic: str) -> str:
         cg = ConceptGraph()
         
         # Check if topic exists in graph
-        if topic.lower() in [k.lower() for k in cg.graph.keys()]:
+        if topic.lower() in [k.lower() for k in cg.graph]:
             prereqs = cg.get_prerequisites(topic)
             path = cg.get_learning_path(topic)
             if prereqs or path:
@@ -251,7 +253,7 @@ def _get_user_context() -> str:
         return ""
 
 
-def _verify_math(response: str) -> Optional[str]:
+def _verify_math(response: str) -> str | None:
     """Check if response contains math claims and verify with SymPy.
 
     Logs unexpected errors instead of silently swallowing them; only the
@@ -295,8 +297,8 @@ def _verify_math(response: str) -> Optional[str]:
 def _save_to_memory(role: str, content: str, topic: str = "general") -> None:
     """Save message to memory store."""
     try:
-        from pitagora.memory.store import MemoryStore
         from pitagora.core.models import MemoryEntry
+        from pitagora.memory.store import MemoryStore
         store = MemoryStore()
         entry = MemoryEntry(
             layer="L1",
@@ -311,8 +313,8 @@ def _save_to_memory(role: str, content: str, topic: str = "general") -> None:
 def _record_study(topic: str, user_input: str) -> None:
     """Record study activity in user graph."""
     try:
-        from pitagora.memory.user_graph import UserGraph
         from pitagora.cli.commands.onboard import load_profile
+        from pitagora.memory.user_graph import UserGraph
         profile = load_profile()
         if profile:
             ug = UserGraph()
@@ -321,7 +323,7 @@ def _record_study(topic: str, user_input: str) -> None:
         log.debug("failed to record study activity: %s", e)
 
 
-def _check_due_reviews() -> Optional[str]:
+def _check_due_reviews() -> str | None:
     """Check if there are cards due for spaced repetition review."""
     try:
         from pitagora.memory.spaced_repetition import SpacedRepetition
@@ -353,7 +355,7 @@ STYLE_GUIDES = {
 }
 
 
-def _generate_sub_concepts(topic: str, config: Dict[str, Any], model: str) -> List[str]:
+def _generate_sub_concepts(topic: str, config: dict[str, Any], model: str) -> list[str]:
     """Ask the LLM to decompose a topic into ordered sub-concepts."""
     messages = [
         {"role": "system", "content": SUBCONCEPT_GEN_PROMPT},
@@ -412,8 +414,11 @@ def _run_teaching_turn(console, session, analyzer, user_input, config, model, me
     ResponseAnalyzer classification (WS1) and records matched skill usage (WS3a).
     """
     from rich.markdown import Markdown
+
     from pitagora.teaching.ui import (
-        show_controls, show_comprehension_gauge, show_subconcept_progress,
+        show_comprehension_gauge,
+        show_controls,
+        show_subconcept_progress,
     )
 
     sc = session.current_subconcept
@@ -497,7 +502,8 @@ def _run_teaching_turn(console, session, analyzer, user_input, config, model, me
 def launch_chat(
     mode: str = "study",
     topic: str = "general",
-    system_prompt: Optional[str] = None,
+    system_prompt: str | None = None,
+    simple: bool = False,
 ) -> None:
     """Launch the interactive chat REPL with all systems connected."""
     from rich.console import Console
@@ -622,7 +628,7 @@ def launch_chat(
                             console.print(f"  [cyan]{s['id']}[/cyan] — {s['topic']} ({s['mode']}) — {s['message_count']} msgs")
                     continue
                 elif cmd == "/resume":
-                    from pitagora.sessions import load_session, list_sessions
+                    from pitagora.sessions import list_sessions, load_session
                     if arg:
                         sid = arg.strip()
                     else:
@@ -654,15 +660,15 @@ def launch_chat(
                     continue
                 elif cmd == "/progress":
                     try:
+                        from pitagora.cli.commands.onboard import load_profile
                         from pitagora.concepts.graph import ConceptGraph
                         from pitagora.memory.user_graph import UserGraph
-                        from pitagora.cli.commands.onboard import load_profile
                         
                         profile = load_profile()
                         cg = ConceptGraph()
                         ug = UserGraph()
                         
-                        console.print(f"[bold]📊 Progress Dashboard[/bold]\n")
+                        console.print("[bold]📊 Progress Dashboard[/bold]\n")
                         
                         if profile:
                             console.print(f"Level: {', '.join(f'{k}: {v}' for k, v in profile.get('levels', {}).items())}")
@@ -685,10 +691,11 @@ def launch_chat(
                     continue
                 elif cmd == "/ingest":
                     if arg:
-                        from pitagora.knowledge.base import KnowledgeBase
-                        from pitagora.knowledge.ingester import DocumentIngester
-                        from pitagora.knowledge.chunker import SmartChunker
                         from pathlib import Path
+
+                        from pitagora.knowledge.base import KnowledgeBase
+                        from pitagora.knowledge.chunker import SmartChunker
+                        from pitagora.knowledge.ingester import DocumentIngester
                         
                         target = Path(arg.strip()).expanduser()
                         if target.exists():
@@ -718,9 +725,13 @@ def launch_chat(
                         console.print("[dim]Usage: /ingest <path>[/dim]")
                     continue
                 elif cmd == "/explore":
-                    from pitagora.teaching.session import TeachingSession, TeachingState
                     from pitagora.teaching.analyzer import ResponseAnalyzer
-                    from pitagora.teaching.ui import show_topic_overview, show_controls, show_comprehension_gauge
+                    from pitagora.teaching.session import TeachingSession, TeachingState
+                    from pitagora.teaching.ui import (
+                        show_comprehension_gauge,
+                        show_controls,
+                        show_topic_overview,
+                    )
 
                     if arg.strip() == "--continue":
                         # Resume the most recent paused/active journey for any topic.
@@ -819,16 +830,17 @@ def launch_chat(
                     continue
                 elif cmd == "/workflow":
                     import asyncio as _asyncio
-                    from pitagora.agents.providers.base import ProviderConfig
-                    from pitagora.agents.providers import get_provider
-                    from pitagora.agents.tutor import TutorAgent
-                    from pitagora.agents.researcher import ResearchAgent
-                    from pitagora.agents.prover import ProverAgent
-                    from pitagora.agents.reviewer import ReviewerAgent
-                    from pitagora.agents.visualizer import VisualizerAgent
-                    from pitagora.agents.explainer import ExplainerAgent
-                    from pitagora.agents.self_improver import SelfImproverAgent
+
                     from pitagora.agents.data_analyst import DataAnalystAgent
+                    from pitagora.agents.explainer import ExplainerAgent
+                    from pitagora.agents.prover import ProverAgent
+                    from pitagora.agents.providers import get_provider
+                    from pitagora.agents.providers.base import ProviderConfig
+                    from pitagora.agents.researcher import ResearchAgent
+                    from pitagora.agents.reviewer import ReviewerAgent
+                    from pitagora.agents.self_improver import SelfImproverAgent
+                    from pitagora.agents.tutor import TutorAgent
+                    from pitagora.agents.visualizer import VisualizerAgent
                     from pitagora.agents.workflows import WorkflowEngine
 
                     AVAILABLE_WORKFLOWS = (
@@ -876,7 +888,7 @@ def launch_chat(
                     continue
                 elif cmd == "/latex":
                     if arg:
-                        from pitagora.latex_render import latex_to_unicode, render_equation_box
+                        from pitagora.latex_render import render_equation_box
                         console.print(render_equation_box(arg))
                     continue
                 elif cmd == "/rate":
@@ -961,8 +973,8 @@ def launch_chat(
                         except Exception:
                             pass
                     console.print(
-                        f"[dim]Teaching paused. Resumable with /explore --continue. "
-                        f"Back to free-form chat.[/dim]"
+                        "[dim]Teaching paused. Resumable with /explore --continue. "
+                        "Back to free-form chat.[/dim]"
                     )
                     teaching_session = None
                     teaching_analyzer = None

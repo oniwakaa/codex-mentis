@@ -111,40 +111,13 @@ def test_record_study_called_with_correct_args():
 
 
 def test_custom_system_prompt_appears_in_messages():
-    controller_with_prompt = ChatController(
-        mode="study",
-        topic="limits",
-        system_prompt="You are a custom tutor.",
-        config={"default_model": "test-model"},
-        completion=lambda messages, model=None, config=None: "answer",
-        rag_lookup=lambda query: "",
-        concept_lookup=lambda topic: "",
-        verify_math=lambda response: None,
-        save_memory=lambda role, content, topic: None,
-        record_study=lambda topic, user_input: None,
-        due_reviews=lambda: None,
-        user_context="",
-        feedback_loop=(None, None, None),
-    )
+    controller = make_controller(system_prompt="You are a custom tutor.")
 
-    assert controller_with_prompt.messages[0]["content"] == "You are a custom tutor."
+    assert controller.messages[0]["content"] == "You are a custom tutor."
 
 
 def test_user_context_appended_to_system_prompt():
-    controller = ChatController(
-        mode="study",
-        topic="limits",
-        config={"default_model": "test-model"},
-        completion=lambda messages, model=None, config=None: "answer",
-        rag_lookup=lambda query: "",
-        concept_lookup=lambda topic: "",
-        verify_math=lambda response: None,
-        save_memory=lambda role, content, topic: None,
-        record_study=lambda topic, user_input: None,
-        due_reviews=lambda: None,
-        user_context="[User profile: Alice]",
-        feedback_loop=(None, None, None),
-    )
+    controller = make_controller(user_context="[User profile: Alice]")
 
     assert controller.messages[0]["content"].startswith("You are Pitagora")
     assert controller.messages[0]["content"].endswith("[User profile: Alice]")

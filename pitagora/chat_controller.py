@@ -96,7 +96,6 @@ class ChatController:
             self.feedback_skill_evo,
             self.feedback_skills_engine,
         ) = loop
-        self._due_review_message = self.due_reviews()
 
     @staticmethod
     def _default_system_prompt() -> str:
@@ -130,7 +129,7 @@ class ChatController:
                 if session and session.sub_concepts
                 else 0.0
             ),
-            "due_reviews": self._due_review_message,
+            "due_reviews": self.due_reviews(),
         }
 
     def handle_input(self, user_input: str) -> Iterator[ChatEvent]:
@@ -163,11 +162,17 @@ class ChatController:
         )
         self.messages.append({"role": "user", "content": enriched})
         yield ChatEvent("status", "Thinking...", {"busy": True})
-        response = self.completion(
-            self.messages,
-            model=self.model,
-            config=self.config,
-        )
+        try:
+            response = self.completion(
+                self.messages,
+                model=self.model,
+                config=self.config,
+            )
+        except Exception:
+            # Roll back the user message so retries leave the conversation
+            # in a consistent state (no orphan user turn without a reply).
+            self.messages.pop()
+            raise
         self.messages.append({"role": "assistant", "content": response})
         yield ChatEvent("markdown", response)
         verification = self.verify_math(response)

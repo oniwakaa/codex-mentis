@@ -131,3 +131,48 @@ def test_controller_is_neutral_no_io_when_deps_injected(capsys):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == ""
+
+
+# ─── Command dispatch parity and state tests (Task 4) ───
+
+from pitagora.cli.repl_input import COMMAND_TREE
+
+
+def test_controller_has_handler_for_every_repl_command():
+    assert set(COMMAND_TREE).issubset(ChatController.COMMANDS)
+
+
+def test_mode_topic_and_model_commands_update_context():
+    controller = make_controller()
+
+    list(controller.handle_input("/mode reason"))
+    list(controller.handle_input("/topic derivatives"))
+    list(controller.handle_input("/model another-model"))
+
+    assert controller.context["mode"] == "reason"
+    assert controller.context["topic"] == "derivatives"
+    assert controller.context["model"] == "another-model"
+
+
+def test_clear_resets_messages_but_keeps_system_prompt():
+    controller = make_controller()
+    list(controller.handle_input("hello"))
+
+    events = list(controller.handle_input("/clear"))
+
+    assert controller.messages == [
+        {"role": "system", "content": controller.system_prompt}
+    ]
+    assert events[-1].kind == "state_changed"
+
+
+def test_quit_emits_quit_request():
+    events = list(make_controller().handle_input("/quit"))
+
+    assert events[-1].metadata["quit"] is True
+
+
+def test_unknown_command_is_visible():
+    events = list(make_controller().handle_input("/not-real"))
+
+    assert events == [ChatEvent("error", "Unknown: /not-real. /help for commands.")]

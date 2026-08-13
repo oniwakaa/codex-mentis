@@ -177,6 +177,34 @@ def print_split_reasoning(derivation: str, intuition: str) -> None:
     grid.add_row(left_panel, right_panel)
     console.print(grid)
 
+def build_plot(
+    x: List[float], 
+    y: List[float], 
+    title: str, 
+    xlabel: str, 
+    ylabel: str, 
+    plot_type: str = "function", 
+    x_range: Optional[Tuple[float, float]] = None
+) -> Panel:
+    import plotext as plt
+    plt.clf()
+    plt.theme("dark")
+    
+    if plot_type == "scatter":
+        plt.scatter(x, y)
+    else:
+        plt.plot(x, y)
+        
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    
+    if x_range:
+        plt.xlim(x_range[0], x_range[1])
+        
+    ansi = plt.build()
+    return Panel(Text.from_ansi(ansi), title=title, expand=False)
+
 def print_plot(
     x: List[float], 
     y: List[float], 
@@ -188,23 +216,7 @@ def print_plot(
 ) -> None:
     """Renders a terminal plot using plotext."""
     try:
-        import plotext as plt
-        plt.clf()
-        plt.theme("dark")
-        
-        if plot_type == "scatter":
-            plt.scatter(x, y)
-        else:
-            plt.plot(x, y)
-            
-        plt.title(title)
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        
-        if x_range:
-            plt.xlim(x_range[0], x_range[1])
-            
-        plt.show()
+        console.print(build_plot(x, y, title, xlabel, ylabel, plot_type, x_range))
     except Exception as e:
         console.print(f"[yellow]Plotext execution failed: {e}[/yellow]")
         console.print(f"[bold]Plot: {title}[/bold]")
@@ -257,6 +269,22 @@ def print_concept_map(
     console.print(tree)
 
 
+def build_equation_block(
+    equations: List[Dict[str, str]],
+    title: str = "Equations",
+    style: str = "cyan",
+) -> Panel:
+    lines = []
+    for i, eq in enumerate(equations, 1):
+        rendered = print_math(eq["equation"], return_str=True)
+        line = f"[bold yellow]({i})[/bold yellow]  {rendered}"
+        ann = eq.get("annotation")
+        if ann:
+            line += f"\\n      [dim italic]{ann}[/dim italic]"
+        lines.append(line)
+    content = "\\n\\n".join(lines)
+    return Panel(content, title=title, border_style=style, expand=False)
+
 def print_equation_block(
     equations: List[Dict[str, str]],
     title: str = "Equations",
@@ -266,16 +294,7 @@ def print_equation_block(
 
     Each item: {"equation": "<latex>", "annotation": "<optional note>"}.
     """
-    lines = []
-    for i, eq in enumerate(equations, 1):
-        rendered = print_math(eq["equation"], return_str=True)
-        line = f"[bold yellow]({i})[/bold yellow]  {rendered}"
-        ann = eq.get("annotation")
-        if ann:
-            line += f"\n      [dim italic]{ann}[/dim italic]"
-        lines.append(line)
-    content = "\n\n".join(lines)
-    print_panel(content, title=title, style=style)
+    console.print(build_equation_block(equations, title, style))
 
 
 def print_mastery_dashboard(
@@ -325,14 +344,17 @@ def print_mastery_dashboard(
                 f"({j.get('status', '?')}) — {j.get('interaction_count', 0)} interactions"
             )
 
-def print_table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None) -> None:
-    """Prints tabular data nicely formatted."""
-    table = Table(title=title, show_header=True, header_style="bold magenta")
+def build_table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None) -> Table:
+    table = Table(title=title, show_header=True, header_style="bold magenta", expand=True, row_styles=["none", "dim"])
     for header in headers:
         table.add_column(header)
     for row in rows:
         table.add_row(*[str(item) for item in row])
-    console.print(table)
+    return table
+
+def print_table(headers: List[str], rows: List[List[Any]], title: Optional[str] = None) -> None:
+    """Prints tabular data nicely formatted."""
+    console.print(build_table(headers, rows, title))
 
 def create_spinner(text: str):
     """Creates a loading spinner context manager."""

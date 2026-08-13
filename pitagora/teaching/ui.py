@@ -24,8 +24,11 @@ CONTROLS_LINE = (
 )
 
 
+def build_controls() -> Text:
+    return Text.from_markup(CONTROLS_LINE)
+
 def show_controls(con: Optional[Console] = None) -> None:
-    (con or console).print(CONTROLS_LINE)
+    (con or console).print(build_controls())
 
 
 def _score_color(score: float) -> str:
@@ -36,17 +39,53 @@ def _score_color(score: float) -> str:
     return "red"
 
 
-def show_comprehension_gauge(score: float, con: Optional[Console] = None) -> None:
-    """Render comprehension as a colored progress bar."""
-    con = con or console
+def build_comprehension_gauge(score: float) -> Text:
     color = _score_color(score)
     bar_width = 20
     filled = int(round(score * bar_width))
-    bar = "█" * filled + "░" * (bar_width - filled)
-    con.print(
-        f"[{color}]{bar}[/{color}] {score*100:5.1f}% comprehension"
+    return Text.assemble(
+        ("█" * filled + "░" * (bar_width - filled), color),
+        f" {score * 100:5.1f}% comprehension",
     )
 
+def show_comprehension_gauge(score: float, con: Optional[Console] = None) -> None:
+    """Render comprehension as a colored progress bar."""
+    (con or console).print(build_comprehension_gauge(score))
+
+
+def build_subconcept_progress(
+    sub_concepts: List[Dict[str, Any]],
+    current_index: int,
+    compact: bool = False,
+):
+    lines: List[str] = []
+    parts = []
+    for i, sc in enumerate(sub_concepts):
+        marker = "▸ " if i == current_index else ("" if compact else "  ")
+        name = sc.get("name", "?")
+        mastery = float(sc.get("mastery", 0.0))
+        visited = bool(sc.get("visited", False))
+        if not visited:
+            if compact:
+                parts.append((f"{marker}{name}", "dim"))
+            else:
+                lines.append(f"{marker}[dim]{name}[/dim]")
+        else:
+            color = _score_color(mastery)
+            if compact:
+                parts.append((f"{marker}{name} ({mastery*100:.0f}%)", color))
+            else:
+                lines.append(f"{marker}[{color}]{name}[/{color}] ({mastery*100:.0f}%)")
+    
+    if compact:
+        t = Text()
+        for i, (text, style) in enumerate(parts):
+            if i > 0:
+                t.append("; ", style="dim")
+            t.append(text, style=style)
+        return t
+    else:
+        return Panel("\\n".join(lines), title="Sub-concepts", border_style="blue")
 
 def show_subconcept_progress(
     sub_concepts: List[Dict[str, Any]],
@@ -54,19 +93,7 @@ def show_subconcept_progress(
     con: Optional[Console] = None,
 ) -> None:
     """Render sub-concept list with mastery colors and a current marker."""
-    con = con or console
-    lines: List[str] = []
-    for i, sc in enumerate(sub_concepts):
-        marker = "▸ " if i == current_index else "  "
-        name = sc.get("name", "?")
-        mastery = float(sc.get("mastery", 0.0))
-        visited = bool(sc.get("visited", False))
-        if not visited:
-            lines.append(f"{marker}[dim]{name}[/dim]")
-        else:
-            color = _score_color(mastery)
-            lines.append(f"{marker}[{color}]{name}[/{color}] ({mastery*100:.0f}%)")
-    con.print(Panel("\n".join(lines), title="Sub-concepts", border_style="blue"))
+    (con or console).print(build_subconcept_progress(sub_concepts, current_index))
 
 
 def show_topic_overview(

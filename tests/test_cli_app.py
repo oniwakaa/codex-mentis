@@ -1,6 +1,7 @@
 import pytest
 from typer.testing import CliRunner
 from unittest.mock import MagicMock, patch
+import pitagora.cli.app as cli_app
 from pitagora.cli.app import app
 from pitagora.agents.base import AgentResponse
 
@@ -52,3 +53,63 @@ def test_cli_verify_command(runner):
     """Test the verify command."""
     result = runner.invoke(app, ["verify", "1 + 1 = 2"])
     assert result.exit_code == 0
+
+
+def test_select_chat_launcher_uses_simple_when_explicit():
+    simple_launcher = MagicMock()
+
+    with patch.object(cli_app, "_load_simple_launcher", return_value=simple_launcher), patch.object(
+        cli_app, "_load_tui_launcher"
+    ) as load_tui:
+        selected = cli_app._select_chat_launcher(simple=True)
+
+    assert selected is simple_launcher
+    load_tui.assert_not_called()
+
+
+def test_select_chat_launcher_uses_simple_when_not_interactive():
+    simple_launcher = MagicMock()
+
+    with patch.object(cli_app, "_is_interactive", return_value=False), patch.object(
+        cli_app, "_load_simple_launcher", return_value=simple_launcher
+    ), patch.object(cli_app, "_load_tui_launcher") as load_tui:
+        selected = cli_app._select_chat_launcher(simple=False)
+
+    assert selected is simple_launcher
+    load_tui.assert_not_called()
+
+
+def test_select_chat_launcher_uses_tui_in_interactive_terminal():
+    tui_launcher = MagicMock()
+
+    with patch.object(cli_app, "_is_interactive", return_value=True), patch.object(
+        cli_app, "_load_tui_launcher", return_value=tui_launcher
+    ):
+        selected = cli_app._select_chat_launcher(simple=False)
+
+    assert selected is tui_launcher
+
+
+def test_select_chat_launcher_falls_back_when_textual_is_missing(capsys):
+    simple_launcher = MagicMock()
+    missing_textual = ModuleNotFoundError("No module named 'textual'", name="textual.widgets")
+
+    with patch.object(cli_app, "_is_interactive", return_value=True), patch.object(
+        cli_app, "_load_tui_launcher", side_effect=missing_textual
+    ), patch.object(cli_app, "_load_simple_launcher", return_value=simple_launcher):
+        selected = cli_app._select_chat_launcher(simple=False)
+
+    assert selected is simple_launcher
+    assert "pip install pitagora[tui]" in capsys.readouterr().out
+
+
+def test_select_chat_launcher_reraises_unrelated_missing_module():
+    missing_dependency = ModuleNotFoundError("No module named 'other'", name="other")
+
+    with patch.object(cli_app, "_is_interactive", return_value=True), patch.object(
+        cli_app, "_load_tui_launcher", side_effect=missing_dependency
+    ):
+        with pytest.raises(ModuleNotFoundError) as exc_info:
+            cli_app._select_chat_launcher(simple=False)
+
+    assert exc_info.value is missing_dependency

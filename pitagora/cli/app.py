@@ -1,6 +1,7 @@
 """Pitagora CLI — the main entry point."""
 import os
 import logging
+import sys
 import typer
 from pitagora.cli.commands import (
     study,
@@ -18,6 +19,47 @@ from pitagora.cli.commands import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def _is_interactive() -> bool:
+    """Return whether both standard input and output are terminals."""
+    return bool(
+        sys.stdin
+        and sys.stdout
+        and sys.stdin.isatty()
+        and sys.stdout.isatty()
+    )
+
+
+def _load_simple_launcher():
+    from pitagora.chat import launch_chat
+
+    return launch_chat
+
+
+def _load_tui_launcher():
+    from pitagora.cli.tui import launch_tui
+
+    return launch_tui
+
+
+def _select_chat_launcher(simple: bool):
+    if simple or not _is_interactive():
+        return _load_simple_launcher()
+
+    try:
+        return _load_tui_launcher()
+    except ModuleNotFoundError as exc:
+        if exc.name != "textual" and not (
+            exc.name and exc.name.startswith("textual.")
+        ):
+            raise
+        typer.echo(
+            "Textual is not installed; install it with "
+            "`pip install pitagora[tui]`. Falling back to simple chat."
+        )
+        return _load_simple_launcher()
+
 
 # Lazy imports for optional command groups
 try:
@@ -222,20 +264,21 @@ def chat_cmd(
     mode: str = typer.Option("study", help="Mode: study/explore/reason/verify"),
     topic: str = typer.Option("general", help="Initial topic"),
     model: str = typer.Option(None, help="Override model"),
+    simple: bool = typer.Option(False, "--simple", help="Use the simple chat interface"),
 ):
     """Launch the interactive chat REPL — the main experience."""
-    from pitagora.chat import launch_chat
-
     if model:
         os.environ["PITAGORA_MODEL"] = model
 
-    launch_chat(mode=mode, topic=topic)
+    launcher = _select_chat_launcher(simple)
+    launcher(mode=mode, topic=topic)
 
 
 @app.callback(invoke_without_command=True)
 def main_callback(
     ctx: typer.Context,
     model: str = typer.Option(None, "--model", "-m", help="Override model"),
+    simple: bool = typer.Option(False, "--simple", help="Use the simple chat interface"),
 ):
     """Pitagora — AI-powered math & physics learning.
 
@@ -244,13 +287,10 @@ def main_callback(
     if ctx.invoked_subcommand is not None:
         return
 
-    from pitagora.chat import launch_chat
-
     # WS4b: first-run wizard. Launch the interactive setup wizard when no
     # config exists AND stdin is a TTY (interactive use). In non-interactive
     # contexts (CI, pipes), fall back to a one-line hint + defaults so the
     # command never blocks on a prompt.
-    import sys
     from pitagora.core.constants import CONFIG_PATH
     if not CONFIG_PATH.exists():
         if sys.stdin and sys.stdin.isatty():
@@ -270,7 +310,8 @@ def main_callback(
     if model:
         os.environ["PITAGORA_MODEL"] = model
 
-    launch_chat()
+    launcher = _select_chat_launcher(simple)
+    launcher()
 
 
 if __name__ == "__main__":

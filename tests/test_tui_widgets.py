@@ -48,3 +48,27 @@ def test_compact_teaching_builders_return_renderables():
     assert isinstance(gauge, Text)
     assert isinstance(progress, Text)
     assert isinstance(controls, Text)
+
+from pitagora.cli.tui_widgets import InputHistory, split_math
+
+
+def test_history_caps_at_100_and_navigates():
+    history = InputHistory(limit=100)
+    for index in range(105):
+        history.add(f"message {index}")
+
+    assert len(history.items) == 100
+    assert history.previous() == "message 104"
+    assert history.previous() == "message 103"
+    assert history.next() == "message 104"
+    assert history.next() == ""
+
+
+def test_split_math_keeps_markdown_and_numbers_display_equations():
+    parts = split_math("Before $x^2$.\\n\\n$$x^2 + y^2 = z^2$$\\n\\nAfter.")
+
+    assert parts == [
+        ("markdown", "Before x².\\n\\n", 0),
+        ("equation", "x^2 + y^2 = z^2", 1),
+        ("markdown", "\\n\\nAfter.", 0),
+    ]

@@ -52,3 +52,35 @@ async def test_compact_mode_hides_sidebar():
         await pilot.press("ctrl+x")
         assert app.has_class("compact")
         assert app.query_one("#sidebar").display is False
+
+@pytest.mark.asyncio
+async def test_enter_sends_and_shift_enter_inserts_newline():
+    app = PitagoraApp(controller=FakeController())
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("h", "i", "shift+enter", "t", "h", "e", "r", "e")
+        assert app.query_one("#composer").text == "hi\nthere"
+        await pilot.press("enter")
+        await pilot.pause()
+        assert app.query_one("#composer").text == ""
+
+
+@pytest.mark.asyncio
+async def test_multiline_paste_submits_as_one_message():
+    controller = FakeController()
+    app = PitagoraApp(controller=controller)
+    async with app.run_test(size=(120, 40)) as pilot:
+        composer = app.query_one("#composer")
+        composer.insert("first line\nsecond line")
+        await pilot.press("enter")
+        await pilot.pause()
+        assert controller.received == ["first line\nsecond line"]
+
+
+@pytest.mark.asyncio
+async def test_slash_opens_autocomplete_and_tab_completes():
+    app = PitagoraApp(controller=FakeController())
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("/")
+        assert app.query_one("#command-popup").display is True
+        await pilot.press("h", "e", "tab")
+        assert app.query_one("#composer").text == "/help"

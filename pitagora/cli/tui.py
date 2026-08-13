@@ -1,10 +1,11 @@
+
 from typing import Optional, Dict, Any
 
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
-from textual.widgets import Static
+from textual.widgets import Static, OptionList
 
 from pitagora.cli.tui_widgets import (
     ChatTextArea,
@@ -12,6 +13,7 @@ from pitagora.cli.tui_widgets import (
     Conversation,
     QuitScreen,
     SidebarScreen,
+    CommandPopup,
 )
 
 
@@ -71,10 +73,23 @@ class PitagoraApp(App):
         padding: 1;
     }
 
-    #input-area {
-        height: 4;
+    #input-container {
+        height: auto;
         dock: bottom;
         border-top: solid $primary;
+        layout: vertical;
+    }
+    
+    #command-popup {
+        display: none;
+        height: auto;
+        max-height: 10;
+        border: solid $secondary;
+        background: $surface;
+    }
+
+    #input-area {
+        height: 4;
         layout: horizontal;
     }
 
@@ -121,9 +136,13 @@ class PitagoraApp(App):
         with Horizontal(id="main"):
             yield Conversation(id="conversation")
             yield ContextSidebar(id="sidebar")
-        with Horizontal(id="input-area"):
-            yield Static("△ pitagora>", id="prompt")
-            yield ChatTextArea(id="composer")
+            
+        with Static(id="input-container"):
+            yield CommandPopup(id="command-popup")
+            with Horizontal(id="input-area"):
+                yield Static("△ pitagora>", id="prompt")
+                yield ChatTextArea(id="composer")
+                
         yield Static(
             "Ctrl+B sidebar  Ctrl+X compact  / commands",
             id="footer",
@@ -150,8 +169,6 @@ class PitagoraApp(App):
         
         conversation.mount(Static(Panel(welcome_text, title="Welcome to Pitagora", border_style="gold1"), id="welcome-panel"))
         
-        # Call list_journeys once. In a real app we'd import it. 
-        # But we need to use controller.context["due_reviews"]
         due_reviews = self.controller.context.get("due_reviews")
         if due_reviews:
             self.due_reviews = due_reviews
@@ -162,6 +179,8 @@ class PitagoraApp(App):
         
         sidebar = self.query_one("#sidebar", ContextSidebar)
         sidebar.update_context(self.controller.context)
+        
+        self.query_one("#command-popup").display = False
 
     def on_resize(self, event) -> None:
         self._apply_sidebar_layout(event.size.width)
@@ -202,6 +221,62 @@ class PitagoraApp(App):
         seconds = elapsed % 60
         header_context = self.query_one("#header-context", Static)
         header_context.update(f"{minutes:02d}:{seconds:02d}")
+        
+
+    def on_text_area_changed(self, event: ChatTextArea.Changed) -> None:
+        composer = self.query_one("#composer")
+        popup = self.query_one("#command-popup")
+        if event.text_area == composer:
+            text = composer.text
+            if text.startswith("/") and " " not in text:
+                popup.display = True
+                
+                # Highlight matching command if any
+                for i in range(popup.option_count):
+                    option = popup.get_option_at_index(i)
+                    if str(option.prompt).startswith(text):
+                        popup.highlighted = i
+                        break
+            else:
+                popup.display = False
+
+                
+    def on_chat_text_area_autocomplete_navigate(self, event: ChatTextArea.AutocompleteNavigate) -> None:
+        popup = self.query_one("#command-popup")
+        if popup.display:
+            if event.direction == "up":
+                popup.action_cursor_up()
+            elif event.direction == "down":
+                popup.action_cursor_down()
+
+    def on_chat_text_area_autocomplete_requested(self, event: ChatTextArea.AutocompleteRequested) -> None:
+        popup = self.query_one("#command-popup")
+        if popup.display and popup.highlighted is not None:
+            composer = self.query_one("#composer")
+            option = popup.get_option_at_index(popup.highlighted)
+            composer.text = str(option.prompt)
+            composer.move_cursor((composer.document.line_count - 1, len(composer.document.get_line(composer.document.line_count - 1))))
+            popup.display = False
+            
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        popup = self.query_one("#command-popup")
+        if event.option_list == popup:
+            composer = self.query_one("#composer")
+            composer.text = str(event.option.prompt)
+            composer.move_cursor((composer.document.line_count - 1, len(composer.document.get_line(composer.document.line_count - 1))))
+            popup.display = False
+            composer.focus()
+            
+    def on_chat_text_area_submitted(self, event: ChatTextArea.Submitted) -> None:
+        popup = self.query_one("#command-popup")
+        popup.display = False
+        
+        composer = self.query_one("#composer")
+        composer.input_history.add(event.text)
+        composer.text = ""
+        
+        for _ in self.controller.handle_input(event.text):
+            pass
 
 
 def launch_tui(

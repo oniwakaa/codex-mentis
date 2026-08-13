@@ -296,8 +296,12 @@ class PitagoraApp(App):
         elapsed = self.controller.context.get("elapsed_seconds", 0)
         minutes = elapsed // 60
         seconds = elapsed % 60
-        header_context = self.query_one("#header-context", Static)
-        header_context.update(f"{minutes:02d}:{seconds:02d}")
+        from textual.css.query import NoMatches
+        try:
+            header_context = self.query_one("#header-context", Static)
+            header_context.update(f"{minutes:02d}:{seconds:02d}")
+        except NoMatches:
+            return
         
 
     def on_text_area_changed(self, event: ChatTextArea.Changed) -> None:

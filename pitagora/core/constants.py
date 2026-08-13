@@ -1,7 +1,12 @@
 from pathlib import Path
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 APP_NAME = "pitagora"
+
+# Provider default constants — single source of truth for CLIProxy defaults.
+DEFAULT_BASE_URL = "http://localhost:8317/v1"
+DEFAULT_API_KEY = "cliproxy-sk-local"
+DEFAULT_MODEL = "google/gemini-3.6-flash-high"
 
 # Single source of truth for all on-disk paths. Every module must import from
 # here instead of hardcoding ~/.pitagora/ string literals.

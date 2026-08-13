@@ -43,49 +43,11 @@ class ProverAgent(BaseAgent):
         )
 
     def tool_sympy_verify(self, code: str) -> str:
-        """
-        Executes code in a SymPy sandbox. Tries importing the project's sandbox,
-        otherwise falls back to a clean local execution.
-        """
-        try:
-            from pitagora.math_engine.sandbox import SymPySandbox
-            sandbox = SymPySandbox()
-            res = sandbox.execute(code)
-            return json.dumps(res)
-        except ImportError:
-            # Local fallback sandbox implementation
-            import sys
-            from io import StringIO
-            
-            old_stdout = sys.stdout
-            redirected_output = sys.stdout = StringIO()
-            
-            local_vars: Dict[str, Any] = {}
-            try:
-                import sympy
-                local_vars['sympy'] = sympy
-                # Common math variables
-                local_vars['x'], local_vars['y'], local_vars['z'], local_vars['t'] = sympy.symbols('x y z t')
-            except ImportError:
-                pass
-                
-            success = True
-            error_msg = ""
-            try:
-                # Safe-ish execution of local sympy scripts
-                exec(code, {}, local_vars)
-            except Exception as e:
-                success = False
-                error_msg = str(e)
-            finally:
-                sys.stdout = old_stdout
-                
-            return json.dumps({
-                "success": success,
-                "output": redirected_output.getvalue(),
-                "error": error_msg,
-                "variables": {k: str(v) for k, v in local_vars.items() if k not in ('__builtins__', 'sympy')}
-            })
+        """Executes code in the project's SymPy sandbox."""
+        from pitagora.math_engine.sandbox import SymPySandbox
+        sandbox = SymPySandbox()
+        res = sandbox.execute(code)
+        return json.dumps(res)
 
     def generate_solution(self, problem: str) -> AgentResponse:
         """
@@ -122,8 +84,8 @@ class ProverAgent(BaseAgent):
             tool_calls = response.get("tool_calls", [])
             
             if not tool_calls:
-                # Decide if verified based on the final inspection text
-                verified = "error" not in content.lower() and "incorrect" not in content.lower() and "invalid" not in content.lower()
+                # Parse explicit verdict from the inspection text
+                verified = self._parse_verdict(content)
                 return {
                     "verified": verified,
                     "critique": content
@@ -142,11 +104,28 @@ class ProverAgent(BaseAgent):
             
         response = self.provider.complete(messages)
         content = response.get("content", "")
-        verified = "error" not in content.lower() and "incorrect" not in content.lower() and "invalid" not in content.lower()
+        verified = self._parse_verdict(content)
         return {
             "verified": verified,
             "critique": content
         }
+
+    @staticmethod
+    def _parse_verdict(content: str) -> bool:
+        """Parse an explicit verdict token from the reviewer response."""
+        lower = content.lower()
+        # Look for explicit verdict markers
+        if "verdict: valid" in lower or "verdict: correct" in lower:
+            return True
+        if "verdict: invalid" in lower or "verdict: incorrect" in lower:
+            return False
+        # Fallback: look for clear confirmation/correction phrases
+        if "the proof is correct" in lower or "the derivation is correct" in lower:
+            return True
+        if "the proof is incorrect" in lower or "the derivation is incorrect" in lower:
+            return False
+        # Unclear — err on the side of caution
+        return False
 
     def revise(self, solution: str, critique: str) -> AgentResponse:
         """

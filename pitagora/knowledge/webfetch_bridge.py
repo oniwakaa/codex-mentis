@@ -13,6 +13,7 @@ import json
 import os
 import subprocess
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote_plus
 
 
 class WebfetchBridge:
@@ -106,7 +107,7 @@ class WebfetchBridge:
             import httpx
             import re
             headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/119.0"}
-            url = f"https://html.duckduckgo.com/html/?q={query}"
+            url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
             with httpx.Client(timeout=15.0) as client:
                 r = client.get(url, headers=headers)
             if r.status_code == 200:

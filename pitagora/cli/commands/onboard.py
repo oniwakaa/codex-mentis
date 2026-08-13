@@ -1,7 +1,6 @@
 """Onboarding system — first-run experience with level assessment."""
-import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from datetime import datetime
 
 from pitagora.core.constants import CONFIG_DIR
@@ -115,7 +114,7 @@ def run_onboarding(console=None, skip: bool = False, level_override: Optional[st
     banner = """
 ╔═══════════════════════════════════════════════════════╗
 ║                                                       ║
-║      🧠  C O D E X   M E N T I S  🧠                ║
+║      🧠  P I T A G O R A  🧠                        ║
 ║                                                       ║
 ║      Book of the Mind                                 ║
 ║      AI-Powered Math & Physics Learning               ║

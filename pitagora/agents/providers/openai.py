@@ -92,14 +92,14 @@ class OpenAIProvider(BaseProvider):
         headers = self._get_headers()
         payload = self._build_payload(messages, tools, temperature, response_format, stream=False)
 
-        # Retry rate limits
+        # Retry rate limits and server errors only
         retries = self.config.max_retries
         backoff = self.config.initial_backoff
         for attempt in range(retries + 1):
             try:
                 with httpx.Client(timeout=self.config.timeout) as client:
                     response = client.post(url, headers=headers, json=payload)
-                    if response.status_code == 429:
+                    if response.status_code == 429 or response.status_code >= 500:
                         if attempt == retries:
                             response.raise_for_status()
                         time.sleep(backoff)
@@ -108,15 +108,17 @@ class OpenAIProvider(BaseProvider):
                     response.raise_for_status()
                     data = response.json()
                     parsed = self._parse_response_choice(data)
-                    
+
                     # Accumulate token usage
                     usage = parsed["usage"]
                     self.token_usage["prompt_tokens"] += usage["prompt_tokens"]
                     self.token_usage["completion_tokens"] += usage["completion_tokens"]
                     self.token_usage["total_tokens"] += usage["total_tokens"]
-                    
+
                     return parsed
-            except Exception as e:
+            except httpx.HTTPStatusError:
+                raise
+            except (httpx.TransportError, httpx.TimeoutException, OSError) as e:
                 if attempt == retries:
                     raise e
                 time.sleep(backoff)
@@ -141,7 +143,7 @@ class OpenAIProvider(BaseProvider):
             try:
                 async with httpx.AsyncClient(timeout=self.config.timeout) as client:
                     response = await client.post(url, headers=headers, json=payload)
-                    if response.status_code == 429:
+                    if response.status_code == 429 or response.status_code >= 500:
                         if attempt == retries:
                             response.raise_for_status()
                         await asyncio.sleep(backoff)
@@ -150,15 +152,17 @@ class OpenAIProvider(BaseProvider):
                     response.raise_for_status()
                     data = response.json()
                     parsed = self._parse_response_choice(data)
-                    
+
                     # Accumulate token usage
                     usage = parsed["usage"]
                     self.token_usage["prompt_tokens"] += usage["prompt_tokens"]
                     self.token_usage["completion_tokens"] += usage["completion_tokens"]
                     self.token_usage["total_tokens"] += usage["total_tokens"]
-                    
+
                     return parsed
-            except Exception as e:
+            except httpx.HTTPStatusError:
+                raise
+            except (httpx.TransportError, httpx.TimeoutException, OSError) as e:
                 if attempt == retries:
                     raise e
                 await asyncio.sleep(backoff)

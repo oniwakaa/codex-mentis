@@ -1,6 +1,5 @@
 import typer
 import sympy as sp
-from typing import Optional
 from pitagora.cli.rich_ui import print_panel, print_math, create_spinner
 
 app = typer.Typer(help="Verify a mathematical claim symbolically using SymPy")
@@ -35,17 +34,8 @@ def verify(
             raise typer.Exit(1)
             
         lhs_str, rhs_str = parts
-        
-        # Replace common LaTeX structures with Python/SymPy syntax if needed
-        # e.g., \pi -> pi, e -> E, etc.
-        lhs_str = lhs_str.replace("pi", "pi").replace("I", "I").strip()
-        rhs_str = rhs_str.replace("pi", "pi").replace("I", "I").strip()
-        
+
         try:
-            # We define standard symbols commonly used
-            x, y, z, t = sp.symbols('x y z t')
-            theta, phi = sp.symbols('theta phi')
-            
             lhs = sp.sympify(lhs_str)
             rhs = sp.sympify(rhs_str)
             

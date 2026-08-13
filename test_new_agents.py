@@ -52,7 +52,7 @@ class MockProvider(BaseProvider):
     async def aembed(self, texts: List[str]) -> List[List[float]]:
         return [[0.1, 0.2, 0.3] for _ in texts]
 
-class TestCodexMentisAgents(unittest.TestCase):
+class TestPitagoraAgents(unittest.TestCase):
     def setUp(self):
         self.prov = MockProvider()
         self.db_path = "/tmp/test_improver.db"

@@ -5,7 +5,7 @@ are handled through the OpenAI-compatible protocol. CLIProxy routes to the
 correct backend automatically.
 """
 import logging
-from typing import Dict, Any, List, Optional, Iterator
+from typing import Dict, Any, List, Optional
 from pitagora.agents.providers.base import BaseProvider, ProviderConfig
 from pitagora.agents.providers.openai import OpenAIProvider
 
@@ -46,6 +46,32 @@ class FallbackProvider(BaseProvider):
             except Exception as e:
                 logger.warning(f"{p.__class__.__name__} embed failed: {e}")
         raise RuntimeError("All providers failed to embed")
+
+    async def acomplete(self, messages, tools=None, temperature=0.7, response_format=None):
+        last_err = None
+        for p in self.providers:
+            try:
+                return await p.acomplete(messages, tools, temperature, response_format)
+            except Exception as e:
+                logger.warning(f"{p.__class__.__name__} acomplete failed: {e}")
+                last_err = e
+        raise RuntimeError(f"All providers failed. Last: {last_err}")
+
+    async def astream(self, messages):
+        for p in self.providers:
+            try:
+                return p.astream(messages)
+            except Exception as e:
+                logger.warning(f"{p.__class__.__name__} astream failed: {e}")
+        raise RuntimeError("All providers failed to astream")
+
+    async def aembed(self, texts):
+        for p in self.providers:
+            try:
+                return await p.aembed(texts)
+            except Exception as e:
+                logger.warning(f"{p.__class__.__name__} aembed failed: {e}")
+        raise RuntimeError("All providers failed to aembed")
 
 
 def create_provider(config: ProviderConfig) -> BaseProvider:

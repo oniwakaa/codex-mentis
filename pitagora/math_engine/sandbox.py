@@ -79,7 +79,7 @@ if __name__ == '__main__':
     def evaluate(self, expression_str: str) -> SandboxResult:
         code = """
         expr_str = data['expression']
-        expr = sp.sympify(expr_str, locals=context)
+        expr = sp.parse_expr(expr_str, local_dict=context)
         val = str(expr)
         try:
             val_eval = str(expr.evalf())
@@ -126,12 +126,12 @@ if __name__ == '__main__':
         # Parse equation (if contains '=', split it and subtract rhs)
         if '=' in eq_str:
             lhs_str, rhs_str = eq_str.split('=', 1)
-            lhs = sp.sympify(lhs_str, locals=context)
-            rhs = sp.sympify(rhs_str, locals=context)
+            lhs = sp.parse_expr(lhs_str, local_dict=context)
+            rhs = sp.parse_expr(rhs_str, local_dict=context)
             eq = sp.Eq(lhs, rhs)
             expr_to_solve = lhs - rhs
         else:
-            expr_to_solve = sp.sympify(eq_str, locals=context)
+            expr_to_solve = sp.parse_expr(eq_str, local_dict=context)
             eq = sp.Eq(expr_to_solve, 0)
             
         solutions = sp.solve(expr_to_solve, var)
@@ -168,7 +168,7 @@ if __name__ == '__main__':
         v = sp.Symbol(var_str)
         context[var_str] = v
         
-        expression = sp.sympify(expr_str, locals=context)
+        expression = sp.parse_expr(expr_str, local_dict=context)
         res = sp.integrate(expression, v)
         
         steps = [
@@ -199,7 +199,7 @@ if __name__ == '__main__':
         v = sp.Symbol(var_str)
         context[var_str] = v
         
-        expression = sp.sympify(expr_str, locals=context)
+        expression = sp.parse_expr(expr_str, local_dict=context)
         res = sp.diff(expression, v)
         
         steps = [
@@ -232,8 +232,8 @@ if __name__ == '__main__':
         v = sp.Symbol(var_str)
         context[var_str] = v
         
-        expression = sp.sympify(expr_str, locals=context)
-        pt = sp.sympify(pt_str, locals=context)
+        expression = sp.parse_expr(expr_str, local_dict=context)
+        pt = sp.parse_expr(pt_str, local_dict=context)
         
         res = sp.limit(expression, v, pt)
         
@@ -268,8 +268,8 @@ if __name__ == '__main__':
         v = sp.Symbol(var_str)
         context[var_str] = v
         
-        expression = sp.sympify(expr_str, locals=context)
-        pt = sp.sympify(pt_str, locals=context)
+        expression = sp.parse_expr(expr_str, local_dict=context)
+        pt = sp.parse_expr(pt_str, local_dict=context)
         
         res = sp.series(expression, v, pt, n)
         
@@ -300,7 +300,7 @@ if __name__ == '__main__':
         op = data['operation']
         
         # Expect matrix_str to be nested list e.g. [[1,2],[3,4]] or a SymPy Matrix string
-        m = sp.Matrix(sp.sympify(mat_str, locals=context))
+        m = sp.Matrix(sp.parse_expr(mat_str, local_dict=context))
         
         steps = [f"Matrix: {m}"]
         

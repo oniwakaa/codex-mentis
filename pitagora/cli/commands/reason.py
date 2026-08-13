@@ -1,6 +1,6 @@
 import typer
 import sympy as sp
-from typing import Optional, List, Tuple
+from typing import List, Tuple
 from pitagora.cli.rich_ui import format_proof, print_panel, create_spinner
 
 app = typer.Typer(help="Formulate step-by-step mathematical proofs or derivations")
@@ -8,7 +8,7 @@ app = typer.Typer(help="Formulate step-by-step mathematical proofs or derivation
 def verify_step_sympy(step_expr: str) -> Tuple[bool, str]:
     """Helper to check if a step's assertion holds using SymPy (e.g. 'LHS = RHS' or 'LHS - RHS = 0')."""
     if "=" not in step_expr:
-        return True, "Computational (Symbolic logic verified)"
+        return True, "Computational step (no equality to verify)"
         
     try:
         parts = step_expr.split("=")
@@ -21,7 +21,7 @@ def verify_step_sympy(step_expr: str) -> Tuple[bool, str]:
             else:
                 return False, f"Computational (SymPy: mismatch, diff = {diff})"
     except Exception as e:
-        return True, f"Cross-check (Unable to parse symbolically: {e})"
+        return False, f"Unable to parse: {e}"
         
     return True, "Logical assertion"
 

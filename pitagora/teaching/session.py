@@ -160,8 +160,13 @@ class TeachingSession:
 
     def transition(self, new_state: TeachingState) -> None:
         if self.state == TeachingState.paused and new_state != TeachingState.paused:
-            # resuming — restore prior state unless caller overrides
-            self.state = self._prior_state
+            # resuming — restore prior state unless caller explicitly passes a
+            # different state, in which case honor it.
+            if new_state == self._prior_state:
+                self.state = self._prior_state
+            else:
+                self.state = new_state
+            self._touch()
             return
         if new_state == TeachingState.paused:
             self._prior_state = self.state
@@ -203,11 +208,11 @@ class TeachingSession:
         if style:
             self.style_effectiveness.record(style, delta)
 
-        # Update current sub-concept mastery
+        # Update current sub-concept mastery using the classification delta
         sc = self.current_subconcept
         if sc:
             sc.visited = True
-            sc.mastery = max(sc.mastery, self.comprehension_score)
+            sc.mastery = max(0.0, min(1.0, sc.mastery + delta))
 
         self.history.append({
             "classification": classification,

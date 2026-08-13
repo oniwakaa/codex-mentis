@@ -9,9 +9,6 @@ inputs:
   - name: claim
     description: The claim or proposition to debate
     required: true
-  - name: rounds
-    description: Number of debate rounds
-    default: 3
 
 steps:
   - id: opening_pro
@@ -23,7 +20,6 @@ steps:
       Present your strongest opening argument. Use mathematical evidence,
       citations, and formal reasoning. This is a DEBATE — be persuasive
       but rigorous.
-    outputs: [pro_argument]
 
   - id: opening_con
     agent: reviewer
@@ -35,7 +31,6 @@ steps:
       edge cases, and logical flaws. Use mathematical evidence.
       This is a DEBATE — be rigorous and find weaknesses.
     tools: [sympy_evaluate]
-    outputs: [con_argument]
 
   - id: cross_exam_pro
     agent: prover
@@ -47,7 +42,6 @@ steps:
       challenge their evidence, and defend your position.
       Claim being debated: "{{ claim }}"
     inputs_from: [opening_con]
-    outputs: [pro_cross_exam]
 
   - id: cross_exam_con
     agent: reviewer
@@ -60,7 +54,6 @@ steps:
       Claim being debated: "{{ claim }}"
     inputs_from: [opening_pro]
     tools: [sympy_evaluate]
-    outputs: [con_cross_exam]
 
   - id: rebuttal_pro
     agent: prover
@@ -70,7 +63,6 @@ steps:
       
       Defend against challenges and strengthen your case.
     inputs_from: [cross_exam_con]
-    outputs: [pro_rebuttal]
 
   - id: rebuttal_con
     agent: reviewer
@@ -81,7 +73,6 @@ steps:
       Address the challenges and reinforce your counter-arguments.
     inputs_from: [cross_exam_pro]
     tools: [sympy_evaluate]
-    outputs: [con_rebuttal]
 
   - id: synthesis
     agent: tutor
@@ -104,6 +95,5 @@ steps:
       Give a balanced verdict with a confidence score.
       What is the truth? Is the claim fully correct, partially correct, or false?
     inputs_from: [opening_pro, opening_con, cross_exam_pro, cross_exam_con, rebuttal_pro, rebuttal_con]
-    outputs: [verdict, confidence, synthesis]
 
 merge_strategy: last

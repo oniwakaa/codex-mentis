@@ -1,5 +1,4 @@
 """Folder ingestion — analyze papers, books, and documents in a directory."""
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -8,8 +7,9 @@ import typer
 app = typer.Typer(help="Ingest and analyze documents from folders")
 
 
-@app.command("ingest")
-def ingest_folder(
+@app.callback(invoke_without_command=True)
+def ingest_main(
+    ctx: typer.Context,
     path: str = typer.Argument(..., help="Path to folder or file to ingest"),
     subject: str = typer.Option("general", "--subject", "-s", help="Subject tag for all documents"),
     recursive: bool = typer.Option(True, "--recursive/--no-recursive", "-r", help="Scan subdirectories"),

@@ -10,12 +10,16 @@ This is the core chat loop. It connects ALL systems:
 - Spaced repetition (trigger reviews)
 """
 import os
-import sys
-import asyncio
+import logging
 from typing import Optional, Dict, Any, List
-from datetime import datetime
 
 import httpx
+
+from pitagora.core.constants import (
+    CONFIG_PATH, DEFAULT_BASE_URL, DEFAULT_API_KEY, DEFAULT_MODEL,
+)
+
+log = logging.getLogger(__name__)
 
 
 def load_provider_config() -> Dict[str, Any]:
@@ -23,7 +27,6 @@ def load_provider_config() -> Dict[str, Any]:
     from pathlib import Path
     import yaml
 
-    from pitagora.core.constants import CONFIG_PATH
     config_path = CONFIG_PATH
     
     if config_path.exists():
@@ -43,15 +46,15 @@ def load_provider_config() -> Dict[str, Any]:
             "type": "openai_compatible",
             "base_url": base_url,
             "api_key": api_key,
-            "default_model": os.getenv("PITAGORA_MODEL", "google/gemini-3.6-flash-high"),
+            "default_model": os.getenv("PITAGORA_MODEL", DEFAULT_MODEL),
         }
 
     return {
         "name": "cliproxy",
         "type": "openai_compatible",
-        "base_url": "http://localhost:8317/v1",
-        "api_key": "cliproxy-sk-local",
-        "default_model": "google/gemini-3.6-flash-high",
+        "base_url": DEFAULT_BASE_URL,
+        "api_key": DEFAULT_API_KEY,
+        "default_model": DEFAULT_MODEL,
     }
 
 
@@ -65,9 +68,9 @@ def chat_completion(
     if config is None:
         config = load_provider_config()
 
-    base_url = config.get("base_url", "http://localhost:8317/v1")
-    api_key = config.get("api_key", "cliproxy-sk-local")
-    model = model or config.get("default_model", "google/gemini-3.6-flash-high")
+    base_url = config.get("base_url", DEFAULT_BASE_URL)
+    api_key = config.get("api_key", DEFAULT_API_KEY)
+    model = model or config.get("default_model", DEFAULT_MODEL)
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -218,8 +221,8 @@ def _save_to_memory(role: str, content: str, topic: str = "general") -> None:
             topic=topic,
         )
         store.create_memory_entry(entry)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("failed to save memory entry: %s", e)
 
 
 def _record_study(topic: str, user_input: str) -> None:
@@ -231,8 +234,8 @@ def _record_study(topic: str, user_input: str) -> None:
         if profile:
             ug = UserGraph()
             ug.record_study(profile.get("name", "default"), topic, duration_minutes=1)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("failed to record study activity: %s", e)
 
 
 def _check_due_reviews() -> Optional[str]:
@@ -243,8 +246,8 @@ def _check_due_reviews() -> Optional[str]:
         due = sr.get_due_reviews()
         if due and len(due) > 0:
             return f"📚 You have {len(due)} concepts due for review. Run `pitagora review start`."
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("failed to check due reviews: %s", e)
     return None
 
 
@@ -571,7 +574,8 @@ def launch_chat(
                             chunker = SmartChunker()
                             
                             files = list(target.glob("**/*")) if target.is_dir() else [target]
-                            exts = {".pdf", ".md", ".txt", ".tex", ".ipynb", ".html"}
+                            from pitagora.core.constants import SUPPORTED_FORMATS
+                            exts = set(SUPPORTED_FORMATS) | {".ipynb", ".html"}
                             files = [f for f in files if f.suffix.lower() in exts]
                             
                             count = 0
@@ -714,9 +718,9 @@ def launch_chat(
                         continue
                     try:
                         prov_cfg = ProviderConfig(
-                            api_key=config.get("api_key", "cliproxy-sk-local"),
+                            api_key=config.get("api_key", DEFAULT_API_KEY),
                             model=model,
-                            base_url=config.get("base_url", "http://localhost:8317/v1"),
+                            base_url=config.get("base_url", DEFAULT_BASE_URL),
                             max_tokens=4096,
                         )
                         prov = get_provider("openai", prov_cfg)
@@ -887,6 +891,9 @@ def launch_chat(
 
             console.print()
 
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+            continue
         except KeyboardInterrupt:
             console.print("\n[dim]Use /quit to exit.[/dim]")
         except EOFError:

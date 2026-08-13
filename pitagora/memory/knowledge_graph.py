@@ -131,7 +131,7 @@ class KnowledgeGraph:
                 return vector.tolist()
             return list(vector)
 
-    def _resolve_entity_id(self, name_or_id: str) -> str:
+    def _resolve_entity_id(self, name_or_id: str, strict: bool = False) -> Optional[str]:
         # Match case-insensitive or exact
         slug = name_or_id.strip().lower().replace(" ", "_")
         with sqlite3.connect(self.db_path) as conn:
@@ -140,12 +140,16 @@ class KnowledgeGraph:
             row = cursor.fetchone()
             if row:
                 return row[0]
-            
+
             cursor.execute("SELECT id FROM entities WHERE id = ?", (slug,))
             row = cursor.fetchone()
             if row:
                 return slug
-                
+
+        # In strict mode (read-only callers), do not auto-create entities.
+        if strict:
+            return None
+
         # Automatically insert if not found
         return self.add_entity(name_or_id, "Concept")
 
@@ -236,7 +240,9 @@ class KnowledgeGraph:
             )
 
     def find_related(self, entity_id: str, rel_type: Optional[str] = None, depth: int = 2) -> List[Tuple[EntityNode, Relationship, int]]:
-        resolved_id = self._resolve_entity_id(entity_id)
+        resolved_id = self._resolve_entity_id(entity_id, strict=True)
+        if not resolved_id:
+            return []
         visited = {resolved_id}
         queue = [(resolved_id, 1)]
         results = []
@@ -324,7 +330,9 @@ class KnowledgeGraph:
         return [node for _, node in results[:limit]]
 
     def graph_traversal(self, start_id: str, max_depth: int = 2, rel_types: Optional[List[str]] = None) -> Dict[str, Any]:
-        resolved_id = self._resolve_entity_id(start_id)
+        resolved_id = self._resolve_entity_id(start_id, strict=True)
+        if not resolved_id:
+            return {"nodes": [], "relationships": []}
         start_entity = self.find_entity(resolved_id)
         if not start_entity:
             return {"nodes": [], "relationships": []}
@@ -384,40 +392,44 @@ class KnowledgeGraph:
         e2 = self.find_entity(id2)
         if not e1 or not e2:
             raise ValueError(f"Entities not found: {id1} or {id2}")
-            
+
+        # Use resolved entity IDs in all subsequent operations
+        rid1 = e1.id
+        rid2 = e2.id
+
         now = datetime.datetime.now().isoformat()
         merged_properties = {**e2.properties, **e1.properties}
         merged_properties_json = json.dumps(merged_properties)
-        
+
         # 1. Fetch relationships to migrate
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT target_id, rel_type, properties, weight FROM relationships WHERE source_id = ? AND is_deleted = 0", (id2,))
+            cursor.execute("SELECT target_id, rel_type, properties, weight FROM relationships WHERE source_id = ? AND is_deleted = 0", (rid2,))
             source_rels = cursor.fetchall()
-            cursor.execute("SELECT source_id, rel_type, properties, weight FROM relationships WHERE target_id = ? AND is_deleted = 0", (id2,))
+            cursor.execute("SELECT source_id, rel_type, properties, weight FROM relationships WHERE target_id = ? AND is_deleted = 0", (rid2,))
             target_rels = cursor.fetchall()
-            
+
         # 2. Add migrated relationships outside of connection transaction to avoid locks
         for tgt, r_type, r_props_json, weight in source_rels:
-            if tgt != id1:
-                self.add_relationship(id1, tgt, r_type, json.loads(r_props_json or "{}"), weight)
-                
+            if tgt != rid1:
+                self.add_relationship(rid1, tgt, r_type, json.loads(r_props_json or "{}"), weight)
+
         for src, r_type, r_props_json, weight in target_rels:
-            if src != id1:
-                self.add_relationship(src, id1, r_type, json.loads(r_props_json or "{}"), weight)
-                
+            if src != rid1:
+                self.add_relationship(src, rid1, r_type, json.loads(r_props_json or "{}"), weight)
+
         # 3. Soft-delete the absorbed node and original relationships, and update merged properties
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE entities SET properties = ?, updated_at = ? WHERE id = ?",
-                (merged_properties_json, now, id1)
+                (merged_properties_json, now, rid1)
             )
-            cursor.execute("UPDATE entities SET is_deleted = 1, updated_at = ? WHERE id = ?", (now, id2))
-            cursor.execute("UPDATE relationships SET is_deleted = 1, updated_at = ? WHERE source_id = ? OR target_id = ?", (now, id2, id2))
+            cursor.execute("UPDATE entities SET is_deleted = 1, updated_at = ? WHERE id = ?", (now, rid2))
+            cursor.execute("UPDATE relationships SET is_deleted = 1, updated_at = ? WHERE source_id = ? OR target_id = ?", (now, rid2, rid2))
             conn.commit()
-            
-        return id1
+
+        return rid1
 
     def forget(self, entity_id: str):
         resolved_id = self._resolve_entity_id(entity_id)
@@ -429,7 +441,9 @@ class KnowledgeGraph:
             conn.commit()
 
     def get_context_window(self, entity_id: str, max_tokens: int = 1000) -> str:
-        resolved_id = self._resolve_entity_id(entity_id)
+        resolved_id = self._resolve_entity_id(entity_id, strict=True)
+        if not resolved_id:
+            return ""
         entity = self.find_entity(resolved_id)
         if not entity:
             return ""
@@ -458,7 +472,9 @@ class KnowledgeGraph:
         return context_str
 
     def temporal_query(self, entity_id: str, before: Optional[str] = None, after: Optional[str] = None) -> List[Dict[str, Any]]:
-        resolved_id = self._resolve_entity_id(entity_id)
+        resolved_id = self._resolve_entity_id(entity_id, strict=True)
+        if not resolved_id:
+            return []
         query_parts = ["(source_id = ? OR target_id = ?) AND is_deleted = 0"]
         params = [resolved_id, resolved_id]
         

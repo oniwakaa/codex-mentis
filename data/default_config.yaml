@@ -4,7 +4,7 @@ providers:
     name: cliproxy
     type: openai_compatible
     base_url: http://localhost:8317/v1
-    api_key: cliproxy-sk-local
+    api_key: ${CLIPROXY_API_KEY}
     default_model: google/gemini-3.6-flash-high
 model: google/gemini-3.6-flash-high
 features:

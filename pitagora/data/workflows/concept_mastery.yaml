@@ -22,7 +22,6 @@ steps:
       Focus on: definitions, theorems, equations, and practical applications.
       {{ "The student already knows: " + current_knowledge if current_knowledge else "" }}
     tools: [web_search, kb_retrieve]
-    outputs: [raw_knowledge, sources]
 
   - id: extract_concepts
     agent: researcher
@@ -37,7 +36,6 @@ steps:
       4. Difficulty level
       5. Key equations (if any)
     inputs_from: [research]
-    outputs: [concept_list, prerequisites]
 
   - id: explain_concepts
     agent: explainer
@@ -50,7 +48,6 @@ steps:
       - Key equation with intuition
       - How it connects to prerequisites
     inputs_from: [extract_concepts]
-    outputs: [explanations]
 
   - id: verify_understanding
     agent: reviewer
@@ -62,7 +59,6 @@ steps:
       in the explanations.
     inputs_from: [explain_concepts]
     tools: [sympy_evaluate]
-    outputs: [verified_explanations, corrections]
 
   - id: generate_exercises
     agent: tutor
@@ -77,7 +73,6 @@ steps:
       
       Don't provide solutions. Include hints only.
     inputs_from: [extract_concepts, verify_understanding]
-    outputs: [exercises]
 
   - id: track_progress
     agent: self_improver
@@ -90,6 +85,5 @@ steps:
       Track which explanation strategies were used for future optimization.
     inputs_from: [extract_concepts, generate_exercises]
     tools: [track_outcome]
-    outputs: [progress_recorded]
 
 merge_strategy: combine

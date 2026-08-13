@@ -1,4 +1,6 @@
 """Pitagora CLI — the main entry point."""
+import os
+import logging
 import typer
 from pitagora.cli.commands import (
     study,
@@ -13,20 +15,25 @@ from pitagora.cli.commands import (
     skills,
 )
 
+log = logging.getLogger(__name__)
+
 # Lazy imports for optional command groups
 try:
     from pitagora.cli.commands import review
-except ImportError:
+except ImportError as e:
+    log.warning("Failed to import %s: %s", "review", e)
     review = None
 
 try:
     from pitagora.cli.commands import doctor
-except ImportError:
+except ImportError as e:
+    log.warning("Failed to import %s: %s", "doctor", e)
     doctor = None
 
 try:
     from pitagora.cli.commands import profile, session, onboard, ingest, setup
-except ImportError:
+except ImportError as e:
+    log.warning("Failed to import %s: %s", "profile, session, onboard, ingest, setup", e)
     profile = session = onboard = ingest = setup = None
 
 app = typer.Typer(
@@ -89,8 +96,8 @@ def research_cmd(
     console = Console()
     console.print(f"[bold cyan]Researching:[/bold cyan] {topic} (depth={depth})")
 
-    kb = KnowledgeBase() if save else None
-    acquirer = KnowledgeAcquisition(knowledge_base=kb)
+    knowledge_base = KnowledgeBase() if save else None
+    acquirer = KnowledgeAcquisition(knowledge_base=knowledge_base)
     result = acquirer.research_topic(topic, depth=depth)
 
     if result.get("citations"):
@@ -172,6 +179,9 @@ def debate_cmd(
     prover_msgs = [{"role": "system", "content": prover_prompt}]
     reviewer_msgs = [{"role": "system", "content": reviewer_prompt}]
 
+    prover_resp = ""
+    reviewer_resp = ""
+
     for round_num in range(1, rounds + 1):
         console.print(f"[bold]Round {round_num}[/bold]")
 
@@ -210,11 +220,10 @@ def chat_cmd(
     model: str = typer.Option(None, help="Override model"),
 ):
     """Launch the interactive chat REPL — the main experience."""
-    from pitagora.chat import launch_chat, load_provider_config
+    from pitagora.chat import launch_chat
 
-    config = load_provider_config()
     if model:
-        config["default_model"] = model
+        os.environ["PITAGORA_MODEL"] = model
 
     launch_chat(mode=mode, topic=topic)
 
@@ -231,11 +240,10 @@ def main_callback(
     if ctx.invoked_subcommand is not None:
         return
 
-    from pitagora.chat import launch_chat, load_provider_config
+    from pitagora.chat import launch_chat
 
-    config = load_provider_config()
     if model:
-        config["default_model"] = model
+        os.environ["PITAGORA_MODEL"] = model
 
     launch_chat()
 

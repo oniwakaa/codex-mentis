@@ -1,15 +1,16 @@
 import typer
 import httpx
+import logging
 import xml.etree.ElementTree as ET
-from typing import Optional, List, Dict, Any
-from pitagora.cli.rich_ui import print_panel, print_table
+from typing import List, Dict
+from pitagora.cli.rich_ui import print_table
 from pitagora.chat import launch_chat as launch_repl
 
 app = typer.Typer(help="Explore open-ended questions using researcher agents")
 
 def search_arxiv(query: str, max_results: int = 3) -> List[Dict[str, str]]:
     """Live search on the arXiv public API to find academic reference papers."""
-    url = f"http://export.arxiv.org/api/query?search_query=all:{query}&max_results={max_results}"
+    url = f"https://export.arxiv.org/api/query?search_query=all:{query}&max_results={max_results}"
     try:
         response = httpx.get(url, timeout=10.0)
         if response.status_code == 200:
@@ -35,7 +36,7 @@ def search_arxiv(query: str, max_results: int = 3) -> List[Dict[str, str]]:
                 })
             return papers
     except Exception as e:
-        # Silently fail or log to stderr
+        logging.getLogger(__name__).warning("arxiv search failed: %s", e)
         pass
     return []
 
@@ -67,7 +68,5 @@ def explore(
     launch_repl(
         mode="EXPLORE",
         topic=question,
-        context=paper_context,
-        domain="general",
-        difficulty=3
+        system_prompt=paper_context,
     )

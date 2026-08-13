@@ -163,7 +163,17 @@ class DebateAgent(BaseAgent):
             f"determine which side presented the mathematically/physically sounder argument, and output your verdict (FOR, AGAINST, or UNDECIDED) with confidence."
         )
 
-        synthesis: DebateSynthesis = await synth_agent.athink_structured(synthesis_prompt, DebateSynthesis)
+        try:
+            synthesis: DebateSynthesis = await synth_agent.athink_structured(synthesis_prompt, DebateSynthesis)
+        except (ValueError, Exception) as e:
+            logger.warning(f"Debate synthesis failed: {e}")
+            synthesis = DebateSynthesis(
+                verdict="UNDECIDED",
+                confidence=0.0,
+                strongest_arguments_pro=[],
+                strongest_arguments_con=[],
+                synthesis_summary=f"Synthesis failed: {e}",
+            )
 
         return {
             "statement": statement,

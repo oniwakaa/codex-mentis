@@ -1,8 +1,6 @@
 import typer
 import sqlite3
-from typing import Optional
 from pitagora.core.config import CONFIG_DIR
-from pitagora.cli.rich_ui import print_panel, print_table
 from pitagora.chat import launch_chat as launch_repl
 
 app = typer.Typer(help="Initiate Socratic study mode for a math/physics topic")
@@ -71,7 +69,5 @@ def study(
     launch_repl(
         mode="STUDY",
         topic=topic,
-        context=kb_context,
-        domain=domain,
-        difficulty=difficulty
+        system_prompt=kb_context,
     )

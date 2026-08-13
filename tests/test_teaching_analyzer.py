@@ -15,7 +15,7 @@ def _make_chat(reply_obj):
 
 def test_shortcut_bypasses_llm():
     a = ResponseAnalyzer(_make_chat({"label": "correct"}))
-    r = a.classify("n", "limits", "definition")
+    r = a.classify("s", "limits", "definition")
     assert r.via_shortcut is True
     assert r.label == "skip"
     assert r.delta == DELTA["skip"]

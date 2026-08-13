@@ -24,7 +24,6 @@ class WorkflowDefinition:
     name: str
     description: str
     steps: List[WorkflowStep]
-    parallel_groups: List[List[str]] = field(default_factory=field)
     merge_strategy: str = "concat"
 
 def format_template(template: str, inputs: Dict[str, Any], step_outputs: Dict[str, str]) -> str:
@@ -32,34 +31,27 @@ def format_template(template: str, inputs: Dict[str, Any], step_outputs: Dict[st
     Parses and formats double-curly braces {{ variable }} including step references.
     """
     pattern = re.compile(r"\{\{\s*(.*?)\s*\}\}")
-    
+
     def replacement(match):
         expr = match.group(1).strip()
-        
+
         # Check if it exists in inputs
         if expr in inputs:
             return str(inputs[expr])
-            
+
         # Check if it is step_name.outputs.var_name
         if ".outputs." in expr:
             parts = expr.split(".outputs.")
             step_name = parts[0].strip()
             if step_name in step_outputs:
                 return str(step_outputs[step_name])
-                
+
         # Fallback to step_outputs
         if expr in step_outputs:
             return str(step_outputs[expr])
-            
-        # Try evaluating simple python expressions
-        try:
-            val = eval(expr, {}, inputs)
-            return str(val)
-        except Exception:
-            pass
-            
+
         return ""
-        
+
     return pattern.sub(replacement, template)
 
 class WorkflowEngine:
@@ -98,7 +90,6 @@ class WorkflowEngine:
             name=data["name"],
             description=data.get("description", ""),
             steps=steps,
-            parallel_groups=data.get("parallel_groups", []),
             merge_strategy=data.get("merge_strategy", "concat")
         )
         return self.workflow
@@ -125,18 +116,18 @@ class WorkflowEngine:
             self.workflow = w_def
 
         # A map of step name -> Future which will resolve with the step output content
-        step_futures: Dict[str, asyncio.Future] = {step.name: asyncio.Future() for step in w_def.steps}
+        loop = asyncio.get_running_loop()
+        step_futures: Dict[str, asyncio.Future] = {step.name: loop.create_future() for step in w_def.steps}
         step_outputs: Dict[str, str] = {}
         agent_responses: List[AgentResponse] = []
 
         async def run_step(step: WorkflowStep) -> str:
             try:
                 # 1. Await dependency outputs
-                dep_results = {}
                 for dep_name in step.inputs_from:
                     if dep_name not in step_futures:
                         raise ValueError(f"Step '{step.name}' depends on non-existent step '{dep_name}'")
-                    dep_results[dep_name] = await step_futures[dep_name]
+                    await step_futures[dep_name]
 
                 # 2. Construct prompt by formatting template
                 prompt = format_template(step.prompt_template, inputs, step_outputs)

@@ -1,7 +1,6 @@
 """Setup wizard — configure providers, API keys, and preferences interactively."""
 import os
-from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 import typer
 
@@ -84,7 +83,6 @@ def run_setup(console=None, quick: bool = False):
     # ─── Step 3: Features ───
     console.print("\n[bold]Step 3: Features[/bold]\n")
     
-    enable_tui = Confirm.ask("Enable Textual TUI?", default=True)
     enable_embeddings = Confirm.ask("Enable vector embeddings for semantic search?", default=True)
     enable_spaced_rep = Confirm.ask("Enable spaced repetition?", default=True)
 
@@ -96,7 +94,6 @@ def run_setup(console=None, quick: bool = False):
         },
         "model": default_model,
         "features": {
-            "tui": enable_tui,
             "embeddings": enable_embeddings,
             "spaced_repetition": enable_spaced_rep,
         },
@@ -123,7 +120,6 @@ def run_setup(console=None, quick: bool = False):
         f"[green]✓ Configuration saved to {config_path}[/green]\n\n"
         f"Provider: [cyan]{providers_config.get('name', 'cliproxy')}[/cyan]\n"
         f"Model: [cyan]{default_model}[/cyan]\n"
-        f"TUI: [cyan]{'enabled' if enable_tui else 'disabled'}[/cyan]\n"
         f"Embeddings: [cyan]{'enabled' if enable_embeddings else 'disabled'}[/cyan]\n"
         f"Spaced Repetition: [cyan]{'enabled' if enable_spaced_rep else 'disabled'}[/cyan]\n\n"
         "[bold]Get started:[/bold]\n"

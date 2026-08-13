@@ -45,45 +45,11 @@ class ReviewerAgent(BaseAgent):
         )
 
     def tool_sympy_evaluate(self, code: str) -> str:
-        """
-        Executes code in a SymPy sandbox to evaluate mathematical claims.
-        """
-        try:
-            from pitagora.math_engine.sandbox import SymPySandbox
-            sandbox = SymPySandbox()
-            res = sandbox.execute(code)
-            return json.dumps(res)
-        except ImportError:
-            import sys
-            from io import StringIO
-            
-            old_stdout = sys.stdout
-            redirected_output = sys.stdout = StringIO()
-            
-            local_vars: Dict[str, Any] = {}
-            try:
-                import sympy
-                local_vars['sympy'] = sympy
-                local_vars['x'], local_vars['y'], local_vars['z'], local_vars['t'] = sympy.symbols('x y z t')
-            except ImportError:
-                pass
-                
-            success = True
-            error_msg = ""
-            try:
-                exec(code, {}, local_vars)
-            except Exception as e:
-                success = False
-                error_msg = str(e)
-            finally:
-                sys.stdout = old_stdout
-                
-            return json.dumps({
-                "success": success,
-                "output": redirected_output.getvalue(),
-                "error": error_msg,
-                "variables": {k: str(v) for k, v in local_vars.items() if k not in ('__builtins__', 'sympy')}
-            })
+        """Executes code in the project's SymPy sandbox to evaluate mathematical claims."""
+        from pitagora.math_engine.sandbox import SymPySandbox
+        sandbox = SymPySandbox()
+        res = sandbox.execute(code)
+        return json.dumps(res)
 
     def _parse_verdict(self, content: str) -> Dict[str, Any]:
         """

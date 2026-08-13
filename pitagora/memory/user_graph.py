@@ -30,8 +30,8 @@ class UserGraph:
     """Tracks the relationship between users and their knowledge."""
 
     def __init__(self, db_path: Optional[str] = None):
-        from pitagora.core.config import CONFIG_DIR
-        self.db_path = db_path or str(CONFIG_DIR / "user_graph.db")
+        from pitagora.core.constants import DB_DIR
+        self.db_path = db_path or str(DB_DIR / "user_graph.db")
         self._init_db()
 
     def _init_db(self):
@@ -67,7 +67,9 @@ class UserGraph:
         now = datetime.now().isoformat()
         conn = sqlite3.connect(self.db_path)
         conn.execute(
-            "INSERT OR REPLACE INTO graph_nodes (id, node_type, properties, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+            """INSERT INTO graph_nodes (id, node_type, properties, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(id) DO UPDATE SET properties=excluded.properties, updated_at=excluded.updated_at""",
             (node_id, node_type, json.dumps(properties or {}), now, now)
         )
         conn.commit()
@@ -80,8 +82,9 @@ class UserGraph:
         now = datetime.now().isoformat()
         conn = sqlite3.connect(self.db_path)
         conn.execute(
-            """INSERT OR REPLACE INTO graph_edges (source, target, edge_type, weight, properties, created_at)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO graph_edges (source, target, edge_type, weight, properties, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(source, target, edge_type) DO UPDATE SET properties=excluded.properties, weight=excluded.weight""",
             (source, target, edge_type, weight, json.dumps(properties or {}), now)
         )
         conn.commit()

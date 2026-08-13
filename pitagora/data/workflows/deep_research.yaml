@@ -25,7 +25,6 @@ steps:
       Focus on academic sources and primary literature.
       Depth: {{ depth }}
     tools: [web_search, kb_retrieve]
-    outputs: [sources, initial_findings]
 
   - id: extract
     agent: researcher
@@ -35,7 +34,6 @@ steps:
       Source material: {{ search.outputs.initial_findings }}
     inputs_from: [search]
     tools: [kb_retrieve]
-    outputs: [equations, concepts, key_points]
 
   - id: verify
     agent: reviewer
@@ -46,7 +44,6 @@ steps:
       Claims to verify: {{ extract.outputs.key_points }}
     inputs_from: [extract]
     tools: [sympy_evaluate]
-    outputs: [verified_claims, flagged_claims]
 
   - id: synthesize
     agent: tutor
@@ -61,6 +58,5 @@ steps:
       Concepts discovered: {{ extract.outputs.concepts }}
       Sources: {{ search.outputs.sources }}
     inputs_from: [verify, extract, search]
-    outputs: [report]
 
 merge_strategy: last  # Use output of final step

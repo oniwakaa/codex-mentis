@@ -136,7 +136,6 @@ def _unicode_substitute(latex_str: str) -> str:
         .replace(r"\leq", "≤")
         .replace(r"\geq", "≥")
         .replace(r"\rightarrow", "→")
-        .replace(r"\infty", "∞")
     )
 
     import re

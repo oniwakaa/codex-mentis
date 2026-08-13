@@ -61,18 +61,19 @@ def temp_db(tmp_path):
 def temp_yaml(tmp_path):
     yaml_file = tmp_path / "concepts.yaml"
     content = """
-Calculus:
-  description: "Study of continuous change"
-  prerequisites: []
-Linear Algebra:
-  description: "Study of vectors and linear fields"
-  prerequisites: []
-Classical Mechanics:
-  description: "Study of motion of macroscopic objects"
-  prerequisites: ["Calculus", "Linear Algebra"]
-Quantum Mechanics:
-  description: "Study of particles at the atomic scale"
-  prerequisites: ["Calculus", "Linear Algebra", "Classical Mechanics"]
+General:
+  - id: Calculus
+    name: Calculus
+    prerequisites: []
+  - id: Linear Algebra
+    name: Linear Algebra
+    prerequisites: []
+  - id: Classical Mechanics
+    name: Classical Mechanics
+    prerequisites: [Calculus, Linear Algebra]
+  - id: Quantum Mechanics
+    name: Quantum Mechanics
+    prerequisites: [Calculus, Linear Algebra, Classical Mechanics]
 """
     yaml_file.write_text(content)
     return str(yaml_file)

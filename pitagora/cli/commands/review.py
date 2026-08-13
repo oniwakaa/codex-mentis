@@ -90,7 +90,10 @@ def review_start(
         rating_int = int(rating)
 
         # Update SM-2 algorithm
-        sr.update_score(concept, quality=rating_int)
+        # UI rating: 1=Perfect, 5=No recall. SM-2 quality: 0-2=fail, 3-5=correct.
+        # Invert so rating 1→quality 5, rating 5→quality 1.
+        quality = 6 - rating_int
+        sr.update_score(concept, quality=quality)
 
         if rating_int <= 2:
             correct += 1

@@ -6,14 +6,14 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from pitagora.core.config import CONFIG_DIR
+from pitagora.core.constants import DB_DIR
 
 
 class KnowledgeBase:
     """Manages the document knowledge base with semantic search."""
 
     def __init__(self, db_path: Optional[str] = None, embedding_db_path: Optional[str] = None):
-        self.db_path = db_path or str(CONFIG_DIR / "knowledge.db")
+        self.db_path = db_path or str(DB_DIR / "knowledge.db")
         self.embedding_db_path = embedding_db_path
         self._ensure_db()
 
@@ -54,8 +54,6 @@ class KnowledgeBase:
                      chunks: Optional[List[Dict[str, Any]]] = None,
                      metadata: Optional[Dict[str, Any]] = None) -> int:
         """Add a document and its chunks to the knowledge base."""
-        if subject == "general" and title != "general":
-            subject = title
         from pitagora.knowledge.ingester import DocumentIngester
         from pitagora.knowledge.chunker import SmartChunker
 

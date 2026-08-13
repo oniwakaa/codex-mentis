@@ -168,7 +168,7 @@ def show_review_queue():
     """Show the spaced repetition review queue."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    # Mock queue logic: anything with last_reviewed or a low mastery score < 0.5 needs review
+    # Mock queue logic: anything with last_reviewed or a low mastery score < 0.8 needs review
     cursor.execute("SELECT concept_id, mastery_score, last_reviewed FROM concept_mastery WHERE mastery_score < 0.8")
     rows = cursor.fetchall()
     conn.close()

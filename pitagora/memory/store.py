@@ -117,10 +117,10 @@ class MemoryStore:
                 "embedding": bytes, # BLOB
                 "timestamp": str,
                 "metadata": str # JSON text
-            }, pk="id", defaults={"timestamp": "CURRENT_TIMESTAMP"})
+            }, pk="id")
             db["memory_entries"].create_index(["layer"])
             db["memory_entries"].create_index(["topic"])
-            
+
         # Table: conversations
         if not db["conversations"].exists():
             db["conversations"].create({
@@ -128,7 +128,7 @@ class MemoryStore:
                 "topic": str,
                 "messages": str, # JSON text
                 "created_at": str
-            }, pk="id", defaults={"created_at": "CURRENT_TIMESTAMP"})
+            }, pk="id")
 
     def _float_list_to_blob(self, floats: List[float]) -> bytes:
         return struct.pack(f"{len(floats)}f", *floats)
@@ -303,7 +303,8 @@ class MemoryStore:
         db["conversations"].insert({
             "id": conversation_id,
             "topic": topic,
-            "messages": messages_json
+            "messages": messages_json,
+            "created_at": datetime.now().isoformat()
         }, replace=True)
 
     def get_conversation(self, conversation_id: str) -> Optional[List[Dict[str, str]]]:

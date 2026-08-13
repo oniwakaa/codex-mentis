@@ -1,7 +1,7 @@
 """Provider base — abstract interface for LLM providers."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Iterator, AsyncIterator
+from typing import Any, Dict, List, Optional, Iterator
 
 
 @dataclass
@@ -20,6 +20,11 @@ class ProviderConfig:
 class BaseProvider(ABC):
     def __init__(self, config: ProviderConfig):
         self.config = config
+        self.token_usage: Dict[str, int] = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
 
     @abstractmethod
     def complete(

@@ -29,7 +29,10 @@ class GeneratedSkill(BaseModel):
     example_output: str = Field(description="An example successful response showing the pattern in action")
 
 class SelfImproverAgent(BaseAgent):
-    def __init__(self, provider: BaseProvider, db_path: str = "self_improver.db"):
+    def __init__(self, provider: BaseProvider, db_path: str = ""):
+        if not db_path:
+            from pitagora.core.constants import DB_DIR
+            db_path = str(DB_DIR / "self_improver.db")
         super().__init__(
             name="SelfImprover",
             role="Prompts & Strategy Evolution Optimizer",
@@ -379,15 +382,17 @@ class SelfImproverAgent(BaseAgent):
             
             # Save the new evolved prompt template in database
             conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            new_prompt_id = f"{strategy_name}_v{random.randint(1000, 9999)}"
-            cursor.execute(
-                "INSERT INTO prompt_performance (prompt_id, prompt_text, strategy_name) VALUES (?, ?, ?)",
-                (new_prompt_id, evolved.new_prompt_template, strategy_name)
-            )
-            conn.commit()
-            conn.close()
-            
+            try:
+                cursor = conn.cursor()
+                new_prompt_id = f"{strategy_name}_v{random.randint(1000, 9999)}"
+                cursor.execute(
+                    "INSERT INTO prompt_performance (prompt_id, prompt_text, strategy_name) VALUES (?, ?, ?)",
+                    (new_prompt_id, evolved.new_prompt_template, strategy_name)
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
             return evolved.model_dump_json(indent=2)
         except Exception as e:
             logger.error(f"Error in tool_evolve_strategy: {e}")
@@ -407,20 +412,22 @@ class SelfImproverAgent(BaseAgent):
             
             # Store in database
             conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT OR REPLACE INTO evolved_skills (skill_name, description, instructions, example_input, example_output)
-                VALUES (?, ?, ?, ?, ?)
-            """, (
-                skill.skill_name,
-                skill.description,
-                json.dumps(skill.instructions),
-                skill.example_input,
-                skill.example_output
-            ))
-            conn.commit()
-            conn.close()
-            
+            try:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT OR REPLACE INTO evolved_skills (skill_name, description, instructions, example_input, example_output)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    skill.skill_name,
+                    skill.description,
+                    json.dumps(skill.instructions),
+                    skill.example_input,
+                    skill.example_output
+                ))
+                conn.commit()
+            finally:
+                conn.close()
+
             return skill.model_dump_json(indent=2)
         except Exception as e:
             logger.error(f"Error in tool_generate_skill: {e}")

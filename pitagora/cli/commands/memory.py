@@ -2,10 +2,9 @@ import typer
 import sqlite3
 import json
 from pathlib import Path
-from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 from pitagora.core.config import CONFIG_DIR
-from pitagora.cli.rich_ui import print_table, print_panel, print_markdown
+from pitagora.cli.rich_ui import print_table, print_panel
 
 app = typer.Typer(help="Manage and query Pitagora memory layers")
 

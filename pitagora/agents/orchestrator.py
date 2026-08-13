@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 import re
@@ -66,7 +65,7 @@ class Orchestrator:
         input_lower = user_input.lower()
         
         # Rule-based fast checks
-        if "debate" in input_lower or "vs" in input_lower and ("prover" in input_lower or "reviewer" in input_lower):
+        if "debate" in input_lower or ("vs" in input_lower and ("prover" in input_lower or "reviewer" in input_lower)):
             return {"route_type": "workflow", "name": "prover_reviewer_debate"}
         if "pipeline" in input_lower or ("research" in input_lower and "prove" in input_lower and "visualize" in input_lower):
             return {"route_type": "workflow", "name": "research_prove_review_visualize"}
@@ -250,7 +249,10 @@ class Orchestrator:
                         if d in user_input.lower():
                             domain = d
                             break
-                    res_str = await agent.tool_analogy_generator(user_input, domain=domain)
+                    # Extract the concept from the user input (strip the analogy request phrase)
+                    concept = re.sub(r"^(give me an |an )?analogy for\s+", "", user_input, flags=re.IGNORECASE)
+                    concept = re.sub(r"\s+using\s+.*$", "", concept).strip() or user_input
+                    res_str = await agent.tool_analogy_generator(concept, domain=domain)
                     agent_response = AgentResponse(content=res_str, metadata={"analogy": True})
                 else:
                     agent_response = await agent.explain_level(user_input, level="Beginner")
@@ -263,7 +265,7 @@ class Orchestrator:
                 expr_match = re.search(r"plot\s+([a-zA-Z0-9\s\+\-\*\/\(\)\^]+)", user_input, re.IGNORECASE)
                 if expr_match:
                     expr = expr_match.group(1).strip()
-                    res_str = agent.plot_expression(expr)
+                    res_str = await asyncio.to_thread(agent.plot_expression, expr)
                     agent_response = AgentResponse(content=res_str, metadata={"expr": expr})
                 else:
                     agent_response = await agent.athink(user_input, context)
@@ -422,14 +424,16 @@ class Orchestrator:
 
         agent_responses = []
         debate_history = []
-        
+
         # Round 1: Generate initial proof
         current_proof = await prover.athink(f"Propose a proof/derivation for: '{user_input}'", context)
         agent_responses.append(current_proof)
         debate_history.append(f"#### Round 1: Prover's Initial Derivation\n{current_proof.content}")
-        
+
         max_rounds = 3
+        rounds_completed = 0
         for round_idx in range(1, max_rounds + 1):
+            rounds_completed = round_idx
             # Reviewer critiques
             critique = await reviewer.athink(
                 f"Critically audit this math/physics proof. Check for signs, steps, dimensions, and notation errors. "
@@ -463,7 +467,7 @@ class Orchestrator:
         return OrchestratorResponse(
             content=final_content,
             agent_responses=agent_responses,
-            metadata={"workflow": "prover_reviewer_debate", "rounds": round_idx}
+            metadata={"workflow": "prover_reviewer_debate", "rounds": rounds_completed}
         )
 
     async def _run_derive_verify_plot_workflow(self, user_input: str, context: Optional[str]) -> OrchestratorResponse:
@@ -542,28 +546,32 @@ def orchestrate(query: str, mode: str, topic: str, context: str = "") -> str:
     from pitagora.agents.explainer import ExplainerAgent
     from pitagora.agents.self_improver import SelfImproverAgent
     
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or "mock"
-    
-    # Simple default model resolution
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("PITAGORA_API_KEY") or "mock"
+
+    # Resolve provider config from pitagora config or defaults
     default_provider_name = "gemini"
-    default_model = "gemini-1.5-flash"
-    
+    default_model = os.getenv("PITAGORA_MODEL", "google/gemini-3.6-flash-high")
+    base_url = os.getenv("PITAGORA_BASE_URL", "http://localhost:8317/v1")
+
     try:
         from pitagora.core.config import load_config
         config_obj = load_config()
         default_provider_name = config_obj.providers.default
-        if default_provider_name == "openai":
-            default_model = "gpt-4o"
-        elif default_provider_name == "anthropic":
-            default_model = "claude-3-5-sonnet-20240620"
-        elif default_provider_name == "local":
-            default_model = "local-model"
+        # Read nested provider config if available
+        prov_config = config_obj.providers.config if hasattr(config_obj.providers, 'config') else {}
+        if prov_config:
+            default_model = prov_config.get("default_model", default_model)
+            base_url = prov_config.get("base_url", base_url)
+            api_key = prov_config.get("api_key", api_key)
+        if config_obj.model:
+            default_model = config_obj.model
     except Exception:
         pass
-        
+
     config = ProviderConfig(
         api_key=api_key,
         model=default_model,
+        base_url=base_url,
         max_tokens=4096
     )
     

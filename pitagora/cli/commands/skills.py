@@ -129,10 +129,9 @@ def evolve_skill(name: Optional[str] = typer.Argument(None, help="Specific skill
 @app.command("install")
 def install_skill(
     skill_name: str = typer.Argument(..., help="Name of the community skill"),
-    source: str = typer.Option("community", "--source", "-s", help="Community/URL source to install from")
 ):
     """Install an evolving skill or method template from community repositories."""
-    typer.echo(f"Searching for '{skill_name}' on community registries ({source})...")
+    typer.echo(f"Searching for '{skill_name}' on community registries...")
     
     # Mock installing a community skill
     conn = get_db_connection()

@@ -49,8 +49,9 @@ class ResponseClassification:
 
 
 # Shortcut → classification map. These skip the LLM round-trip entirely.
+# Note: "n" is intentionally absent — it maps to "next" in TeachingSession.SHORTCUTS
+# and is handled by the session as an advance action, not a classification.
 SHORTCUT_CLASSIFICATION: Dict[str, str] = {
-    "n": Classification.skip.value,      # "next" = abandon current sub-concept
     "e": Classification.partial.value,    # "explain differently" = didn't land
     "d": Classification.deeper.value,     # "go deeper" = ready for more
     "s": Classification.skip.value,
@@ -170,8 +171,10 @@ def demo() -> None:
         return '{"label": "correct", "rationale": "nailed it"}'
 
     a = ResponseAnalyzer(fake_chat)
+    # "n" is no longer a classification shortcut (handled by session as "next"),
+    # so it now goes through the LLM path.
     r = a.classify("n", "limits", "definition")
-    assert r.via_shortcut and r.label == "skip"
+    assert not r.via_shortcut and r.label == "correct"
     r = a.classify("The limit is the value the function approaches.",
                    "limits", "definition")
     assert r.label == "correct" and r.delta == 0.15

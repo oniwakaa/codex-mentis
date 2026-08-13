@@ -1,7 +1,7 @@
 import typer
 import sympy as sp
 import numpy as np
-from typing import Optional, List, Tuple
+from typing import Optional, Tuple
 from pathlib import Path
 from pitagora.cli.rich_ui import print_plot, print_panel, create_spinner
 

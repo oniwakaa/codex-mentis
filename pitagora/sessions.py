@@ -1,6 +1,7 @@
 """Session persistence — save/load conversations across restarts."""
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -36,6 +37,8 @@ def save_session(messages: List[Dict], topic: str = "general", mode: str = "stud
 
 def load_session(session_id: str) -> Optional[List[Dict]]:
     """Load a saved session by ID."""
+    if not re.fullmatch(r"[\w.-]+", session_id):
+        raise ValueError(f"Invalid session id: {session_id}")
     path = SESSIONS_DIR / f"{session_id}.json"
     if not path.exists():
         return None
@@ -68,6 +71,8 @@ def list_sessions(limit: int = 10) -> List[Dict]:
 
 def delete_session(session_id: str) -> bool:
     """Delete a saved session."""
+    if not re.fullmatch(r"[\w.-]+", session_id):
+        raise ValueError(f"Invalid session id: {session_id}")
     path = SESSIONS_DIR / f"{session_id}.json"
     if path.exists():
         path.unlink()

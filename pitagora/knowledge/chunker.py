@@ -82,7 +82,7 @@ class SmartChunker:
             sections.append((last_title, remaining))
 
         if not sections:
-            sections = [("全文", text)]
+            sections = [("Full Text", text)]
 
         return sections
 

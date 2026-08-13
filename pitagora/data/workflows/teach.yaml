@@ -26,7 +26,6 @@ steps:
       2. Use analogies and mental models
       3. Identify the key sub-concepts needed
       4. Map the intuition (what does this concept FEEL like?)
-    outputs: [explanation, sub_concepts, analogies]
 
   - id: socratic_guide
     agent: tutor
@@ -43,7 +42,6 @@ steps:
       Guide the student through the concept using questions, not lectures.
       Ask ONE question at a time. Build on their answers.
     inputs_from: [breakdown]
-    outputs: [guiding_question]
 
   - id: quiz
     agent: tutor
@@ -54,7 +52,6 @@ steps:
       
       Concept breakdown: {{ breakdown.outputs.explanation }}
     inputs_from: [breakdown]
-    outputs: [exercise]
 
   - id: feedback_tracker
     agent: self_improver
@@ -69,6 +66,5 @@ steps:
       best for different topics and levels.
     inputs_from: [breakdown]
     tools: [track_outcome]
-    outputs: [strategy_recorded]
 
 merge_strategy: combine

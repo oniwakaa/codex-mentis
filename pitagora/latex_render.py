@@ -32,7 +32,7 @@ OPERATORS = {
     r'\hbar': 'ħ', r'\ell': 'ℓ', r'\Re': 'ℜ', r'\Im': 'ℑ',
     r'\le': '≤', r'\ge': '≥', r'\ne': '≠',
     r'\to': '→', r'\mapsto': '↦',
-    r'\langle': '⟨', r'\rangle': 'rangle',
+    r'\langle': '⟨', r'\rangle': '⟩',
     r'\left': '', r'\right': '',  # sizing commands, just remove
     r'\quad': ' ', r'\qquad': '  ', r'\,': ' ', r'\;': ' ',
     r'\!': '', r'\enspace': ' ', r'\thinspace': ' ',
@@ -103,6 +103,8 @@ def latex_to_unicode(text: str) -> str:
 def render_equation_box(equation: str, width: int = 60) -> str:
     """Render an equation in a nice terminal box."""
     rendered = latex_to_unicode(equation)
+    if len(rendered) > width - 2:
+        width = len(rendered) + 4
     lines = []
     lines.append('┌' + '─' * (width - 2) + '┐')
     # Center the equation

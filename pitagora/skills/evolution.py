@@ -15,8 +15,9 @@ class Stats:
     success_count: int = 0
 
 class SkillEvolution:
-    def __init__(self, db_path: str = "skills_evolution.db"):
-        self.db_path = os.path.expanduser(db_path)
+    def __init__(self, db_path: str = None):
+        from pitagora.core.constants import DB_DIR
+        self.db_path = os.path.expanduser(db_path or str(DB_DIR / "skills_evolution.db"))
         db_dir = os.path.dirname(self.db_path)
         if db_dir:
             os.makedirs(db_dir, exist_ok=True)
@@ -36,10 +37,10 @@ class SkillEvolution:
                 "feedback": str,
                 "variant": str, # for A/B testing, default to 'A'
                 "timestamp": str
-            }, pk="id", defaults={"timestamp": "CURRENT_TIMESTAMP"})
+            }, pk="id")
             db["skill_usage"].create_index(["skill_name"])
             db["skill_usage"].create_index(["topic"])
-            
+
         # Table: skill_prompts
         if not db["skill_prompts"].exists():
             db["skill_prompts"].create({
@@ -48,7 +49,7 @@ class SkillEvolution:
                 "prompt_template": str,
                 "version": int,
                 "timestamp": str
-            }, pk="id", defaults={"timestamp": "CURRENT_TIMESTAMP"})
+            }, pk="id")
 
     def record_use(
         self, 
@@ -67,7 +68,8 @@ class SkillEvolution:
             "success": 1 if success else 0,
             "confidence": confidence,
             "feedback": feedback,
-            "variant": variant
+            "variant": variant,
+            "timestamp": datetime.now().isoformat()
         })
 
     def get_stats(self, skill_name: str) -> Stats:
@@ -200,9 +202,10 @@ class SkillEvolution:
         db["skill_prompts"].insert({
             "skill_name": skill_name,
             "prompt_template": mutated_template,
-            "version": new_version
+            "version": new_version,
+            "timestamp": datetime.now().isoformat()
         })
-        
+
         return mutated_template
 
     def evolve_prompt(self, skill_name: str, base_template: str) -> str:
@@ -248,7 +251,8 @@ class SkillEvolution:
         db["skill_prompts"].insert({
             "skill_name": skill_name,
             "prompt_template": evolved_template,
-            "version": version
+            "version": version,
+            "timestamp": datetime.now().isoformat()
         })
 
         return evolved_template

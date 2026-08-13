@@ -39,44 +39,31 @@ class VisualizerAgent(BaseAgent):
         # Parse expression and calculate data points
         x_vals = []
         y_vals = []
-        
+
+        if points < 2:
+            points = 2
         step = (x_range[1] - x_range[0]) / (points - 1)
-        
+
         try:
             import sympy
             from sympy.parsing.sympy_parser import parse_expr
             x_sym = sympy.Symbol('x')
             parsed_expr = parse_expr(expr)
-            
+
             for i in range(points):
                 val = x_range[0] + i * step
                 x_vals.append(val)
                 # Substitute and evaluate numerically
                 res = parsed_expr.subs(x_sym, val).evalf()
                 # Handle complex values or non-numerical answers
-                if res.is_real:
+                if res.is_real is not False:
                     y_vals.append(float(res))
                 else:
                     y_vals.append(0.0)
         except Exception:
-            # Fallback evaluation if sympy fails or is not available
-            import math
-            # Basic safe math evaluation environment
-            safe_dict = {
-                'x': 0.0,
-                'sin': math.sin, 'cos': math.cos, 'tan': math.tan,
-                'exp': math.exp, 'log': math.log, 'sqrt': math.sqrt,
-                'pi': math.pi, 'e': math.e, 'pow': math.pow
-            }
-            for i in range(points):
-                val = x_range[0] + i * step
-                x_vals.append(val)
-                safe_dict['x'] = val
-                try:
-                    res = eval(expr, {"__builtins__": None}, safe_dict)
-                    y_vals.append(float(res))
-                except Exception:
-                    y_vals.append(0.0)
+            # No sympy available — cannot safely evaluate arbitrary expressions
+            x_vals = list(x_vals) if x_vals else [x_range[0], x_range[1]]
+            y_vals = [0.0] * len(x_vals)
 
         # Generate terminal plot using plotext
         terminal_plot = ""

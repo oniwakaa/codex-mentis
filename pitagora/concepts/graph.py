@@ -98,6 +98,7 @@ class ConceptGraph:
         """
         self.graph = {}
         current_concept = None
+        current_list_field = None
         try:
             with open(self.yaml_path, "r", encoding="utf-8") as f:
                 for line in f:
@@ -107,9 +108,13 @@ class ConceptGraph:
                     if line.startswith("  ") and current_concept:
                         if "prerequisites:" in line_stripped:
                             self.graph[current_concept]["prerequisites"] = []
-                        elif line_stripped.startswith("-") and "prerequisites" in self.graph[current_concept]:
-                            prereq = line_stripped.replace("-", "").strip().strip('"').strip("'")
-                            self.graph[current_concept]["prerequisites"].append(prereq)
+                            current_list_field = "prerequisites"
+                        elif "dependents:" in line_stripped:
+                            self.graph[current_concept]["dependents"] = []
+                            current_list_field = "dependents"
+                        elif line_stripped.startswith("-") and current_list_field:
+                            item = line_stripped.replace("-", "").strip().strip('"').strip("'")
+                            self.graph[current_concept][current_list_field].append(item)
                         elif ":" in line_stripped:
                             parts = line_stripped.split(":", 1)
                             key = parts[0].strip()
@@ -121,10 +126,12 @@ class ConceptGraph:
                                     self.graph[current_concept][key] = val
                             else:
                                 self.graph[current_concept][key] = val
+                            current_list_field = None
                     else:
                         if line_stripped.endswith(":"):
                             current_concept = line_stripped[:-1].strip().strip('"').strip("'")
                             self.graph[current_concept] = {"prerequisites": [], "dependents": []}
+                            current_list_field = None
         except Exception:
             self._create_seed_graph()
 
@@ -201,6 +208,7 @@ class ConceptGraph:
                 with open(self.yaml_path, "w", encoding="utf-8") as f:
                     for concept, details in self.graph.items():
                         f.write(f"{concept}:\n")
+                        f.write(f"  name: \"{details.get('name', concept)}\"\n")
                         f.write(f"  description: \"{details.get('description', '')}\"\n")
                         f.write(f"  domain: \"{details.get('domain', '')}\"\n")
                         f.write(f"  difficulty: {details.get('difficulty', 1)}\n")
@@ -227,12 +235,15 @@ class ConceptGraph:
             if cid.lower() == lower:
                 return cid
         # Partial match (name contains query or query contains name)
-        for cid, details in self.graph.items():
-            name = details.get("name", "").lower()
-            if lower in name or name in lower:
-                return cid
-            if lower in cid.lower():
-                return cid
+        # Only attempt partial match for queries of reasonable length to avoid
+        # spurious short-string matches (e.g. "a" matching "Algebra").
+        if len(lower) >= 3:
+            for cid, details in self.graph.items():
+                name = details.get("name", "").lower()
+                if lower in name or name in lower:
+                    return cid
+                if lower in cid.lower():
+                    return cid
         # Domain match — prefer longest domain match
         best_match = None
         best_len = 0
@@ -254,7 +265,6 @@ class ConceptGraph:
         cid = self._resolve_concept(concept)
         if cid:
             prereq_ids = self.graph.get(cid, {}).get("prerequisites", [])
-            # Return names, not IDs
             return [self.graph.get(p, {}).get("name", p) for p in prereq_ids if p in self.graph]
         return []
 
@@ -283,8 +293,8 @@ class ConceptGraph:
             for prereq in self.graph.get(node, {}).get("prerequisites", []):
                 if prereq in self.graph:
                     dfs(prereq)
-            name = self.graph.get(node, {}).get("name", node)
-            path.append(name)
+            # Append display name for user-facing output
+            path.append(self.graph.get(node, {}).get("name", node))
 
         dfs(cid)
         return path
@@ -295,40 +305,37 @@ class ConceptGraph:
         nodes dynamically by difficulty and estimated learning time (e.g. build up from easiest).
         """
         mastered = set(mastered_concepts or [])
-        needed = set(self.get_learning_path(target)) - mastered
-        
+        # get_learning_path returns display names; resolve to IDs for internal processing
+        name_to_id = {details.get("name", cid): cid for cid, details in self.graph.items()}
+        needed = set(name_to_id.get(name, name) for name in self.get_learning_path(target)) - mastered
+
         if not needed:
             return []
-            
+
         path = []
         visited = set()
-        
+
         while len(path) < len(needed):
-            # Find all nodes in `needed` that are not yet in `path`
-            # and whose prerequisites are either mastered or already in `path`
             available = []
             for node in needed:
                 if node in visited:
                     continue
-                prereqs = set(self.get_prerequisites(node))
+                prereqs = set(self.graph.get(node, {}).get("prerequisites", []))
                 if prereqs.issubset(mastered.union(visited)):
                     available.append(node)
-                    
+
             if not available:
-                # Should not happen in a DAG, but fallback to prevent infinite loop
                 break
-                
-            # Sort available concepts by difficulty (ascending) and learning time (ascending)
+
             available.sort(key=lambda x: (
                 self.graph[x].get("difficulty", 1),
                 self.graph[x].get("estimated_learning_time", 60)
             ))
-            
-            # Select the optimized next concept
+
             next_concept = available[0]
             path.append(next_concept)
             visited.add(next_concept)
-            
+
         return path
 
     def add_concept(

@@ -4,7 +4,7 @@ import logging
 import random
 import re
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional, Callable, Type, Union, AsyncIterator
+from typing import Dict, Any, List, Optional, Callable, Type
 from pydantic import BaseModel, ValidationError
 
 from pitagora.agents.providers.base import BaseProvider
@@ -36,7 +36,7 @@ class EventEmitter:
 
     async def emit(self, event: str, *args: Any, **kwargs: Any) -> None:
         if event in self._listeners:
-            for listener in self._listeners[event]:
+            for listener in list(self._listeners[event]):
                 try:
                     if asyncio.iscoroutinefunction(listener):
                         await listener(*args, **kwargs)
@@ -182,11 +182,7 @@ class BaseAgent:
         
         # Enforce history limit while retaining system context if possible
         if len(self.history) > self.max_history_len:
-            # Try to keep the first message if it is system
-            if self.history[0].get("role") == "system":
-                self.history = [self.history[0]] + self.history[-(self.max_history_len - 1):]
-            else:
-                self.history = self.history[-self.max_history_len:]
+            self.history = self.history[-self.max_history_len:]
 
     def clear_history(self) -> None:
         self.history = []
@@ -222,15 +218,18 @@ class BaseAgent:
                 # If the handler is async, run in a loop
                 if asyncio.iscoroutinefunction(handler):
                     try:
-                        loop = asyncio.get_event_loop()
-                        if loop.is_closed():
-                            raise RuntimeError("loop closed")
+                        loop = asyncio.get_running_loop()
                     except RuntimeError:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                    if loop.is_running():
-                        import nest_asyncio
-                        nest_asyncio.apply()
+                        loop = None
+                    if loop is not None and loop.is_running():
+                        import threading
+                        result: list = [None]
+                        def _run():
+                            result[0] = asyncio.run(handler(**args))
+                        t = threading.Thread(target=_run)
+                        t.start()
+                        t.join()
+                        return result[0]
                     return asyncio.run(handler(**args))
                 return handler(**args)
             except Exception as e:
@@ -271,42 +270,20 @@ class BaseAgent:
         Sends the prompt and optional context to the LLM provider synchronously.
         """
         try:
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_closed():
-                    raise RuntimeError("loop closed")
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            if loop.is_running():
-                import nest_asyncio
-                nest_asyncio.apply()
-            return asyncio.run(self.athink(prompt, context))
-        except Exception:
-            # Fallback to pure synchronous complete
-            messages = [{"role": "system", "content": self.system_prompt}]
-            user_content = f"--- CONTEXT ---\n{context}\n---------------\n\n{prompt}" if context else prompt
-            messages.append({"role": "user", "content": user_content})
-            
-            raw_response = self.provider.complete(messages=messages, tools=self.tools, temperature=0.7)
-            content = raw_response.get("content", "")
-            tool_calls = raw_response.get("tool_calls", [])
-            
-            # Parse token usage
-            usage = raw_response.get("usage") or {}
-            p_tok = usage.get("prompt_tokens", 0)
-            c_tok = usage.get("completion_tokens", 0)
-            t_tok = usage.get("total_tokens", p_tok + c_tok)
-            self.token_usage["prompt_tokens"] += p_tok
-            self.token_usage["completion_tokens"] += c_tok
-            self.token_usage["total_tokens"] += t_tok
-            
-            return AgentResponse(
-                content=content,
-                tool_calls=tool_calls,
-                confidence=self._calculate_confidence(content, raw_response),
-                metadata={"agent_name": self.name, "agent_role": self.role}
-            )
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is not None and loop.is_running():
+            # Inside a running event loop — run in a separate thread with its own loop
+            import threading
+            result: list = [None]
+            def _run():
+                result[0] = asyncio.run(self.athink(prompt, context))
+            t = threading.Thread(target=_run)
+            t.start()
+            t.join()
+            return result[0]
+        return asyncio.run(self.athink(prompt, context))
 
     async def athink(self, prompt: str, context: Optional[str] = None) -> AgentResponse:
         """

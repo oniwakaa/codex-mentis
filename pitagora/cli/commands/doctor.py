@@ -1,8 +1,5 @@
 """Doctor command — check system health and diagnose issues."""
 import typer
-import os
-import shutil
-from pathlib import Path
 
 from pitagora.core.constants import CONFIG_DIR
 

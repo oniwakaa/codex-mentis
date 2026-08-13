@@ -24,7 +24,6 @@ steps:
       Define all variables. Use correct LaTeX notation.
       Use SymPy to verify algebraic steps along the way.
     tools: [sympy_verify]
-    outputs: [derivation, equations]
 
   - id: review
     agent: reviewer
@@ -36,7 +35,6 @@ steps:
       Derivation: {{ derive.outputs.derivation }}
     inputs_from: [derive]
     tools: [sympy_evaluate]
-    outputs: [verdict, critique, errors_found]
 
   - id: revise
     agent: prover
@@ -50,8 +48,6 @@ steps:
       Produce a corrected derivation. Re-verify with SymPy.
     inputs_from: [derive, review]
     tools: [sympy_verify]
-    condition: "{{ review.outputs.verdict }} != CONFIRMED"
-    outputs: [corrected_derivation]
 
   - id: visualize
     agent: visualizer
@@ -62,7 +58,6 @@ steps:
       
       Derivation: {{ revise.outputs.corrected_derivation | default: derive.outputs.derivation }}
     inputs_from: [derive, revise]
-    outputs: [plot, equation_display]
 
   - id: explain
     agent: explainer
@@ -73,8 +68,5 @@ steps:
       
       Derivation: {{ revise.outputs.corrected_derivation | default: derive.outputs.derivation }}
     inputs_from: [derive, revise]
-    outputs: [technical_explanation, intuition_explanation]
 
 merge_strategy: combine
-parallel_groups:
-  - [visualize, explain]  # These can run in parallel

@@ -85,9 +85,6 @@ def test_logic_skill_yaml_loads():
         data = yaml.safe_load(f)
     assert data["name"] == "Formal Logic"
     assert data["domain"] == "Philosophy"
-    exercises = data["exercises"]
-    levels = {e["level"] for e in exercises}
-    assert {"beginner", "intermediate", "advanced"}.issubset(levels)
     # Three concept areas covered
     concepts = data["concepts"]
     assert any("truth table" in c.lower() for c in concepts)

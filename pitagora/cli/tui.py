@@ -7,6 +7,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Static, OptionList
 
+from pitagora.cli.repl_input import COMMAND_TREE
 from pitagora.cli.tui_widgets import (
     ChatTextArea,
     ContextSidebar,
@@ -229,14 +230,21 @@ class PitagoraApp(App):
         if event.text_area == composer:
             text = composer.text
             if text.startswith("/") and " " not in text:
-                popup.display = True
+                text_lower = text.lower()
+                popup.clear_options()
                 
-                # Highlight matching command if any
-                for i in range(popup.option_count):
-                    option = popup.get_option_at_index(i)
-                    if str(option.prompt).startswith(text):
-                        popup.highlighted = i
-                        break
+                # Add only matching commands
+                has_matches = False
+                for cmd in COMMAND_TREE:
+                    if cmd.startswith(text_lower):
+                        popup.add_option(cmd)
+                        has_matches = True
+                        
+                if has_matches:
+                    popup.display = True
+                    popup.highlighted = 0
+                else:
+                    popup.display = False
             else:
                 popup.display = False
 

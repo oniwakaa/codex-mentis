@@ -232,10 +232,11 @@ class ChatTextArea(TextArea):
                 return
 
         if event.key in {"up", "down"}:
+            from textual.css.query import NoMatches
             popup = None
             try:
                 popup = self.app.query_one("#command-popup")
-            except Exception:
+            except NoMatches:
                 pass
                 
             if popup and popup.display:

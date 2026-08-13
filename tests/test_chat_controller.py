@@ -176,3 +176,67 @@ def test_unknown_command_is_visible():
     events = list(make_controller().handle_input("/not-real"))
 
     assert events == [ChatEvent("error", "Unknown: /not-real. /help for commands.")]
+
+
+# ─── Teaching mode tests (Task 5) ───
+
+from pitagora.teaching.analyzer import ResponseClassification
+from pitagora.teaching.session import TeachingState
+from pitagora.journeys.model import LearningJourney
+
+
+class CorrectAnalyzer:
+    def classify(self, text, topic, sub_concept, config=None, model=None):
+        return ResponseClassification(
+            label="correct",
+            delta=0.15,
+            rationale="test",
+            via_shortcut=text == "n",
+        )
+
+
+def test_explore_starts_teaching_and_emits_inline_widgets(monkeypatch):
+    controller = make_controller()
+    monkeypatch.setattr(
+        "pitagora.chat_controller.chat_runtime._generate_sub_concepts",
+        lambda topic, config, model: ["Definition", "Examples"],
+    )
+    monkeypatch.setattr(
+        "pitagora.chat_controller.ResponseAnalyzer",
+        lambda completion: CorrectAnalyzer(),
+    )
+
+    events = list(controller.handle_input("/explore limits"))
+
+    assert controller.teaching_session.topic == "limits"
+    assert controller.teaching_session.state in {
+        TeachingState.exploring,
+        TeachingState.checking,
+    }
+    assert {"markdown", "comprehension", "subconcepts", "controls"}.issubset(
+        {event.kind for event in events}
+    )
+
+
+def test_pause_shortcut_saves_and_leaves_teaching(monkeypatch):
+    controller = make_controller()
+    controller.teaching_session = __import__(
+        "pitagora.teaching.session", fromlist=["TeachingSession"]
+    ).TeachingSession("limits", ["Definition"])
+    controller.teaching_session.transition(TeachingState.exploring)
+    controller.teaching_journey = LearningJourney(
+        topic="limits",
+        sub_concepts=[
+            {"name": "Definition", "mastery": 0.0, "visited": False}
+        ],
+    )
+    saved = []
+    monkeypatch.setattr(
+        "pitagora.journeys.store.save_journey",
+        lambda journey: saved.append(journey),
+    )
+
+    events = list(controller.handle_input("p"))
+
+    assert controller.teaching_session is None
+    assert events[-1].kind == "state_changed"

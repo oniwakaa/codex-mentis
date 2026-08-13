@@ -18,6 +18,8 @@ from datetime import datetime
 from typing import Any, Callable, Iterator, Optional
 
 from pitagora import chat as chat_runtime
+from pitagora.teaching.analyzer import ResponseAnalyzer
+from pitagora.teaching.session import TeachingSession, TeachingState
 
 
 @dataclass(frozen=True)
@@ -576,13 +578,235 @@ class ChatController:
         except Exception as e:
             yield ChatEvent("error", f"Workflow failed: {e}")
 
-    # ─── Teaching command (stub — full flow in Task 5) ───
+    # ─── Teaching command ───
 
     def _cmd_explore(self, argument: str) -> Iterator[ChatEvent]:
+        arg = argument.strip()
+        if arg == "--continue":
+            yield from self._resume_journey()
+            return
+        if not arg:
+            yield ChatEvent(
+                "status",
+                "Usage: /explore <topic>  (or /explore --continue)",
+            )
+            return
+        yield from self._start_teaching(arg)
+
+    def _start_teaching(self, topic: str) -> Iterator[ChatEvent]:
+        yield ChatEvent("status", "Designing learning path...", {"busy": True})
+        subs = chat_runtime._generate_sub_concepts(topic, self.config, self.model)
+        session = TeachingSession(
+            topic=topic, sub_concepts=subs, user_level="intermediate",
+        )
+        chat_runtime._seed_session_style(session, self.feedback_improver)
+        session.transition(TeachingState.exploring)
+        self.teaching_session = session
+        self.teaching_analyzer = ResponseAnalyzer(self.completion)
+        self.topic = topic
+
+        # Auto-create or resume a journey (mirrors chat.py wiring).
+        try:
+            from pitagora.journeys.store import get_or_create_journey
+            journey = get_or_create_journey(topic, subs)
+            journey.session_state = session.to_dict()
+            self.teaching_journey = journey
+        except Exception:
+            self.teaching_journey = None
+
         yield ChatEvent(
-            "status",
-            "Teaching mode is coming in Task 5. Use /help for available commands.",
+            "renderable",
+            {
+                "topic": topic,
+                "sub_concepts": subs,
+                "level": session.user_level,
+            },
+        )
+        yield from self._run_teaching_turn_events("begin")
+
+    def _resume_journey(self) -> Iterator[ChatEvent]:
+        try:
+            from pitagora.journeys.store import list_journeys, load_journey
+            journeys = [
+                j for j in list_journeys()
+                if j.get("status") in ("active", "paused")
+            ]
+            if not journeys:
+                yield ChatEvent(
+                    "status",
+                    "No journeys to continue. Use /explore <topic>.",
+                )
+                return
+            journey = load_journey(journeys[0]["id"])
+            session = TeachingSession.from_dict(journey.session_state)
+            self.teaching_session = session
+            self.teaching_analyzer = ResponseAnalyzer(self.completion)
+            self.topic = session.topic
+            self.teaching_journey = journey
+            yield ChatEvent(
+                "status",
+                f"✓ Resumed journey '{journey.topic}' "
+                f"({session.interaction_count} interactions)",
+            )
+            yield ChatEvent(
+                "comprehension", session.comprehension_score,
+            )
+            yield ChatEvent("controls")
+            yield ChatEvent("state_changed", metadata={"context": self.context})
+        except Exception as e:
+            yield ChatEvent("error", f"Resume failed: {e}")
+
+    def _run_teaching_turn_events(self, user_input: str) -> Iterator[ChatEvent]:
+        """Event-based variant of chat._run_teaching_turn.
+
+        Preserves the original classification, feedback recording, style
+        selection, action policy, prompt construction, state transitions,
+        and journey updates — only console output is replaced with events.
+        """
+        session = self.teaching_session
+        analyzer = self.teaching_analyzer
+        sc = session.current_subconcept
+        sc_name = sc.name if sc else session.topic
+
+        result = analyzer.classify(
+            user_input, session.topic, sc_name,
+            config=self.config, model=self.model,
+        )
+        session.apply_classification(
+            result.label, result.delta, style=session.current_style,
         )
 
+        # WS1: feed the cross-session feedback loop with a real quality signal.
+        if self.feedback_improver is not None:
+            try:
+                from pitagora.agents.self_improver import quality_from_classification
+                self.feedback_improver.record_interaction(
+                    topic=session.topic,
+                    level=session.user_level,
+                    strategy_used=session.current_style,
+                    response_quality=quality_from_classification(result.label),
+                    success=result.delta > 0,
+                )
+            except Exception:
+                pass
+
+        # WS3a: record matched skill usage with the same success signal.
+        if (
+            self.feedback_skill_evo is not None
+            and self.feedback_skills_engine is not None
+            and user_input != "begin"
+        ):
+            try:
+                matched = self.feedback_skills_engine.match_skills(
+                    session.topic, user_input,
+                )
+                if matched:
+                    self.feedback_skill_evo.record_use(
+                        matched[0].name,
+                        success=result.delta > 0,
+                        feedback=result.label,
+                        topic=session.topic,
+                    )
+            except Exception:
+                pass
+
+        action = session.next_action(result.label)
+        style = (
+            session.style_effectiveness.best()
+            if any(session.style_effectiveness.attempts.values())
+            else session.current_style
+        )
+        session.current_style = style
+
+        if action == "adapt":
+            session.transition(TeachingState.adapting)
+        elif action == "check":
+            session.transition(TeachingState.checking)
+        elif action == "visualize":
+            session.transition(TeachingState.visualizing)
+        elif action == "quiz":
+            session.transition(TeachingState.quizzing)
+        elif action == "review":
+            session.transition(TeachingState.reviewing)
+        elif action == "complete":
+            session.complete()
+
+        prompt = chat_runtime._build_teaching_prompt(session, action, style)
+        self.messages.append({"role": "user", "content": prompt})
+        yield ChatEvent("status", "Teaching...", {"busy": True})
+        response = self.completion(
+            self.messages, model=self.model, config=self.config,
+        )
+        self.messages.append({"role": "assistant", "content": response})
+
+        yield ChatEvent("markdown", response)
+        yield ChatEvent("comprehension", session.comprehension_score)
+        yield ChatEvent(
+            "subconcepts",
+            [item.to_dict() for item in session.sub_concepts],
+            {"current_index": session.current_index},
+        )
+        yield ChatEvent("controls")
+
+        # Auto-save journey after each teaching turn.
+        if self.teaching_journey is not None:
+            try:
+                from pitagora.journeys.store import save_journey
+                self.teaching_journey.session_state = session.to_dict()
+                self.teaching_journey.comprehension_history.append(
+                    session.comprehension_score,
+                )
+                self.teaching_journey.sub_concepts = [
+                    sc.to_dict() for sc in session.sub_concepts
+                ]
+                self.teaching_journey.interaction_count = session.interaction_count
+                save_journey(self.teaching_journey)
+            except Exception:
+                pass
+
+        yield ChatEvent("state_changed", metadata={"context": self.context})
+
     def _handle_teaching_turn(self, text: str) -> Iterator[ChatEvent]:
-        yield ChatEvent("error", "Teaching mode is not initialized.")
+        session = self.teaching_session
+        if text.strip().lower() == "p":
+            session.pause()
+            if self.teaching_journey is not None:
+                try:
+                    from pitagora.journeys.store import save_journey
+                    self.teaching_journey.session_state = session.to_dict()
+                    save_journey(self.teaching_journey)
+                except Exception:
+                    pass
+            yield ChatEvent(
+                "status",
+                "Teaching paused. Resumable with /explore --continue. "
+                "Back to free-form chat.",
+            )
+            self.teaching_session = None
+            self.teaching_analyzer = None
+            yield ChatEvent("state_changed", metadata={"context": self.context})
+            return
+
+        yield from self._run_teaching_turn_events(text)
+
+        # If the session completed, drop back to free-form chat.
+        if self.teaching_session is not None and \
+                self.teaching_session.state == TeachingState.completed:
+            session = self.teaching_session
+            mastered = [
+                sc.name for sc in session.sub_concepts if sc.mastery >= 0.8
+            ]
+            yield ChatEvent(
+                "renderable",
+                {
+                    "summary": True,
+                    "topic": session.topic,
+                    "comprehension": session.comprehension_score,
+                    "interaction_count": session.interaction_count,
+                    "best_style": session.style_effectiveness.best(),
+                    "mastered": mastered,
+                },
+            )
+            self.teaching_session = None
+            self.teaching_analyzer = None
+            yield ChatEvent("state_changed", metadata={"context": self.context})

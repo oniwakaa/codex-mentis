@@ -261,6 +261,7 @@ def debate_cmd(
 
 @app.command("chat")
 def chat_cmd(
+    ctx: typer.Context,
     mode: str = typer.Option("study", help="Mode: study/explore/reason/verify"),
     topic: str = typer.Option("general", help="Initial topic"),
     model: str = typer.Option(None, help="Override model"),
@@ -270,7 +271,7 @@ def chat_cmd(
     if model:
         os.environ["PITAGORA_MODEL"] = model
 
-    launcher = _select_chat_launcher(simple)
+    launcher = _select_chat_launcher(simple or bool(ctx.obj and ctx.obj.get("simple")))
     launcher(mode=mode, topic=topic)
 
 
@@ -284,6 +285,9 @@ def main_callback(
 
     Running without a command launches the interactive chat.
     """
+    ctx.ensure_object(dict)
+    ctx.obj["simple"] = simple
+
     if ctx.invoked_subcommand is not None:
         return
 

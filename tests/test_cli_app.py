@@ -166,6 +166,17 @@ def test_chat_command_forwards_simple_mode_topic_and_model(runner):
     launcher.assert_called_once_with(mode="explore", topic="vectors")
 
 
+def test_chat_command_honors_root_simple_option_before_subcommand(runner):
+    launcher = MagicMock()
+
+    with patch.object(cli_app, "_select_chat_launcher", return_value=launcher) as select:
+        result = runner.invoke(app, ["--simple", "chat"])
+
+    assert result.exit_code == 0
+    select.assert_called_once_with(True)
+    launcher.assert_called_once_with(mode="study", topic="general")
+
+
 def test_root_callback_forwards_simple_option(runner):
     launcher = MagicMock()
 

@@ -548,7 +548,8 @@ def launch_chat(
 
     while True:
         try:
-            user_input = console.input(f"[bold green]△ pitagora ({mode}:{topic})> [/bold green]")
+            from pitagora.cli.repl_input import pitagora_prompt
+            user_input = pitagora_prompt(mode, topic)
             
             if not user_input.strip():
                 continue

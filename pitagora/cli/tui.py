@@ -273,7 +273,7 @@ class PitagoraApp(App):
         elif event.kind == "error":
             conversation.mount(Static(f"[red]{event.content}[/red]", classes="error-msg"))
         elif event.kind == "status":
-            if self._turn_worker and self._turn_worker.is_running:
+            if event.metadata.get("busy"):
                 footer = self.query_one("#footer", Static)
                 footer.update(f"[cyan]{event.content}[/cyan]")
             else:
@@ -286,6 +286,7 @@ class PitagoraApp(App):
             conversation.mount(Static(build_controls()))
         elif event.kind == "state_changed":
             header_context = self.query_one("#header-context", Static)
+            self._refresh_elapsed()
             sidebar = self.query_one("#sidebar", ContextSidebar)
             sidebar.update_context(event.metadata["context"])
             if event.metadata.get("quit"):

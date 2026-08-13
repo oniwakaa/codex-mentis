@@ -543,7 +543,7 @@ def launch_chat(
             model=controller.model,
             con=console,
         )
-        review_msg = _check_due_reviews()
+        review_msg = controller.due_reviews()
         if review_msg:
             console.print(f"[dim]{review_msg}[/dim]")
 

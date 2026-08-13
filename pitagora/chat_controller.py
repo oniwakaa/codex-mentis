@@ -13,6 +13,7 @@ their own dependencies.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Iterator, Optional
@@ -20,6 +21,8 @@ from typing import Any, Callable, Iterator, Optional
 from pitagora import chat as chat_runtime
 from pitagora.teaching.analyzer import ResponseAnalyzer
 from pitagora.teaching.session import TeachingSession, TeachingState
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -687,8 +690,8 @@ class ChatController:
                     response_quality=quality_from_classification(result.label),
                     success=result.delta > 0,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("feedback loop record_interaction failed: %s", e)
 
         # WS3a: record matched skill usage with the same success signal.
         if (
@@ -707,8 +710,8 @@ class ChatController:
                         feedback=result.label,
                         topic=session.topic,
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("skill usage record failed: %s", e)
 
         action = session.next_action(result.label)
         style = (

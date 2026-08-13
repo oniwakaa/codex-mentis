@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from typer.testing import CliRunner
 from unittest.mock import MagicMock, patch
@@ -113,3 +115,91 @@ def test_select_chat_launcher_reraises_unrelated_missing_module():
             cli_app._select_chat_launcher(simple=False)
 
     assert exc_info.value is missing_dependency
+
+
+@pytest.mark.parametrize(
+    ("stdin_tty", "stdout_tty", "expected"),
+    [
+        (True, True, True),
+        (True, False, False),
+        (False, True, False),
+        (False, False, False),
+    ],
+)
+def test_is_interactive_requires_stdin_and_stdout_tty(
+    monkeypatch, stdin_tty, stdout_tty, expected
+):
+    stdin = MagicMock()
+    stdin.isatty.return_value = stdin_tty
+    stdout = MagicMock()
+    stdout.isatty.return_value = stdout_tty
+    monkeypatch.setattr(cli_app.sys, "stdin", stdin)
+    monkeypatch.setattr(cli_app.sys, "stdout", stdout)
+
+    assert cli_app._is_interactive() is expected
+
+
+def test_chat_command_forwards_simple_mode_topic_and_model(runner):
+    launcher = MagicMock()
+
+    with patch.object(cli_app, "_select_chat_launcher", return_value=launcher) as select, patch.dict(
+        os.environ, {}, clear=False
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "chat",
+                "--simple",
+                "--mode",
+                "explore",
+                "--topic",
+                "vectors",
+                "--model",
+                "test-model",
+            ],
+        )
+
+        assert os.environ["PITAGORA_MODEL"] == "test-model"
+
+    assert result.exit_code == 0
+    select.assert_called_once_with(True)
+    launcher.assert_called_once_with(mode="explore", topic="vectors")
+
+
+def test_root_callback_forwards_simple_option(runner):
+    launcher = MagicMock()
+
+    with patch("pitagora.core.constants.CONFIG_PATH") as config_path, patch.object(
+        cli_app, "_select_chat_launcher", return_value=launcher
+    ) as select:
+        config_path.exists.return_value = True
+        result = runner.invoke(app, ["--simple"])
+
+    assert result.exit_code == 0
+    select.assert_called_once_with(True)
+    launcher.assert_called_once_with()
+
+
+def test_root_callback_preserves_first_run_setup_and_model(monkeypatch):
+    ctx = MagicMock(invoked_subcommand=None)
+    stdin = MagicMock()
+    stdin.isatty.return_value = True
+    launcher = MagicMock()
+
+    monkeypatch.setattr(cli_app.sys, "stdin", stdin)
+    with patch("pitagora.core.constants.CONFIG_PATH") as config_path, patch(
+        "pitagora.cli.commands.setup.run_setup"
+    ) as run_setup, patch.object(
+        cli_app, "_select_chat_launcher", return_value=launcher
+    ) as select, patch.dict(
+        os.environ, {}, clear=False
+    ):
+        config_path.exists.return_value = False
+
+        cli_app.main_callback(ctx=ctx, model="root-model", simple=True)
+
+        assert os.environ["PITAGORA_MODEL"] == "root-model"
+
+    run_setup.assert_called_once_with()
+    select.assert_called_once_with(True)
+    launcher.assert_called_once_with()

@@ -1,0 +1,56 @@
+name: Hypothesis Testing
+domain: Data Science
+version: 2
+description: 'p-values, confidence intervals, Type I/II errors, and the Bayesian vs. frequentist divide.
+
+  '
+trigger_patterns:
+- p-value|hypothesis test|significance
+- confidence interval
+- type i|type ii|power
+- bayesian vs frequentist|prior|posterior
+- null hypothesis
+template: '<approach>Hypothesis-testing reasoning</approach>
+
+  <steps>
+
+  1. State $H_0$ and $H_1$ and pick a significance level $\\alpha$.
+
+  2. Choose a test whose assumptions (normality, independence) the data meet.
+
+  3. Compute the statistic and its p-value or a confidence interval.
+
+  4. Report effect size and uncertainty, not just the binary reject/accept.
+
+  </steps>
+
+  <caution>A small p-value is not the probability that $H_0$ is true.</caution>
+
+  '
+concepts:
+- Null and alternative hypotheses, test statistics
+- p-values and significance levels
+- Type I and Type II errors, statistical power
+- Confidence intervals and their frequentist interpretation
+- "Bayesian testing: priors, posteriors, Bayes factors"
+common_mistakes:
+- Interpreting $p$ as $P(H_0 | \\text{data})$.
+- Multiple testing without correction (inflated Type I error).
+- Confusing "fail to reject" with "accept" the null.
+analogies:
+- "A p-value is the surprise of the data under $H_0$: a small one means $H_0$ predicted something unlikely."
+- A confidence interval is a net that catches the true parameter 95% of the time across repeated experiments — not a range containing the truth with probability 0.95.
+socratic_questions:
+- What exactly does the p-value measure, and what does it not?
+- How does power depend on sample size and effect size?
+- What does a Bayesian add that a frequentist cannot say?
+verification_strategies:
+- Check test assumptions (normality, equal variance) before applying.
+- Apply a multiple-comparison correction (Bonferroni, FDR) when testing many hypotheses.
+exercises:
+- '[easy] Define Type I and Type II errors with an example.'
+- '[easy] Interpret a 95% confidence interval correctly.'
+- '[medium] Compute a one-sample t-test by hand for a small dataset.'
+- '[medium] Explain why $p$ is not $P(H_0)$.'
+- '[hard] Derive the relationship between power, $\alpha$, and sample size.'
+- '[hard] Contrast a Bayes factor with a p-value on the same data.'

@@ -1,0 +1,56 @@
+name: Particle Physics
+domain: Physics
+version: 2
+description: 'The Standard Model, gauge symmetries, Feynman diagrams, and the fundamental interactions.
+
+  '
+trigger_patterns:
+- standard model
+- gauge symmetry|gauge boson|yang-mills
+- feynman diagram|amplitude
+- quark|lepton|boson|higgs
+- particle physics|weak|strong interaction
+template: '<approach>Particle-physics reasoning</approach>
+
+  <steps>
+
+  1. Identify the interaction (EM, weak, strong) and its gauge group.
+
+  2. Determine the relevant Feynman diagram(s) at leading order.
+
+  3. Apply conservation laws (charge, lepton/baryon number, color, energy-momentum).
+
+  4. Relate the amplitude to a cross section via $|\\mathcal{M}|^2$.
+
+  </steps>
+
+  <caution>Gauge symmetry constrains allowed vertices — not every diagram is permitted.</caution>
+
+  '
+concepts:
+- The Standard Model gauge group $SU(3) \\times SU(2) \\times U(1)$
+- Fermions (quarks, leptons) and bosons (photon, W, Z, gluon, Higgs)
+- Feynman diagrams and scattering amplitudes
+- Spontaneous symmetry breaking and the Higgs mechanism
+- Running couplings and asymptotic freedom
+common_mistakes:
+- Forgetting color conservation in QCD processes.
+- Treating the photon as massive (it is massless before symmetry breaking).
+- Ignoring that weak interactions violate parity.
+analogies:
+- "Gauge bosons are messengers of a force: photons carry EM, gluons carry color, W/Z carry weak charge."
+- The Higgs field is like a medium that gives mass to particles moving through it, while the photon glides through unaffected.
+socratic_questions:
+- Why are there exactly three gauge interactions in the Standard Model?
+- What does a Feynman diagram compute, and what does it not?
+- How does asymptotic freedom reconcile quark confinement with free behavior at high energy?
+verification_strategies:
+- Check all conservation laws at each vertex.
+- Confirm gauge invariance of the amplitude.
+exercises:
+- '[easy] List the four fundamental interactions and their gauge bosons.'
+- '[easy] Explain why the photon is massless but the W and Z are not.'
+- '[medium] Draw the leading-order diagram for $e^+ e^- \to \mu^+ \mu^-$.'
+- '[medium] Explain the Higgs mechanism in one paragraph.'
+- '[hard] Show how asymptotic freedom arises from the beta function of QCD.'
+- '[hard] Explain electroweak unification and symmetry breaking.'

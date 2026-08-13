@@ -82,11 +82,19 @@ def run_setup(console=None, quick: bool = False):
 
     # ─── Step 3: Features ───
     console.print("\n[bold]Step 3: Features[/bold]\n")
-    
+
     enable_embeddings = Confirm.ask("Enable vector embeddings for semantic search?", default=True)
     enable_spaced_rep = Confirm.ask("Enable spaced repetition?", default=True)
 
-    # ─── Step 4: Build config ───
+    # ─── Step 4: MCP servers ───
+    console.print("\n[bold]Step 4: Configure MCP servers[/bold]\n")
+    _configure_mcp(console)
+
+    # ─── Step 5: Skill packs ───
+    console.print("\n[bold]Step 5: Install skill packs[/bold]\n")
+    _select_skill_packs(console)
+
+    # ─── Step 6: Build config ───
     config = {
         "providers": {
             "default": providers_config.get("name", "cliproxy"),
@@ -216,6 +224,51 @@ def _configure_provider(choice: str, console, existing: Dict) -> Dict[str, Any]:
         }
         console.print(f"  [green]✓[/green] Custom provider '{name}' configured")
         return config
+
+
+def _configure_mcp(console) -> None:
+    """Toggle MCP servers and write ~/.pitagora/mcp.json."""
+    from rich.prompt import Prompt
+    from pitagora.mcp_integration import MCPManager
+
+    mgr = MCPManager()
+    servers = list(mgr.servers.items())
+    for i, (name, srv) in enumerate(servers, 1):
+        mark = "[green]x[/green]" if srv.enabled else " "
+        console.print(f"  [{mark}] [cyan]{i}[/cyan] = {name:<20} {srv.description}")
+
+    console.print("  Toggle servers by number (comma-separated), or Enter to continue.")
+    choice = Prompt.ask("Servers", default="")
+    if choice.strip():
+        for tok in choice.split(","):
+            tok = tok.strip()
+            if tok.isdigit():
+                idx = int(tok) - 1
+                if 0 <= idx < len(servers):
+                    name = servers[idx][0]
+                    mgr.set_enabled(name, not mgr.servers[name].enabled)
+
+    path = mgr.save_config()
+    enabled = [n for n, s in mgr.servers.items() if s.enabled]
+    console.print(f"  [green]✓[/green] MCP config saved to {path}")
+    console.print(f"  [dim]Enabled: {', '.join(enabled) or 'none'}[/dim]")
+
+
+def _select_skill_packs(console) -> None:
+    """Show builtin skill packs and their counts."""
+    from pitagora.skills.engine import SkillsEngine
+
+    eng = SkillsEngine()
+    packs: Dict[str, int] = {}
+    for name in eng.list_skills():
+        try:
+            skill = eng.load_skill(name)
+            packs[skill.domain] = packs.get(skill.domain, 0) + 1
+        except Exception:
+            continue
+    for i, (domain, count) in enumerate(sorted(packs.items()), 1):
+        console.print(f"  [green]x[/green] [cyan]{i}[/cyan] = {domain:<20} {count} skill(s)")
+    console.print("  [dim]All builtin skills are available by default. Use `pitagora skills list` to inspect.[/dim]")
 
 
 def _verify_connection(config: Dict, model: str, console):

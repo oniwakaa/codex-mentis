@@ -1,0 +1,56 @@
+name: Regression Analysis
+domain: Data Science
+version: 2
+description: 'Linear and logistic regression, regularization, and model diagnostics.
+
+  '
+trigger_patterns:
+- linear regression|least squares|ols
+- logistic regression
+- regularization|ridge|lasso
+- residual|diagnostic|r-squared
+- regression
+template: '<approach>Regression reasoning</approach>
+
+  <steps>
+
+  1. Identify the response type (continuous→linear, binary→logistic) and the predictors.
+
+  2. Fit the model and inspect residuals for structure (nonlinearity, heteroscedasticity).
+
+  3. Check multicollinearity (VIF) and influential points (leverage, Cook''s distance).
+
+  4. Apply regularization (ridge/lasso) when predictors outnumber effective signal or correlate.
+
+  </steps>
+
+  <caution>Correlation in the fit does not imply causation in the world.</caution>
+
+  '
+concepts:
+- Ordinary least squares and the normal equations
+- $R^2$ and adjusted $R^2$
+- Logistic regression and the logit link
+- Ridge ($L^2$) and lasso ($L^1$) regularization
+- "Diagnostics: residuals, leverage, Cook's distance, VIF"
+common_mistakes:
+- Interpreting $R^2$ as model correctness rather than fit to training data.
+- Using linear regression on a binary response.
+- Ignoring multicollinearity, which inflates coefficient variance.
+analogies:
+- OLS is the orthogonal projection of the data onto the column space of the predictors — the closest fit in least-squares distance.
+- Lasso is a budget that forces some coefficients to exactly zero, performing feature selection while fitting.
+socratic_questions:
+- What do the residuals tell you that $R^2$ does not?
+- When would lasso beat ridge, and vice versa?
+- Why does logistic regression use the logit link?
+verification_strategies:
+- Plot residuals vs. fitted and vs. each predictor to spot structure.
+- Compare cross-validated error across regularization strengths.
+exercises:
+- '[easy] Derive the normal equations for OLS.'
+- '[easy] Explain what $R^2$ measures.'
+- '[medium] Show why logistic regression uses the logit link.'
+- '[medium] Compare ridge and lasso on a correlated predictor set.'
+- '[hard] Derive the gradient of the lasso objective and explain the soft-thresholding.'
+- '[hard] Diagnose heteroscedasticity and propose a remedy (weighted least squares).'

@@ -1,155 +1,256 @@
-import typer
-import sqlite3
+"""Skills CLI — list, inspect, import, forge, and activate reasoning skills."""
+import os
 from typing import Optional
-from pitagora.core.config import CONFIG_DIR
+
+import typer
+
+from pitagora.core.constants import CONFIG_DIR
 from pitagora.cli.rich_ui import print_table, print_panel
 
-app = typer.Typer(help="Manage and inspect learning strategies/skills")
+app = typer.Typer(help="Manage and inspect reasoning skills")
 
-DB_PATH = CONFIG_DIR / "memory.db"
+BUILTIN_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "skills", "builtin")
+USER_SKILLS_DIR = str(CONFIG_DIR / "skills")
 
-def get_db_connection():
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS skills (
-            name TEXT PRIMARY KEY,
-            domain TEXT NOT NULL,
-            prompt_template TEXT NOT NULL,
-            success_rate REAL DEFAULT 0.0,
-            use_count INTEGER DEFAULT 0
-        )
-    """)
-    conn.commit()
-    return conn
 
-def seed_default_skills():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) as count FROM skills")
-    if cursor.fetchone()["count"] == 0:
-        default_skills = [
-            (
-                "integration_by_parts", 
-                "calculus", 
-                "Use integration by parts: ∫ u dv = u v - ∫ v du. Identify u using LIATE rule (Logarithmic, Inverse trig, Algebraic, Trigonometric, Exponential). Show step-by-step substitution.", 
-                0.85, 
-                12
-            ),
-            (
-                "lagrangian_setup", 
-                "mechanics", 
-                "Identify generalized coordinates q_i. Express Kinetic Energy (T) and Potential Energy (V) in terms of q_i and dq_i/dt. Compute Lagrangian L = T - V. Write Euler-Lagrange equations d/dt (∂L/∂q_i_dot) - ∂L/∂q_i = 0.", 
-                0.92, 
-                24
-            ),
-            (
-                "quantum_perturbation", 
-                "quantum", 
-                "Express Hamiltonian as H = H_0 + λ H'. Retrieve eigenvalues E_n^(0) and eigenstates |n^(0)> of unperturbed H_0. Compute first-order energy correction: E_n^(1) = <n^(0)|H'|n^(0)>.", 
-                0.78, 
-                8
-            ),
-            (
-                "green_function_solve", 
-                "differential_equations", 
-                "Set up differential operator L. Solve L G(x, x') = δ(x - x') subject to boundary conditions. Express final solution as integral: u(x) = ∫ G(x, x') f(x') dx'.", 
-                0.70, 
-                5
-            )
-        ]
-        cursor.executemany(
-            "INSERT INTO skills (name, domain, prompt_template, success_rate, use_count) VALUES (?, ?, ?, ?, ?)",
-            default_skills
-        )
-        conn.commit()
-    conn.close()
+def _engines():
+    """Return (builtin_engine, user_engine)."""
+    from pitagora.skills.engine import SkillsEngine
+    builtin = SkillsEngine(skills_dir=BUILTIN_DIR)
+    user = SkillsEngine(skills_dir=USER_SKILLS_DIR)
+    return builtin, user
+
+
+def _all_skills():
+    """Yield (origin, skill) for every loadable skill across builtin + user dirs."""
+    builtin_eng, user_eng = _engines()
+    seen = set()
+    for name in builtin_eng.list_skills():
+        if name in seen:
+            continue
+        try:
+            yield "builtin", builtin_eng.load_skill(name)
+        except Exception:
+            continue
+    for name in user_eng.list_skills():
+        if name in seen:
+            continue
+        try:
+            yield user_eng.load_skill(name).origin or "imported", user_eng.load_skill(name)
+        except Exception:
+            continue
+
 
 @app.command("list")
 def list_skills():
-    """List all available math and physics agent skills."""
-    seed_default_skills()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT name, domain, success_rate, use_count FROM skills")
-    rows = cursor.fetchall()
-    conn.close()
-    
-    headers = ["Skill Name", "Domain", "Success Rate", "Use Count"]
-    display_rows = []
-    for r in rows:
-        rate = f"{r['success_rate']*100:.1f}%"
-        display_rows.append([r["name"], r["domain"], rate, r["use_count"]])
-        
-    print_table(headers, display_rows, title="Available Strategies/Skills")
+    """List all available skills (builtin + user)."""
+    rows = []
+    for origin, skill in _all_skills():
+        status = "on" if skill.enabled else "off"
+        rows.append([skill.name, skill.domain, origin, status, f"v{skill.version}"])
+    if not rows:
+        typer.echo("No skills found.")
+        return
+    print_table(
+        ["Skill", "Domain", "Origin", "State", "Ver"],
+        rows,
+        title="Available Skills",
+    )
+
 
 @app.command("show")
-def show_skill(name: str = typer.Argument(..., help="Name of the skill to inspect")):
-    """Show details of a specific skill template."""
-    seed_default_skills()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT name, domain, prompt_template, success_rate, use_count FROM skills WHERE name = ?", (name,))
-    row = cursor.fetchone()
-    conn.close()
-    
-    if not row:
-        typer.echo(f"Error: Skill '{name}' not found.")
+def show_skill(name: str = typer.Argument(..., help="Skill name to inspect")):
+    """Show details of a specific skill."""
+    builtin_eng, user_eng = _engines()
+    skill = None
+    for eng in (builtin_eng, user_eng):
+        try:
+            skill = eng.load_skill(name)
+            break
+        except FileNotFoundError:
+            continue
+    if skill is None:
+        typer.echo(f"Skill '{name}' not found.")
         raise typer.Exit(1)
-        
+    triggers = ", ".join(skill.trigger_patterns) or "-"
+    tmpl = (skill.template or skill.prompt_template or "(none)")[:400]
     content = (
-        f"[bold]Domain:[/bold] {row['domain']}\n"
-        f"[bold]Success Rate:[/bold] {row['success_rate']*100:.1f}%\n"
-        f"[bold]Use Count:[/bold] {row['use_count']}\n\n"
-        f"[bold]Prompt Template:[/bold]\n{row['prompt_template']}"
+        f"[bold]Domain:[/bold] {skill.domain}\n"
+        f"[bold]Origin:[/bold] {skill.origin}\n"
+        f"[bold]State:[/bold] {'enabled' if skill.enabled else 'disabled'}\n"
+        f"[bold]Triggers:[/bold] {triggers}\n\n"
+        f"[bold]Template:[/bold]\n{tmpl}"
     )
-    print_panel(content, title=f"Skill: {row['name']}", style="magenta")
+    print_panel(content, title=f"Skill: {skill.name}", style="magenta")
+
+
+@app.command("activate")
+def activate_skill(name: str = typer.Argument(..., help="Skill to enable")):
+    """Enable a skill for matching."""
+    from pitagora.skills.evolution import SkillForge
+    forge = SkillForge(USER_SKILLS_DIR)
+    try:
+        forge.activate(name)
+    except FileNotFoundError:
+        typer.echo(f"Skill '{name}' not found in user skills dir.")
+        raise typer.Exit(1)
+    typer.echo(f"Activated skill '{name}'.")
+
+
+@app.command("deactivate")
+def deactivate_skill(name: str = typer.Argument(..., help="Skill to disable")):
+    """Disable a skill from matching."""
+    from pitagora.skills.engine import SkillsEngine
+    eng = SkillsEngine(skills_dir=USER_SKILLS_DIR)
+    try:
+        skill = eng.load_skill(name)
+    except FileNotFoundError:
+        typer.echo(f"Skill '{name}' not found in user skills dir.")
+        raise typer.Exit(1)
+    skill.enabled = False
+    eng.save_skill(skill)
+    typer.echo(f"Deactivated skill '{name}'.")
+
+
+@app.command("forge")
+def forge_list():
+    """Show model-created skills pending review."""
+    from pitagora.skills.evolution import SkillForge
+    forge = SkillForge(USER_SKILLS_DIR)
+    pending = forge.pending_review()
+    if not pending:
+        typer.echo("No skills pending review.")
+        return
+    rows = [[s.name, s.domain, ", ".join(s.trigger_patterns) or "-"] for s in pending]
+    print_table(["Skill", "Domain", "Triggers"], rows, title="Skills Pending Review")
+
+
+@app.command("review")
+def review_skill(name: str = typer.Argument(..., help="Skill to review")):
+    """Review a model-created skill, then activate or reject it."""
+    from pitagora.skills.evolution import SkillForge
+    forge = SkillForge(USER_SKILLS_DIR)
+    pending = {s.name: s for s in forge.pending_review()}
+    if name not in pending:
+        typer.echo(f"Skill '{name}' is not pending review.")
+        raise typer.Exit(1)
+    skill = pending[name]
+    typer.echo(f"Name: {skill.name}\nDomain: {skill.domain}\nTriggers: {skill.trigger_patterns}\n")
+    typer.echo(f"Template:\n{skill.template}\n")
+    decision = typer.prompt("Activate or reject?", default="activate")
+    if decision.lower().startswith("a"):
+        forge.activate(name)
+        typer.echo(f"Activated '{name}'.")
+    else:
+        forge.reject(name)
+        typer.echo(f"Rejected and removed '{name}'.")
+
+
+@app.command("import")
+def import_skills(
+    source: str = typer.Option(..., "--from", help="Source: 'claude-code' or a directory path"),
+):
+    """Import skills from Claude Code (.md) or a directory of .yaml/.md files."""
+    from pitagora.skills.engine import SkillsEngine
+    eng = SkillsEngine(skills_dir=USER_SKILLS_DIR)
+    src_dir = source
+    if source == "claude-code":
+        src_dir = os.path.expanduser("~/.claude/skills")
+        if not os.path.isdir(src_dir):
+            typer.echo(f"Claude Code skills dir not found: {src_dir}")
+            raise typer.Exit(1)
+    if not os.path.isdir(src_dir):
+        typer.echo(f"Directory not found: {src_dir}")
+        raise typer.Exit(1)
+
+    imported = 0
+    for fname in sorted(os.listdir(src_dir)):
+        if fname.endswith(".yaml") or fname.endswith(".yml"):
+            _import_yaml(eng, os.path.join(src_dir, fname))
+            imported += 1
+        elif fname.endswith(".md"):
+            _import_markdown(eng, os.path.join(src_dir, fname))
+            imported += 1
+    typer.echo(f"Imported {imported} skill(s) into {USER_SKILLS_DIR}.")
+
+
+def _import_yaml(eng, path: str) -> None:
+    import yaml
+    with open(path) as f:
+        data = yaml.safe_load(f) or {}
+    if not isinstance(data, dict) or "name" not in data:
+        return
+    from pitagora.skills.engine import Skill
+    skill = Skill(
+        name=data["name"],
+        domain=data.get("domain", "General"),
+        description=data.get("description", ""),
+        concepts=data.get("concepts", []),
+        common_mistakes=data.get("common_mistakes", []),
+        analogies=data.get("analogies", []),
+        socratic_questions=data.get("socratic_questions", []),
+        verification_strategies=data.get("verification_strategies", []),
+        prompt_template=data.get("prompt_template"),
+        trigger_patterns=data.get("trigger_patterns", []),
+        template=data.get("template", None),
+        tools_used=data.get("tools_used", []),
+        origin="imported",
+        enabled=data.get("enabled", True),
+        version=data.get("version", 1),
+    )
+    eng.save_skill(skill)
+
+
+def _import_markdown(eng, path: str) -> None:
+    """Convert a Claude Code markdown skill to a Pitagora skill YAML.
+
+    ponytail: heuristic extraction — pulls trigger patterns from a
+    'When to use' section and the body becomes the template. Good enough
+    for a first import; refine manually via `pitagora skills show`.
+    """
+    import re
+    with open(path) as f:
+        text = f.read()
+    name = os.path.splitext(os.path.basename(path))[0]
+    # Trigger patterns from "When to use" / "Use when" sections
+    triggers = []
+    m = re.search(r"(?im)^#+\s*(when to use|use when).*?(?=^#|\Z)", text)
+    if m:
+        for line in m.group(0).splitlines()[1:]:
+            line = line.strip("- *").strip()
+            if line:
+                triggers.append(line)
+    if not triggers:
+        triggers = [name]
+    from pitagora.skills.engine import Skill
+    skill = Skill(
+        name=name.replace(" ", "_").lower(),
+        domain="Imported",
+        description=text.splitlines()[0].lstrip("# ").strip()[:200],
+        concepts=[],
+        template=text,
+        trigger_patterns=triggers,
+        origin="imported",
+        enabled=True,
+        version=1,
+    )
+    eng.save_skill(skill)
+
 
 @app.command("evolve")
-def evolve_skill(name: Optional[str] = typer.Argument(None, help="Specific skill name to evolve/optimize")):
-    """Display optimization history and performance metrics of evolving prompts."""
-    seed_default_skills()
+def evolve_skill(name: Optional[str] = typer.Argument(None, help="Skill to evolve")):
+    """Display evolution history / performance metrics for a skill."""
+    from pitagora.skills.evolution import SkillEvolution
+    evo = SkillEvolution()
     if name:
-        typer.echo(f"Analyzing prompt evolution metrics for '{name}'...")
-        # Mock evolution log
-        evolution_steps = (
-            "• v1.0.0: Initial prompt setup (Success rate: 60%)\n"
-            "• v1.0.1: Added boundary checks verification (Success rate: 72%)\n"
-            "• v1.1.0: Optimized coordinate mapping system (Success rate: 84%)\n"
-            "• v1.1.1: Current production version (Success rate: 92%)"
+        stats = evo.get_stats(name)
+        print_panel(
+            f"Success rate: {stats.success_rate:.1%}\n"
+            f"Uses: {stats.use_count}\n"
+            f"Avg confidence: {stats.avg_confidence:.2f}",
+            title=f"Evolution: {name}",
+            style="cyan",
         )
-        print_panel(evolution_steps, title=f"Evolution History: {name}", style="cyan")
     else:
-        typer.echo("Evolving system-wide agent skills based on learning history...")
-        typer.echo("Updating prompt weights based on success/failure feedback logs...")
-        print_panel("Successfully optimized 2 prompts:\n- 'lagrangian_setup' success rate increased by +8%\n- 'quantum_perturbation' success rate increased by +5%", "Evolution Engine Optimizer", style="green")
-
-@app.command("install")
-def install_skill(
-    skill_name: str = typer.Argument(..., help="Name of the community skill"),
-):
-    """Install an evolving skill or method template from community repositories."""
-    typer.echo(f"Searching for '{skill_name}' on community registries...")
-    
-    # Mock installing a community skill
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    try:
-        # Example community skill
-        new_skill = (
-            skill_name,
-            "electromagnetism",
-            f"Solve boundary value problems using method of images for '{skill_name}'. Setup coordinate system. Find locations of image charges. Write potential function V. Verify boundary constraints.",
-            0.80,
-            0
-        )
-        cursor.execute("INSERT OR REPLACE INTO skills (name, domain, prompt_template, success_rate, use_count) VALUES (?, ?, ?, ?, ?)", new_skill)
-        conn.commit()
-        print_panel(f"Successfully installed skill '{skill_name}'!\nDomain: electromagnetism\nUsage template added to registry.", "Community Installer", style="green")
-    except Exception as e:
-        typer.echo(f"Failed to install community skill: {e}")
-    finally:
-        conn.close()
+        dash = evo.get_performance_dashboard()
+        typer.echo(f"Total uses: {dash['total_usage_count']}  Overall success: {dash['overall_success_rate']:.1%}")

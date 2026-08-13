@@ -6,12 +6,22 @@ from typing import Dict, Any, List, Optional, Tuple
 from pitagora.agents.base import BaseAgent, AgentResponse
 from pitagora.agents.providers.base import BaseProvider
 
-VISUALIZER_SYSTEM_PROMPT = """You are the Visualizer Agent for Pitagora. Your role is to represent mathematical and physical information visually.
+VISUALIZER_SYSTEM_PROMPT = """<role>Visualizer for Pitagora. Represent math and physics information visually.</role>
 
-Guidelines:
-1. Terminal Layouts: When asked to plot, use your tools or libraries (like plotext) to generate beautiful ASCII plots.
-2. Concept Relationships: Create clear, hierarchical structural maps (trees or graphs) using ASCII drawing characters (e.g., ├─, └─, ──) to show dependencies.
-3. Proof Logical Paths: Structure proof steps as trees showing what hypotheses lead to which intermediate claims and final Q.E.D.
+<instructions>
+- Plot with plotext to produce clean ASCII charts in the terminal
+- Render concept relationships as ASCII trees using ├─ └─ ── connectors
+- Map proof logic as a deduction tree from hypotheses to Q.E.D.
+</instructions>
+
+<example>
+Concept map for "Calculus":
+Calculus
+├── Limits
+│   └── Derivatives
+│       └── Integrals
+└── Sequences and Series
+</example>
 """
 
 class VisualizerAgent(BaseAgent):

@@ -1,0 +1,56 @@
+name: Probability Distributions
+domain: Data Science
+version: 2
+description: 'Common distributions, when to use each, and their relationships via limits and conjugacy.
+
+  '
+trigger_patterns:
+- distribution|normal|gaussian|poisson|binomial
+- expected value|variance|moment
+- pdf|pmf|cdf
+- conjugate prior|exponential family
+- probability distribution
+template: '<approach>Distribution reasoning</approach>
+
+  <steps>
+
+  1. Identify the support (discrete/continuous, bounded/unbounded) and the data-generating process.
+
+  2. Match the distribution to the process: counts (Poisson/binomial), waiting (exponential), sums (normal via CLT).
+
+  3. Compute moments from the MGF or directly from the pdf/pmf.
+
+  4. Check limiting relationships (binomial→Poisson, Poisson→normal) when approximating.
+
+  </steps>
+
+  <caution>Check the support and parameters before substituting an approximation.</caution>
+
+  '
+concepts:
+- "Discrete: Bernoulli, binomial, Poisson, geometric"
+- "Continuous: normal, exponential, gamma, beta"
+- "Moments: mean, variance, skewness, kurtosis"
+- The central limit theorem and normal approximations
+- Conjugate priors and the exponential family
+common_mistakes:
+- Using a Poisson for non-rare or dependent events.
+- Approximating a skewed distribution with a normal without checking skewness.
+- Confusing the pdf value with a probability for continuous variables.
+analogies:
+- "The normal distribution is the attractor of sums: averages of almost anything tend to it (CLT gravity)."
+- The Poisson is the binomial in the limit of many rare trials, like counting lightning strikes in a storm.
+socratic_questions:
+- What process generates this data, and which distribution matches it?
+- When is the normal approximation safe, and when does it fail?
+- Why is the exponential the only memoryless continuous distribution?
+verification_strategies:
+- Verify the distribution integrates/sums to 1.
+- Check moments against known formulas via sympy.
+exercises:
+- '[easy] Give the mean and variance of a binomial $(n,p)$.'
+- '[easy] State when a Poisson approximates a binomial.'
+- '[medium] Derive the mean of the exponential from its pdf.'
+- '[medium] Show that the sum of independent Poissons is Poisson.'
+- '[hard] Prove the CLT for iid variables with finite variance (sketch).'
+- '[hard] Identify the conjugate prior for a Poisson likelihood and derive the posterior.'

@@ -15,6 +15,8 @@ DB_DIR = CONFIG_DIR / "db"
 SESSIONS_DIR = CONFIG_DIR / "sessions"
 JOURNEYS_DIR = CONFIG_DIR / "journeys"
 CONFIG_PATH = CONFIG_DIR / "config.yaml"
+MCP_CONFIG_PATH = CONFIG_DIR / "mcp.json"
+USER_SKILLS_DIR = CONFIG_DIR / "skills"
 MEMORY_DB = DB_DIR / "memory.db"
 KNOWLEDGE_GRAPH_DB = DB_DIR / "knowledge_graph.db"
 

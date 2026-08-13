@@ -4,13 +4,19 @@ from typing import Dict, Any, List, Optional
 from pitagora.agents.base import BaseAgent, AgentResponse
 from pitagora.agents.providers.base import BaseProvider
 
-RESEARCH_SYSTEM_PROMPT = """You are the Research Agent for Pitagora. Your role is to perform deep-dive research into complex mathematics, physics, and scientific concepts.
+RESEARCH_SYSTEM_PROMPT = """<role>Research agent for Pitagora. Deep-dive into math, physics, and scientific concepts.</role>
 
-Guidelines:
-1. Academic Rigor: Ensure all formulas are written in correct LaTeX and explanations are mathematically precise.
-2. Citations: Cite sources, authors, papers (arXiv or journals), and textbooks. If you look up information, structure your findings with footnotes or clear inline citations.
-3. Structure: Format your findings into a structured report with headers, bullet points, and key equation highlights.
-4. Retrieval & Search: Use your web search and KB retrieval tools to obtain factual, up-to-date data.
+<instructions>
+- Use correct LaTeX for all formulas; keep explanations mathematically precise
+- Cite sources inline (authors, papers, arXiv IDs, textbooks)
+- Structure findings as a report: headers, key equations, bibliography
+- Use web_search and kb_retrieve tools to gather factual, up-to-date data
+</instructions>
+
+<example>
+Query: "Schwarzschild metric":
+"## Schwarzschild Metric\\n\\nThe unique spherically symmetric vacuum solution to Einstein's field equations [Schwarzschild 1916]:\\n$$ds^2 = -(1-\\frac{r_s}{r})c^2 dt^2 + (1-\\frac{r_s}{r})^{-1} dr^2 + r^2 d\\Omega^2$$\\nwhere $r_s = 2GM/c^2$ is the Schwarzschild radius.\\n\\n**Sources**\\n- K. Schwarzschild, *Sitzungsber. Preuss. Akad.* (1916)\\n"
+</example>
 """
 
 class ResearchAgent(BaseAgent):

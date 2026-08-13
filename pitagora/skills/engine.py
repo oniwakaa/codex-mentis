@@ -1,4 +1,5 @@
 import os
+import re
 import yaml
 import httpx
 from typing import List, Dict, Any, Optional, Tuple
@@ -14,7 +15,14 @@ class Skill(BaseModel):
     analogies: List[str] = Field(default_factory=list)
     socratic_questions: List[str] = Field(default_factory=list)
     verification_strategies: List[str] = Field(default_factory=list)
+    exercises: List[str] = Field(default_factory=list)
     prompt_template: Optional[str] = None
+    # WS3: dynamic skills extension (backward-compatible — all optional)
+    trigger_patterns: List[str] = Field(default_factory=list)
+    template: Optional[str] = None
+    tools_used: List[str] = Field(default_factory=list)
+    origin: str = Field(default="builtin")  # builtin | model_created | imported
+    enabled: bool = Field(default=True)
     version: int = Field(default=1)
 
 class SkillsEngine:
@@ -47,7 +55,13 @@ class SkillsEngine:
             analogies=data.get('analogies', []),
             socratic_questions=data.get('socratic_questions', []),
             verification_strategies=data.get('verification_strategies', []),
+            exercises=data.get('exercises', []),
             prompt_template=data.get('prompt_template', None),
+            trigger_patterns=data.get('trigger_patterns', []),
+            template=data.get('template', None),
+            tools_used=data.get('tools_used', []),
+            origin=data.get('origin', 'builtin'),
+            enabled=data.get('enabled', True),
             version=data.get('version', 1)
         )
         self.skills_cache[name] = skill
@@ -141,41 +155,70 @@ Please solve the problem or respond to the query in the context of the above gui
     def match_skills(self, topic: str, problem_text: Optional[str] = None) -> List[Skill]:
         """
         Matches and ranks skills relevant to a topic and/or problem text.
+        Trigger patterns (regex) take priority; falls back to keyword/fuzzy scoring.
         """
         all_skills = [self.load_skill(name) for name in self.list_skills()]
+        # ponytail: O(n*m) regex scan is fine for a small builtin skill set;
+        # index trigger patterns if the catalog grows past ~100 skills.
         scored_skills = []
-        
+
         search_query = (topic + " " + (problem_text or "")).lower()
-        
+
         for skill in all_skills:
+            if not skill.enabled:
+                continue
             score = 0.0
-            
+
+            # Trigger-pattern regex match (highest signal)
+            for pattern in skill.trigger_patterns:
+                try:
+                    if re.search(pattern, search_query, re.IGNORECASE):
+                        score += 0.6
+                        break
+                except re.error:
+                    # Treat malformed patterns as literal substrings
+                    if pattern.lower() in search_query:
+                        score += 0.6
+                        break
+
             # Exact domain match
             if skill.domain.lower() == topic.lower():
                 score += 0.5
-            
+
             # Substring checks
             if skill.name.lower() in search_query:
                 score += 0.4
-            
+
             # Concept matches
             for concept in skill.concepts:
                 if concept.lower() in search_query:
                     score += 0.2
-                    
+
             # Fuzzy match description/name
             name_sim = SequenceMatcher(None, skill.name.lower(), topic.lower()).ratio()
             desc_sim = 0.0
             if skill.description:
                 desc_sim = max(SequenceMatcher(None, word.lower(), topic.lower()).ratio() for word in skill.description.split()) * 0.3
-                
+
             score += max(name_sim, desc_sim)
-            
+
             if score > 0.1:
                 scored_skills.append((skill, score))
-                
+
         scored_skills.sort(key=lambda x: x[1], reverse=True)
         return [skill for skill, _ in scored_skills]
+
+    def render_template(self, skill: Skill, context: Dict[str, Any]) -> Optional[str]:
+        """Render a skill's `template` with {{variable}} placeholders from context.
+
+        Returns None when the skill has no template (callers fall back to get_prompt).
+        """
+        if not skill.template:
+            return None
+        rendered = skill.template
+        for key, value in context.items():
+            rendered = rendered.replace("{{" + key + "}}", str(value))
+        return rendered
 
     # --- Skill Composition ---
     def create_composite_skill(self, composite_name: str, skill_names: List[str]) -> Skill:
@@ -239,7 +282,13 @@ Please solve the problem or respond to the query in the context of the above gui
             analogies=data.get("analogies", []),
             socratic_questions=data.get("socratic_questions", []),
             verification_strategies=data.get("verification_strategies", []),
+            exercises=data.get("exercises", []),
             prompt_template=data.get("prompt_template"),
+            trigger_patterns=data.get("trigger_patterns", []),
+            template=data.get("template", None),
+            tools_used=data.get("tools_used", []),
+            origin=data.get("origin", "imported"),
+            enabled=data.get("enabled", True),
             version=data.get("version", 1)
         )
         

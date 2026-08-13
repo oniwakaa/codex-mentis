@@ -10,16 +10,44 @@ from pitagora.agents.providers.base import BaseProvider
 
 logger = logging.getLogger(__name__)
 
-SELF_IMPROVER_SYSTEM_PROMPT = """You are the Self-Improver Agent for Pitagora. Your role is to optimize system prompts and pedagogical strategies based on empirical success metrics.
+SELF_IMPROVER_SYSTEM_PROMPT = """<role>Self-improver for Pitagora. Optimize prompts and pedagogical strategies from empirical success metrics.</role>
 
-You analyze user outcomes, evaluate A/B testing data, execute Thompson Sampling to balance exploration and exploitation of explanation strategies, and write evolved guidelines.
-You also specialize in identifying successful explanation patterns and code-generating them into reusable skill definitions.
+<instructions>
+- Analyze outcome metrics to evaluate strategies per topic and level
+- Balance exploration vs. exploitation via Thompson Sampling on Beta(alpha, beta) priors
+- Rewrite underperforming prompts (avg < 3.0 over ≥10 uses) into improved variants
+- Codify successful explanation patterns into reusable skill definitions
+</instructions>
+
+<example>
+Strategy "socratic" underperforms (avg 2.4 over 12 uses):
+"Revised prompt: ask one question at a time, confirm the student's prior step before advancing, and avoid revealing the answer — guide toward it."
+</example>
 """
 
 class EvolvedPrompt(BaseModel):
     strategy_name: str = Field(description="The strategy that was evolved")
     new_prompt_template: str = Field(description="The full revised system prompt template")
     explanation_of_changes: str = Field(description="Why the prompt was updated and how it addresses the failure logs")
+
+
+# Map a teaching classification label to a 1-5 response-quality score.
+# Used by the chat REPL to feed the feedback loop with a real signal
+# derived from the ResponseAnalyzer's classification of the learner's reply.
+CLASSIFICATION_QUALITY: Dict[str, int] = {
+    "correct": 5,
+    "deeper": 5,
+    "partial": 3,
+    "question": 3,
+    "skip": 2,
+    "confused": 1,
+    "off_topic": 1,
+}
+
+
+def quality_from_classification(label: str) -> int:
+    """Convert a teaching classification label to a 1-5 quality score."""
+    return CLASSIFICATION_QUALITY.get(str(label).lower(), 3)
 
 class GeneratedSkill(BaseModel):
     skill_name: str = Field(description="A clean identifier for the new skill (kebab-case)")
@@ -189,7 +217,45 @@ class SelfImproverAgent(BaseAgent):
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
+        # 5. Strategy metrics (WS1) — per-interaction pedagogical outcomes
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS strategy_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                topic TEXT,
+                level TEXT,
+                strategy_used TEXT,
+                response_quality INTEGER,
+                time_to_understanding REAL,
+                hints_needed INTEGER,
+                success INTEGER,
+                feedback TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_metrics_topic_level "
+            "ON strategy_metrics(topic, level)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_metrics_strategy "
+            "ON strategy_metrics(strategy_used)"
+        )
+
+        # 6. Prompt variants (WS1) — evolved prompts with lineage
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS prompt_variants (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                strategy_name TEXT,
+                prompt_text TEXT,
+                parent_id INTEGER,
+                performance_delta REAL,
+                avg_quality REAL,
+                uses INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # Seed default strategies if not exists
         default_strategies = ["socratic", "feynman", "analogy", "side_by_side", "formal_proof"]
         for strategy in default_strategies:
@@ -197,7 +263,7 @@ class SelfImproverAgent(BaseAgent):
                 "INSERT OR IGNORE INTO strategy_performance (strategy_name, alpha, beta) VALUES (?, 1.0, 1.0)",
                 (strategy,)
             )
-            
+
         conn.commit()
         conn.close()
 
@@ -432,3 +498,221 @@ class SelfImproverAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Error in tool_generate_skill: {e}")
             return json.dumps({"error": str(e), "message": "Failed to generate skill."})
+
+    # ─────────────────────────────────────────────────────────────────────
+    # WS1: Self-improving feedback loop — metrics, evaluation, selection
+    # ─────────────────────────────────────────────────────────────────────
+
+    def record_interaction(
+        self,
+        topic: str,
+        level: str,
+        strategy_used: str,
+        response_quality: int,
+        time_to_understanding: Optional[float] = None,
+        hints_needed: Optional[int] = None,
+        success: Optional[bool] = None,
+        feedback: str = "",
+    ) -> int:
+        """Record a single teaching interaction with pedagogical metrics.
+
+        `response_quality` is a 1-5 heuristic (or explicit student feedback).
+        `success` defaults to response_quality >= 4 when not supplied.
+        Returns the row id.
+        """
+        if success is None:
+            success = response_quality >= 4
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """INSERT INTO strategy_metrics
+                   (topic, level, strategy_used, response_quality,
+                    time_to_understanding, hints_needed, success, feedback)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (topic, level, strategy_used, response_quality,
+                 time_to_understanding, hints_needed, 1 if success else 0, feedback),
+            )
+            conn.commit()
+            return cur.lastrowid
+        finally:
+            conn.close()
+
+    def strategy_report(
+        self,
+        topic: Optional[str] = None,
+        level: Optional[str] = None,
+        last_n: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Aggregate metrics per strategy (optionally filtered by topic/level).
+
+        Computes avg_quality, avg_hints_needed, success_rate, and use count.
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cur = conn.cursor()
+            where = []
+            params: List[Any] = []
+            if topic:
+                where.append("topic = ?")
+                params.append(topic)
+            if level:
+                where.append("level = ?")
+                params.append(level)
+            where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+            limit_sql = f"LIMIT {int(last_n)}" if last_n else ""
+            # ponytail: subquery rowid filter keeps the "last N" semantics simple
+            # without window functions; fine for the small interaction volume
+            # of a teaching CLI. Upgrade to a window function if N grows large.
+            cur.execute(
+                f"""SELECT strategy_used,
+                           COUNT(*) AS uses,
+                           AVG(response_quality) AS avg_quality,
+                           AVG(hints_needed) AS avg_hints,
+                           SUM(success) * 1.0 / COUNT(*) AS success_rate
+                    FROM (
+                        SELECT * FROM strategy_metrics {where_sql}
+                        ORDER BY timestamp DESC {limit_sql}
+                    )
+                    GROUP BY strategy_used
+                    ORDER BY avg_quality DESC""",
+                params,
+            )
+            cols = [d[0] for d in cur.description]
+            return [dict(zip(cols, row)) for row in cur.fetchall()]
+        finally:
+            conn.close()
+
+    def select_strategy_for(self, topic: str, level: str) -> str:
+        """Pick a strategy for a topic+level.
+
+        With ≥5 past interactions, exploit the best-performing strategy.
+        Otherwise explore via weighted random favouring untested strategies.
+        """
+        report = {r["strategy_used"]: r for r in self.strategy_report(topic=topic, level=level)}
+        total_uses = sum(r["uses"] for r in report.values())
+
+        strategies = ["socratic", "feynman", "analogy", "side_by_side", "formal_proof"]
+        if total_uses >= 5 and report:
+            # Exploit: highest avg_quality (ties broken by success_rate)
+            best = max(
+                report.items(),
+                key=lambda kv: (kv[1]["avg_quality"], kv[1]["success_rate"]),
+            )
+            return best[0]
+
+        # Explore: weighted random favouring untested strategies
+        weights = []
+        for s in strategies:
+            uses = report.get(s, {}).get("uses", 0)
+            # untested -> high weight; more uses -> lower weight
+            weights.append(1.0 / (uses + 1))
+        return random.choices(strategies, weights=weights, k=1)[0]
+
+    async def suggest_prompt_revision(
+        self, strategy_name: str, metrics: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """When a strategy underperforms (avg < 3.0 over ≥10 uses), use the LLM
+        to rewrite the prompt and store the variant with lineage + delta."""
+        if metrics is None:
+            metrics = {}
+            for r in self.strategy_report():
+                if r["strategy_used"] == strategy_name:
+                    metrics = r
+                    break
+        avg_quality = metrics.get("avg_quality", 0.0) or 0.0
+        uses = metrics.get("uses", 0) or 0
+
+        # Guard: only revise when genuinely underperforming with enough data
+        if uses < 10 or avg_quality >= 3.0:
+            return {
+                "strategy_name": strategy_name,
+                "revised": False,
+                "reason": f"no revision needed (uses={uses}, avg_quality={avg_quality:.2f})",
+            }
+
+        # Fetch the current best prompt text as the parent
+        parent = json.loads(await self.tool_get_best_prompt(strategy_name))
+        parent_text = parent.get("prompt_text", "")
+
+        prompt = (
+            f"<role>Prompt engineer.</role>\n\n"
+            f"<context>The '{strategy_name}' teaching strategy is underperforming.\n"
+            f"avg_quality={avg_quality:.2f} over {uses} uses.\n"
+            f"Current prompt:\n```\n{parent_text}\n```</context>\n\n"
+            f"<instructions>Rewrite the prompt to fix the weaknesses. Keep it under "
+            f"500 tokens, use XML tags, and include one example. Output only the new prompt.</instructions>"
+        )
+        try:
+            evolved = await self.athink_structured(prompt, EvolvedPrompt)
+        except Exception as e:
+            logger.error(f"Error in suggest_prompt_revision: {e}")
+            return {"strategy_name": strategy_name, "revised": False, "error": str(e)}
+
+        # Compute performance delta vs parent and persist the variant
+        parent_id = None
+        if parent.get("prompt_id", "").endswith("_default"):
+            parent_id = None
+        else:
+            conn = sqlite3.connect(self.db_path)
+            try:
+                row = conn.cursor().execute(
+                    "SELECT id FROM prompt_variants WHERE strategy_name=? ORDER BY id DESC LIMIT 1",
+                    (strategy_name,),
+                ).fetchone()
+                parent_id = row[0] if row else None
+            finally:
+                conn.close()
+
+        delta = avg_quality - 3.0  # baseline target
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """INSERT INTO prompt_variants
+                   (strategy_name, prompt_text, parent_id, performance_delta, avg_quality, uses)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (strategy_name, evolved.new_prompt_template, parent_id, delta, avg_quality, uses),
+            )
+            conn.commit()
+            variant_id = cur.lastrowid
+        finally:
+            conn.close()
+
+        return {
+            "strategy_name": strategy_name,
+            "revised": True,
+            "variant_id": variant_id,
+            "parent_id": parent_id,
+            "performance_delta": delta,
+            "new_prompt": evolved.new_prompt_template,
+            "explanation": evolved.explanation_of_changes,
+        }
+
+    def digest(self) -> Dict[str, Any]:
+        """Weekly-style digest: top/bottom strategies, trending topics, focus areas."""
+        report = self.strategy_report()
+        if not report:
+            return {"top": [], "bottom": [], "trending": [], "focus": []}
+        sorted_by_quality = sorted(report, key=lambda r: r["avg_quality"], reverse=True)
+        top = sorted_by_quality[:3]
+        bottom = sorted_by_quality[-3:][::-1]
+
+        # Trending topics = most-used topics in recent interactions
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """SELECT topic, COUNT(*) AS uses
+                   FROM strategy_metrics
+                   GROUP BY topic
+                   ORDER BY uses DESC
+                   LIMIT 5"""
+            )
+            trending = [{"topic": r[0], "uses": r[1]} for r in cur.fetchall()]
+        finally:
+            conn.close()
+
+        # Focus = bottom strategies' topics
+        focus = [r["strategy_used"] for r in bottom]
+        return {"top": top, "bottom": bottom, "trending": trending, "focus": focus}

@@ -1,0 +1,56 @@
+name: Differential Geometry
+domain: Mathematics
+version: 2
+description: 'Manifolds, tangent spaces, curvature, geodesics, and the geometry that underlies general relativity.
+
+  '
+trigger_patterns:
+- manifold|chart|atlas
+- curvature|gaussian curvature|riemann tensor
+- geodesic
+- tangent space|differential form
+- differential geometry
+template: '<approach>Differential-geometric reasoning</approach>
+
+  <steps>
+
+  1. Identify the manifold and its atlas / coordinate charts.
+
+  2. Work locally in a chart, then verify chart-independence of the result.
+
+  3. Compute the metric, connection, and curvature in the relevant coordinates.
+
+  4. Relate geodesics to the Levi-Civita connection of the metric.
+
+  </steps>
+
+  <caution>A tensor expression must transform correctly under coordinate changes — check covariance.</caution>
+
+  '
+concepts:
+- Smooth manifolds, charts, and atlases
+- Tangent vectors and tangent spaces
+- Riemannian metrics and the Levi-Civita connection
+- "Curvature: Gaussian, sectional, Riemann tensor"
+- Geodesics and the exponential map
+common_mistakes:
+- Treating a coordinate expression as intrinsic without checking transformation law.
+- Confusing intrinsic curvature with embedding-dependent bending.
+- Forgetting that geodesics depend on the metric, not just the manifold.
+analogies:
+- A manifold is a patchwork of flat charts glued like a map atlas of a curved Earth.
+- Curvature measures how a vector parallel-transported around a small loop fails to return to itself, like a compass needle drifting on a globe.
+socratic_questions:
+- How does a tangent vector act on a smooth function?
+- What does the Riemann tensor measure that the metric does not?
+- Why are geodesics the "straightest" lines on a curved surface?
+verification_strategies:
+- Verify a tensor identity in one chart and confirm covariance.
+- Compute curvature for a test surface (sphere, pseudosphere) using sympy.
+exercises:
+- '[easy] Define a smooth manifold via charts and an atlas.'
+- '[easy] Explain why the sphere $S^2$ is a 2-manifold.'
+- '[medium] Compute the Gaussian curvature of a sphere of radius $R$.'
+- '[medium] Derive the geodesic equation from the metric.'
+- '[hard] Show that the Riemann tensor vanishes iff the metric is locally flat.'
+- '[hard] Relate sectional curvature to the Riemann tensor.'

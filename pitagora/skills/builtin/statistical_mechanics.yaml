@@ -1,0 +1,56 @@
+name: Statistical Mechanics
+domain: Physics
+version: 2
+description: 'Ensembles, entropy, partition functions, and phase transitions from a microscopic foundation.
+
+  '
+trigger_patterns:
+- ensemble|microcanonical|canonical|grand canonical
+- partition function|boltzmann
+- entropy|boltzmann
+- phase transition|critical point
+- statistical mechanics
+template: '<approach>Statistical-mechanics reasoning</approach>
+
+  <steps>
+
+  1. Identify the ensemble (microcanonical, canonical, grand canonical) and its fixed variables.
+
+  2. Write the partition function $Z$ for the system.
+
+  3. Derive thermodynamic quantities from $\\ln Z$ (energy, entropy, free energy).
+
+  4. Locate critical behavior via exponents or the order parameter.
+
+  </steps>
+
+  <caution>Entropy in stat-mech is $S = k_B \\ln \\Omega$ (microcanonical) — distinguish from information entropy.</caution>
+
+  '
+concepts:
+- Microcanonical, canonical, and grand canonical ensembles
+- The partition function $Z = \\sum e^{-\\beta E_i}$
+- Boltzmann entropy $S = k_B \\ln \\Omega$ and the Gibbs entropy
+- Free energy and its role in equilibrium
+- Phase transitions and critical exponents
+common_mistakes:
+- Mixing up the ensembles' fixed variables (E vs T vs $\\mu$).
+- Forgetting the $k_B$ factor in entropy.
+- Treating the partition function as the probability rather than the normalizer.
+analogies:
+- The partition function is the "accountant" of all microstates, weighting each by its Boltzmann factor.
+- "A phase transition is like a crowd that suddenly agrees on one direction: order emerges from disorder at a critical point."
+socratic_questions:
+- What does $Z$ count, and why does $\\ln Z$ give free energy?
+- Why does the canonical ensemble fix temperature rather than energy?
+- How does an order parameter detect a phase transition?
+verification_strategies:
+- Check that $\\langle E \\rangle = -\\partial \\ln Z / \\partial \\beta$.
+- Verify the thermodynamic identity $F = U - TS$.
+exercises:
+- '[easy] Write the canonical partition function for a two-level system.'
+- '[easy] State the Boltzmann entropy formula.'
+- '[medium] Derive $\langle E \rangle$ from $Z$ for a harmonic oscillator.'
+- '[medium] Compute the entropy of an ideal gas in the microcanonical ensemble.'
+- '[hard] Derive the critical exponent for magnetization in mean-field Ising theory.'
+- '[hard] Show the equivalence of ensembles in the thermodynamic limit.'

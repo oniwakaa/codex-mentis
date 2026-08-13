@@ -1,0 +1,56 @@
+name: Machine Learning Basics
+domain: Data Science
+version: 2
+description: 'Bias-variance tradeoff, cross-validation, overfitting, and the foundations of supervised learning.
+
+  '
+trigger_patterns:
+- bias variance|overfitting|underfitting
+- cross validation|k-fold|validation
+- training error|generalization
+- supervised learning|classification|regression
+- machine learning|model selection
+template: '<approach>ML-reasoning</approach>
+
+  <steps>
+
+  1. Frame the task (classification/regression) and the loss function.
+
+  2. Split data into train/validation/test; use k-fold CV for model selection.
+
+  3. Diagnose bias vs. variance from train vs. validation error curves.
+
+  4. Choose regularization/model complexity that minimizes validation error.
+
+  </steps>
+
+  <caution>Never tune on the test set — that is leakage and inflates your estimate.</caution>
+
+  '
+concepts:
+- "Supervised learning: features, labels, loss"
+- The bias-variance decomposition
+- Cross-validation and model selection
+- Overfitting, underfitting, and the complexity tradeoff
+- Generalization error and the train/validation/test split
+common_mistakes:
+- Tuning hyperparameters on the test set.
+- Reporting training accuracy as the model's performance.
+- Ignoring data leakage from preprocessing fit on the full dataset.
+analogies:
+- "Bias-variance is like aiming darts: bias is systematic off-center error, variance is the scatter around the average landing point."
+- Overfitting is memorizing the training answers instead of learning the pattern — acing the quiz, failing the exam.
+socratic_questions:
+- How do you tell overfitting from underfitting from error curves?
+- Why does k-fold CV give a better estimate than a single split?
+- What does regularization trade off against?
+verification_strategies:
+- Compare train vs. validation error to diagnose bias/variance.
+- Use held-out test error as the final, untuned estimate.
+exercises:
+- '[easy] Define bias and variance in your own words.'
+- '[easy] Explain why a single train/test split can mislead.'
+- '[medium] Decompose expected MSE into bias^2 + variance + irreducible error.'
+- '[medium] Describe k-fold cross-validation step by step.'
+- '[hard] Show how regularization reduces variance at the cost of bias.'
+- '[hard] Explain data leakage with a normalization example and how to avoid it.'

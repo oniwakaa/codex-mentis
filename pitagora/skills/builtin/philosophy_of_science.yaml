@@ -1,0 +1,56 @@
+name: Philosophy of Science
+domain: Philosophy
+version: 2
+description: 'Falsification, paradigm shifts, underdetermination, and the demarcation of science from non-science.
+
+  '
+trigger_patterns:
+- falsification|popper
+- paradigm shift|kuhn
+- underdetermination|quine
+- demarcation|what is science
+- philosophy of science
+template: '<approach>Philosophy-of-science analysis</approach>
+
+  <steps>
+
+  1. Identify the claim about scientific method, theory change, or evidence.
+
+  2. Test it against demarcation criteria (falsifiability, predictive success).
+
+  3. Consider underdetermination: could rival theories fit the same evidence?
+
+  4. Distinguish the descriptive (how science works) from the normative (how it should).
+
+  </steps>
+
+  <caution>A theory being "unfalsified" is not the same as it being "confirmed".</caution>
+
+  '
+concepts:
+- Popperian falsification and the demarcation criterion
+- Kuhnian paradigms and incommensurability
+- The Duhem-Quine thesis and underdetermination
+- Bayesian confirmation theory
+- Realism vs. instrumentalism about scientific theories
+common_mistakes:
+- Treating "not yet falsified" as "proven true".
+- Confusing a paradigm's social dominance with its epistemic superiority.
+- Assuming underdetermination means all theories are equally good.
+analogies:
+- "A paradigm is like a lens: it makes some phenomena visible and others invisible until anomalies accumulate."
+- Underdetermination is like fitting many curves to the same dots — the data underdetermine the theory.
+socratic_questions:
+- What single observation would falsify this theory? If none, is it scientific?
+- Can two rival theories both fit all current evidence? What would break the tie?
+- Does a paradigm shift produce progress or just change?
+verification_strategies:
+- Search for an ad hoc modification that immunizes the theory from falsification.
+- Check whether a rival theory explains the same evidence with fewer auxiliary hypotheses.
+exercises:
+- '[easy] State Popper''s demarcation criterion in one sentence.'
+- '[easy] Explain why "all swans are white" was once a scientific claim.'
+- '[medium] Apply the Duhem-Quine thesis to a failed experimental prediction.'
+- '[medium] Contrast Kuhn''s account of theory change with Popper''s.'
+- '[hard] Is Bayesian confirmation a better account than falsification? Defend a view.'
+- '[hard] Does scientific realism follow from the success of science? Consider the no-miracles argument.'

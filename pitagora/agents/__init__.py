@@ -10,3 +10,4 @@ from pitagora.agents.orchestrator import Orchestrator, OrchestratorResponse, orc
 from pitagora.agents.workflows import WorkflowStep, WorkflowDefinition, WorkflowEngine
 from pitagora.agents.debate import DebateAgent, DebateSynthesis
 from pitagora.agents.chain_of_thought import ReasoningNode, ReasoningChain
+from pitagora.agents.data_analyst import DataAnalystAgent, AnalysisRequest

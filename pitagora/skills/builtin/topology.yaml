@@ -1,0 +1,56 @@
+name: Topology
+domain: Mathematics
+version: 2
+description: 'Open and closed sets, continuity, compactness, connectedness, and the fundamental group.
+
+  '
+trigger_patterns:
+- open set|closed set|topology
+- compactness|heine-borel
+- connectedness
+- fundamental group|homotopy
+- continuity (of maps|in topology)
+template: '<approach>Topological reasoning</approach>
+
+  <steps>
+
+  1. Translate the claim into statements about open sets and their unions/intersections.
+
+  2. Identify the relevant property: compactness, connectedness, separation axioms.
+
+  3. For classification, compute or bound the fundamental group.
+
+  4. Use invariants (compactness, connectedness, $\\pi_1$) to distinguish spaces.
+
+  </steps>
+
+  <caution>Compactness depends on the ambient space — check closed-and-bounded vs. general.</caution>
+
+  '
+concepts:
+- Topological spaces and the open-set axioms
+- Continuous maps and homeomorphism
+- Compactness and the Heine-Borel theorem
+- Connectedness and path-connectedness
+- The fundamental group and homotopy equivalence
+common_mistakes:
+- Assuming "closed" means "not open".
+- Applying Heine-Borel outside $\\mathbb{R}^n$.
+- Confusing path-connectedness with connectedness in pathological spaces.
+analogies:
+- "Compactness is a finitary proxy for finiteness: any open cover admits a finite subcover, like a library where any shelf plan reduces to finitely many shelves."
+- "The fundamental group counts 1-dimensional holes: a loop that cannot shrink to a point signals a hole."
+socratic_questions:
+- Is the continuous image of a compact set compact? Prove it.
+- Can a connected space fail to be path-connected? Find an example.
+- What is $\\pi_1(S^1)$ and why is it nontrivial?
+verification_strategies:
+- Use the open-cover definition directly for compactness proofs.
+- Exhibit a homeomorphism to prove two spaces are topologically identical.
+exercises:
+- '[easy] Prove that the union of open sets is open.'
+- '[easy] Show that $[0,1]$ is compact in $\mathbb{R}$ using Heine-Borel.'
+- '[medium] Prove the continuous image of a connected set is connected.'
+- '[medium] Compute $\pi_1(S^1) \cong \mathbb{Z}$.'
+- '[hard] Show that the topologist''s sine curve is connected but not path-connected.'
+- '[hard] Prove that $\mathbb{R}^n \cong \mathbb{R}^m$ only when $n = m$ (invariance of domain sketch).'

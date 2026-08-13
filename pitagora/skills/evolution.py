@@ -1,11 +1,12 @@
 import os
 import sqlite3
 import numpy as np
+import yaml
 from datetime import datetime
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Tuple
 from sqlite_utils import Database
-from pitagora.skills.engine import Skill
+from pitagora.skills.engine import Skill, SkillsEngine
 
 @dataclass
 class Stats:
@@ -13,6 +14,76 @@ class Stats:
     avg_confidence: float
     use_count: int
     success_count: int = 0
+
+
+class SkillForge:
+    """Creates and persists model-generated skills to the user skills directory.
+
+    Created skills are tagged `origin: model_created` and start disabled
+    (pending review via `pitagora skills review <name>`).
+    """
+
+    def __init__(self, user_skills_dir: Optional[str] = None):
+        from pitagora.core.constants import CONFIG_DIR
+        self.user_skills_dir = user_skills_dir or str(CONFIG_DIR / "skills")
+        os.makedirs(self.user_skills_dir, exist_ok=True)
+        self.engine = SkillsEngine(skills_dir=self.user_skills_dir)
+
+    def create_skill(
+        self,
+        name: str,
+        domain: str,
+        template: str,
+        trigger_patterns: Optional[List[str]] = None,
+        concepts: Optional[List[str]] = None,
+        description: str = "",
+        tools_used: Optional[List[str]] = None,
+    ) -> Skill:
+        """Write a new model-created skill YAML (pending review)."""
+        skill = Skill(
+            name=name,
+            domain=domain,
+            description=description or f"Model-created skill for {domain}.",
+            concepts=concepts or [],
+            common_mistakes=[],
+            analogies=[],
+            socratic_questions=[],
+            verification_strategies=[],
+            template=template,
+            trigger_patterns=trigger_patterns or [],
+            tools_used=tools_used or [],
+            origin="model_created",
+            enabled=False,  # pending review
+            version=1,
+        )
+        self.engine.save_skill(skill)
+        return skill
+
+    def pending_review(self) -> List[Skill]:
+        """List model-created skills awaiting activation."""
+        out = []
+        for name in self.engine.list_skills():
+            try:
+                skill = self.engine.load_skill(name)
+                if skill.origin == "model_created" and not skill.enabled:
+                    out.append(skill)
+            except Exception:
+                continue
+        return out
+
+    def activate(self, name: str) -> Skill:
+        """Approve a model-created skill for matching."""
+        skill = self.engine.load_skill(name)
+        skill.enabled = True
+        self.engine.save_skill(skill)
+        return skill
+
+    def reject(self, name: str) -> None:
+        """Delete a model-created skill that failed review."""
+        import os as _os
+        path = _os.path.join(self.user_skills_dir, f"{name.lower()}.yaml")
+        if _os.path.exists(path):
+            _os.remove(path)
 
 class SkillEvolution:
     def __init__(self, db_path: str = None):

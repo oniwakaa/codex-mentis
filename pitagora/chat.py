@@ -104,6 +104,89 @@ def chat_completion(
         return f"[Error: {e}]"
 
 
+def _build_feedback_loop():
+    """Best-effort construction of the self-improving feedback loop components.
+
+    Returns (improver, skill_evo, skills_engine), each possibly None. The
+    improver uses a null provider — only its DB methods are needed here
+    (record_interaction / select_strategy_for); LLM-based prompt revision is
+    not invoked from the chat loop. All failures degrade gracefully so a
+    missing DB or import never breaks the chat REPL.
+    """
+    improver = skill_evo = skills_engine = None
+    try:
+        from pitagora.agents.providers.base import BaseProvider, ProviderConfig
+        from pitagora.agents.self_improver import SelfImproverAgent
+
+        class _NullProvider(BaseProvider):
+            def __init__(self):
+                super().__init__(ProviderConfig(api_key="null", model="null"))
+
+            def complete(self, messages, tools=None, temperature=0.7, response_format=None):
+                return {"content": "", "tool_calls": []}
+
+            async def acomplete(self, messages, tools=None, temperature=0.7, response_format=None):
+                return {"content": "", "tool_calls": []}
+
+            def stream(self, messages):
+                yield ""
+
+            async def astream(self, messages):
+                yield ""
+
+            def embed(self, texts):
+                return [[0.0] for _ in texts]
+
+            async def aembed(self, texts):
+                return [[0.0] for _ in texts]
+
+        improver = SelfImproverAgent(_NullProvider())
+    except Exception as e:
+        log.debug("feedback loop improver unavailable: %s", e)
+
+    try:
+        from pitagora.skills.evolution import SkillEvolution
+        from pitagora.skills.engine import SkillsEngine
+        skill_evo = SkillEvolution()
+        skills_engine = SkillsEngine()
+    except Exception as e:
+        log.debug("feedback loop skill tracking unavailable: %s", e)
+
+    return improver, skill_evo, skills_engine
+
+
+# Map SelfImprover strategy names to TeachingSession styles for seeding.
+_STRATEGY_TO_STYLE = {
+    "socratic": "socratic",
+    "feynman": "feynman",
+    "formal_proof": "formal",
+    "analogy": "feynman",
+    "side_by_side": "feynman",
+}
+
+
+def _seed_session_style(session, improver) -> None:
+    """Seed a new teaching session's initial style from cross-session metrics.
+
+    Only applies when the improver has enough history (≥5 interactions) for the
+    topic; otherwise the session keeps its default style and learns per-session.
+    """
+    if improver is None:
+        return
+    try:
+        from pitagora.teaching.session import ALL_STYLES
+        report = {r["strategy_used"]: r for r in improver.strategy_report(topic=session.topic)}
+        total = sum(r.get("uses", 0) for r in report.values())
+        if total < 5:
+            return
+        strategy = improver.select_strategy_for(session.topic, session.user_level)
+        style = _STRATEGY_TO_STYLE.get(strategy)
+        if style in ALL_STYLES:
+            session.current_style = style
+    except Exception as e:
+        log.debug("session style seed failed: %s", e)
+
+
 def _get_rag_context(query: str, max_tokens: int = 2000) -> str:
     """Retrieve relevant context from knowledge base for RAG."""
     try:
@@ -319,9 +402,15 @@ def _build_teaching_prompt(session, action: str, style: str) -> str:
     )
 
 
-def _run_teaching_turn(console, session, analyzer, user_input, config, model, messages):
+def _run_teaching_turn(console, session, analyzer, user_input, config, model, messages,
+                       improver=None, skill_evo=None, skills_engine=None):
     """Process one teaching-mode turn: classify, update session, build prompt,
-    call LLM, display response + controls. Mutates `messages` and `session`."""
+    call LLM, display response + controls. Mutates `messages` and `session`.
+
+    When `improver`/`skill_evo`/`skills_engine` are supplied, the turn feeds the
+    self-improving feedback loop with a real quality signal derived from the
+    ResponseAnalyzer classification (WS1) and records matched skill usage (WS3a).
+    """
     from rich.markdown import Markdown
     from pitagora.teaching.ui import (
         show_controls, show_comprehension_gauge, show_subconcept_progress,
@@ -333,6 +422,33 @@ def _run_teaching_turn(console, session, analyzer, user_input, config, model, me
     # Classify (shortcuts bypass the LLM)
     result = analyzer.classify(user_input, session.topic, sc_name, config=config, model=model)
     session.apply_classification(result.label, result.delta, style=session.current_style)
+
+    # WS1: feed the cross-session feedback loop with a real quality signal
+    # derived from the learner's classified reply (not a neutral default).
+    if improver is not None:
+        try:
+            from pitagora.agents.self_improver import quality_from_classification
+            improver.record_interaction(
+                topic=session.topic,
+                level=session.user_level,
+                strategy_used=session.current_style,
+                response_quality=quality_from_classification(result.label),
+                success=result.delta > 0,
+            )
+        except Exception as e:
+            log.debug("feedback loop record_interaction failed: %s", e)
+
+    # WS3a: record matched skill usage with the same success signal.
+    if skill_evo is not None and skills_engine is not None and user_input != "begin":
+        try:
+            matched = skills_engine.match_skills(session.topic, user_input)
+            if matched:
+                skill_evo.record_use(
+                    matched[0].name, success=result.delta > 0,
+                    feedback=result.label, topic=session.topic,
+                )
+        except Exception as e:
+            log.debug("skill usage record failed: %s", e)
 
     # Decide next action
     action = session.next_action(result.label)
@@ -414,6 +530,12 @@ def launch_chat(
     teaching_session = None
     teaching_analyzer = None
     teaching_journey = None  # set in TASK 3 wiring
+
+    # WS1/WS3a feedback loop: cross-session strategy metrics + skill usage.
+    # Best-effort; stays None if the DB or imports are unavailable.
+    feedback_improver, feedback_skill_evo, feedback_skills_engine = _build_feedback_loop()
+    # Last free-form response context (topic, strategy) for the /rate command.
+    last_freeform = {"topic": topic, "strategy": "socratic"}
 
     # Welcome — gold ASCII banner + info panel.
     from pitagora.cli.rich_ui import show_welcome
@@ -635,6 +757,8 @@ def launch_chat(
                     teaching_session = TeachingSession(
                         topic=explore_topic, sub_concepts=subs, user_level="intermediate",
                     )
+                    # WS1: seed the initial style from cross-session metrics when available.
+                    _seed_session_style(teaching_session, feedback_improver)
                     teaching_session.transition(TeachingState.exploring)
                     teaching_analyzer = ResponseAnalyzer(chat_completion)
                     topic = explore_topic
@@ -656,6 +780,8 @@ def launch_chat(
                     _run_teaching_turn(
                         console, teaching_session, teaching_analyzer,
                         "begin", config, model, messages,
+                        improver=feedback_improver, skill_evo=feedback_skill_evo,
+                        skills_engine=feedback_skills_engine,
                     )
                     continue
                 elif cmd == "/journeys":
@@ -701,6 +827,7 @@ def launch_chat(
                     from pitagora.agents.visualizer import VisualizerAgent
                     from pitagora.agents.explainer import ExplainerAgent
                     from pitagora.agents.self_improver import SelfImproverAgent
+                    from pitagora.agents.data_analyst import DataAnalystAgent
                     from pitagora.agents.workflows import WorkflowEngine
 
                     AVAILABLE_WORKFLOWS = (
@@ -732,6 +859,7 @@ def launch_chat(
                             "visualizer": VisualizerAgent(prov),
                             "explainer": ExplainerAgent(prov),
                             "self_improver": SelfImproverAgent(prov),
+                            "data_analyst": DataAnalystAgent(prov),
                             "debate": TutorAgent(prov),  # ponytail: debate agent reused; add DebateAgent if workflow needs its specific methods
                         }
                         engine = WorkflowEngine(agents=agents)
@@ -749,6 +877,31 @@ def launch_chat(
                     if arg:
                         from pitagora.latex_render import latex_to_unicode, render_equation_box
                         console.print(render_equation_box(arg))
+                    continue
+                elif cmd == "/rate":
+                    # WS1: explicit feedback for free-form chat (no automated
+                    # classifier signal there). Rates the last free-form response
+                    # 1-5 and records it in the self-improving feedback loop.
+                    if feedback_improver is None:
+                        console.print("[dim]Feedback loop unavailable.[/dim]")
+                        continue
+                    try:
+                        q = int(arg.strip()) if arg.strip() else 0
+                    except ValueError:
+                        q = 0
+                    if not 1 <= q <= 5:
+                        console.print("[dim]Usage: /rate <1-5>  (rates the last response)[/dim]")
+                        continue
+                    try:
+                        feedback_improver.record_interaction(
+                            topic=last_freeform.get("topic", topic),
+                            level="intermediate",
+                            strategy_used=last_freeform.get("strategy", "socratic"),
+                            response_quality=q,
+                        )
+                        console.print(f"[green]✓ Recorded rating {q}/5.[/green]")
+                    except Exception as e:
+                        console.print(f"[red]Rating failed: {e}[/red]")
                     continue
                 elif cmd == "/help":
                     console.print(Panel(
@@ -772,6 +925,7 @@ def launch_chat(
                         "  /save             Save current session\n"
                         "  /sessions         List saved sessions\n"
                         "  /resume [id]      Resume a saved session\n"
+                        "  /rate <1-5>       Rate the last response (feeds the feedback loop)\n"
                         "  /clear            Clear conversation\n"
                         "  /quit             Exit\n\n"
                         "[bold]Teaching shortcuts (in teaching mode):[/bold]\n"
@@ -815,6 +969,8 @@ def launch_chat(
                 response = _run_teaching_turn(
                     console, teaching_session, teaching_analyzer,
                     user_input, config, model, messages,
+                    improver=feedback_improver, skill_evo=feedback_skill_evo,
+                    skills_engine=feedback_skills_engine,
                 )
                 # Auto-save journey after each teaching turn.
                 if teaching_journey is not None:
@@ -888,6 +1044,9 @@ def launch_chat(
 
             # 7. Record study activity
             _record_study(topic, user_input)
+
+            # Track context for the /rate command (free-form feedback loop).
+            last_freeform = {"topic": topic, "strategy": "socratic"}
 
             console.print()
 

@@ -17,21 +17,27 @@ class OrchestratorResponse:
 
 class Orchestrator:
     def __init__(
-        self, 
-        agents: Dict[str, BaseAgent], 
-        memory: Optional[Any] = None, 
-        concept_graph: Optional[Any] = None
+        self,
+        agents: Dict[str, BaseAgent],
+        memory: Optional[Any] = None,
+        concept_graph: Optional[Any] = None,
+        self_improver: Optional[Any] = None,
     ):
         """
         Orchestrates Pitagora tasks by routing requests to specialized agents
         and running multi-step collaborative workflows.
+
+        `self_improver` (optional) enables the WS1 feedback loop: when present,
+        tutor dispatch picks a strategy via `select_strategy_for` and records
+        the interaction outcome via `record_interaction`.
         """
         self.agents = agents
         self.memory = memory
         self.concept_graph = concept_graph
+        self.self_improver = self_improver
         self.sessions: Dict[str, Dict[str, Any]] = {}
         self.workflow_registry: Dict[str, Callable] = {}
-        
+
         self._register_default_workflows()
 
     def register_workflow(self, name: str, workflow_fn: Callable) -> None:
@@ -89,6 +95,8 @@ class Orchestrator:
             return {"route_type": "agent", "name": "researcher"}
         if "self_improve" in input_lower or "optimize prompt" in input_lower:
             return {"route_type": "agent", "name": "self_improver"}
+        if "dataset" in input_lower or "dataframe" in input_lower or "csv" in input_lower or "regression" in input_lower or "correlation" in input_lower:
+            return {"route_type": "agent", "name": "data_analyst"}
 
         # Dynamic classifier utilizing LLM if possible
         agent = self.agents.get("researcher") or self.agents.get("tutor") or list(self.agents.values())[0] if self.agents else None
@@ -107,7 +115,8 @@ class Orchestrator:
                 f"- 'reviewer' (formal mathematical auditing)\n"
                 f"- 'visualizer' (rendering ASCII plots)\n"
                 f"- 'researcher' (knowledge lookup, web search)\n"
-                f"- 'self_improver' (prompt optimization, A/B strategy outcomes)\n\n"
+                f"- 'self_improver' (prompt optimization, A/B strategy outcomes)\n"
+                f"- 'data_analyst' (dataset profiling, statistical analysis, plots)\n\n"
                 f"User request: \"{user_input}\"\n\n"
                 f"Return a JSON response conforming strictly to: {{\"route_type\": \"workflow\" or \"agent\", \"name\": \"option_name\"}}"
             )
@@ -204,6 +213,9 @@ class Orchestrator:
         elif mode_clean in ("self_improve", "self_improver"):
             route_type = "agent"
             route_name = "self_improver"
+        elif mode_clean in ("data", "data_analyst", "analyze"):
+            route_type = "agent"
+            route_name = "data_analyst"
             
         if not route_type or mode_clean == "explore":
             # Classify intent dynamically
@@ -238,7 +250,43 @@ class Orchestrator:
             
             # Execute specific agent methods if applicable, otherwise fallback to think
             if agent_key == "tutor" and hasattr(agent, "explain_concept"):
-                agent_response = await agent.explain_concept(user_input)
+                # WS1: when a self_improver is wired in, pick a strategy from the
+                # metrics DB before teaching and record the outcome after. The
+                # strategy is injected as a pedagogical-style hint in the prompt.
+                if self.self_improver is not None:
+                    level = "beginner"
+                    try:
+                        strategy = self.self_improver.select_strategy_for(user_input, level)
+                    except Exception:
+                        strategy = None
+                    if strategy:
+                        prompt = (
+                            f"Explain '{user_input}' to a {level} student using a "
+                            f"{strategy} teaching style. Provide a Socratic "
+                            f"introduction, clear explanations with analogies, and "
+                            f"end with a guiding question."
+                        )
+                        agent_response = await agent.athink(prompt)
+                    else:
+                        agent_response = await agent.explain_concept(user_input)
+                    # ponytail: the orchestrator free-form tutor path has no
+                    # ResponseAnalyzer classifier, so quality defaults to neutral
+                    # 3 here. The chat REPL teaching path (_run_teaching_turn)
+                    # records real quality derived from the learner's classified
+                    # reply, and free-form chat there supports explicit /rate N.
+                    # Upgrade this path by passing a classifier in if the
+                    # standalone orchestrate() REPL needs real feedback.
+                    try:
+                        self.self_improver.record_interaction(
+                            topic=user_input,
+                            level=level,
+                            strategy_used=strategy or "socratic",
+                            response_quality=3,
+                        )
+                    except Exception:
+                        pass
+                else:
+                    agent_response = await agent.explain_concept(user_input)
             elif agent_key == "explainer" and hasattr(agent, "feynman_explanation"):
                 if "feynman" in user_input.lower():
                     agent_response = await agent.feynman_explanation(user_input)
@@ -545,6 +593,7 @@ def orchestrate(query: str, mode: str, topic: str, context: str = "") -> str:
     from pitagora.agents.visualizer import VisualizerAgent
     from pitagora.agents.explainer import ExplainerAgent
     from pitagora.agents.self_improver import SelfImproverAgent
+    from pitagora.agents.data_analyst import DataAnalystAgent
     
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("PITAGORA_API_KEY") or "mock"
 
@@ -584,7 +633,8 @@ def orchestrate(query: str, mode: str, topic: str, context: str = "") -> str:
         "reviewer": ReviewerAgent(prov),
         "visualizer": VisualizerAgent(prov),
         "explainer": ExplainerAgent(prov),
-        "self_improver": SelfImproverAgent(prov)
+        "self_improver": SelfImproverAgent(prov),
+        "data_analyst": DataAnalystAgent(prov)
     }
     
     orchestrator = Orchestrator(agents=agents)

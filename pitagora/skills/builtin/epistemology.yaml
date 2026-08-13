@@ -1,0 +1,56 @@
+name: Epistemology
+domain: Philosophy
+version: 2
+description: 'Theory of knowledge: what counts as justified belief, the Gettier problem, internalism vs. externalism, and the structure of justification.
+
+  '
+trigger_patterns:
+- what (is|counts as) knowledge
+- justified true belief
+- gettier
+- how do we know
+- epistemolog
+template: '<approach>Epistemological analysis</approach>
+
+  <steps>
+
+  1. Clarify the claim: is it about knowledge (JTB), justification, or skepticism?
+
+  2. Test against the Gettier schema: could a justified true belief still be luck?
+
+  3. Identify whether the account is internalist (access to reasons) or externalist (reliability).
+
+  4. Check for skeptical counterexamples (brain-in-a-vat, demon).
+
+  </steps>
+
+  <caution>Distinguish "knowing that p" from "being justified in believing p".</caution>
+
+  '
+concepts:
+- Knowledge as justified true belief (JTB)
+- The Gettier problem and its counterexamples
+- Internalist vs. externalist theories of justification
+- Foundationalism vs. coherentism
+- Skepticism and the closure principle
+common_mistakes:
+- Treating "true" and "justified" as interchangeable — a belief can be justified yet false.
+- Forgetting that Gettier cases require the belief to be true but only accidentally.
+- Confusing the causal theory of knowledge with reliabilism.
+analogies:
+- "A justified belief is like a bridge: it must actually reach the truth (reliability), not just look sturdy from one side."
+- Gettier cases are like a stopped clock that happens to show the right time twice a day.
+socratic_questions:
+- If your belief is true and justified, what could still make it "not knowledge"?
+- Does a reliable process guarantee truth in every single case?
+- Can you know something without being able to rule out every skeptical alternative?
+verification_strategies:
+- Construct a Gettier-style counterexample to test a proposed definition of knowledge.
+- Check whether the account survives radical skeptical scenarios.
+exercises:
+- '[easy] Restate the JTB analysis of knowledge and give one everyday example.'
+- '[easy] Explain why a lucky guess is not knowledge even if true.'
+- '[medium] Reconstruct a Gettier case of your own using a fake barn scenario.'
+- '[medium] Compare foundationalism and coherentism on how basic beliefs are grounded.'
+- '[hard] Does reliabilism escape the Gettier problem? Argue both sides.'
+- '[hard] Evaluate whether the closure principle forces us into skepticism.'

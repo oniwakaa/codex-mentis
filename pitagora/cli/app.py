@@ -13,6 +13,8 @@ from pitagora.cli.commands import (
     kb,
     config,
     skills,
+    strategy,
+    data,
 )
 
 log = logging.getLogger(__name__)
@@ -48,6 +50,8 @@ app.add_typer(memory.app, name="memory")
 app.add_typer(kb.app, name="kb")
 app.add_typer(config.app, name="config")
 app.add_typer(skills.app, name="skills")
+app.add_typer(strategy.app, name="strategy")
+app.add_typer(data.app, name="data")
 
 if review:
     app.add_typer(review.app, name="review")
@@ -241,6 +245,27 @@ def main_callback(
         return
 
     from pitagora.chat import launch_chat
+
+    # WS4b: first-run wizard. Launch the interactive setup wizard when no
+    # config exists AND stdin is a TTY (interactive use). In non-interactive
+    # contexts (CI, pipes), fall back to a one-line hint + defaults so the
+    # command never blocks on a prompt.
+    import sys
+    from pitagora.core.constants import CONFIG_PATH
+    if not CONFIG_PATH.exists():
+        if sys.stdin and sys.stdin.isatty():
+            try:
+                from pitagora.cli.commands.setup import run_setup
+                typer.echo("First run detected — launching setup wizard.\n")
+                run_setup()
+            except Exception as e:
+                typer.echo(f"Setup wizard failed ({e}); continuing with defaults.")
+        else:
+            typer.echo(
+                "First run detected — no config at ~/.pitagora/config.yaml. "
+                "Run `pitagora setup` to configure providers and MCP servers. "
+                "Continuing with defaults for now."
+            )
 
     if model:
         os.environ["PITAGORA_MODEL"] = model

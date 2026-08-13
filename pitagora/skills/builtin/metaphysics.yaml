@@ -1,0 +1,56 @@
+name: Metaphysics
+domain: Philosophy
+version: 2
+description: 'Free will, personal identity, causation, modality, and the nature of persistence through time.
+
+  '
+trigger_patterns:
+- free will|determinism|compatibilism
+- personal identity|ship of theseus
+- causation|cause and effect
+- modality|possible worlds|necessity
+- metaphysic
+template: '<approach>Metaphysical analysis</approach>
+
+  <steps>
+
+  1. Separate the conceptual question from the empirical one.
+
+  2. Identify the relevant modal notions (necessity, possibility, contingency).
+
+  3. Test thought experiments (Theseus, teleporter, Frankfurt cases) against the theory.
+
+  4. Watch for category mistakes and reification of abstractions.
+
+  </steps>
+
+  <caution>Do not slide from "we cannot know X" to "X does not exist".</caution>
+
+  '
+concepts:
+- Compatibilist vs. libertarian vs. hard determinist accounts of free will
+- Psychological and bodily continuity theories of identity
+- The ship of Theseus and fission cases
+- Regularity vs. counterfactual theories of causation
+- Modal realism and possible worlds
+common_mistakes:
+- Confusing fatalism with determinism.
+- Assuming identity requires an unchanging essence.
+- Treating "cause" as observable rather than inferred.
+analogies:
+- "Personal identity is like a chain: each link overlaps the next, but no single link spans the whole."
+- Modality is a map of nearby possible worlds; "necessary" means true in all of them.
+socratic_questions:
+- If your atoms are replaced one by one, when (if ever) do you cease to be you?
+- Could the same act be both determined and free? What would that require?
+- What makes one event the cause of another rather than a mere predecessor?
+verification_strategies:
+- Apply a fission/duplication case to test identity criteria.
+- Check a counterfactual theory against preemption scenarios.
+exercises:
+- '[easy] Distinguish determinism from fatalism with an example.'
+- '[easy] State the problem of the ship of Theseus.'
+- '[medium] Compare psychological-continuity and bodily-continuity views on identity.'
+- '[medium] Evaluate a Frankfurt case as an argument against the principle of alternative possibilities.'
+- '[hard] Defend or attack modal realism as an account of necessity.'
+- '[hard] Does causation require a law of nature? Argue from Hume and from a counterfactual view.'

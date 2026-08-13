@@ -2,22 +2,22 @@ name: Algebra and Equation Solving
 domain: Algebra
 description: Fundamental algebraic operations, equation solving, factoring, and polynomial manipulations.
 concepts:
-  - Quadratic equations
-  - Polynomial factorization
-  - Systems of linear equations
-  - Exponential and logarithmic properties
+- Quadratic equations
+- Polynomial factorization
+- Systems of linear equations
+- Exponential and logarithmic properties
 common_mistakes:
-  - Forgetting the +/- sign when taking square roots (e.g. x^2 = 4 => x = 2, omitting -2)
-  - Applying exponent distribution over addition (e.g. (a+b)^2 = a^2 + b^2)
-  - Dividing by zero when simplifying variables (e.g. dividing by x when x could be 0)
+- Forgetting the +/- sign when taking square roots (e.g. x^2 = 4 => x = 2, omitting -2)
+- Applying exponent distribution over addition (e.g. (a+b)^2 = a^2 + b^2)
+- Dividing by zero when simplifying variables (e.g. dividing by x when x could be 0)
 analogies:
-  - Balancing equations is like a seesaw; whatever you add/remove on one side must be added/removed on the other.
-  - Factoring is like decomposing a composite number into prime factors; it breaks complex structures into simple blocks.
+- Balancing equations is like a seesaw; whatever you add/remove on one side must be added/removed on the other.
+- Factoring is like decomposing a composite number into prime factors; it breaks complex structures into simple blocks.
 socratic_questions:
-  - What happens if the variable we are solving for takes a value of zero?
-  - Can this expression be factored further using special products like difference of squares?
-  - Have you verified all constraints on the domain of the solution?
+- What happens if the variable we are solving for takes a value of zero?
+- Can this expression be factored further using special products like difference of squares?
+- Have you verified all constraints on the domain of the solution?
 verification_strategies:
-  - Substitute the solved values back into the original equation.
-  - Evaluate both sides of the equation numerically at a random test value.
-  - Simplify the difference LHS - RHS and check if it reduces to 0.
+- Substitute the solved values back into the original equation.
+- Evaluate both sides of the equation numerically at a random test value.
+- Simplify the difference LHS - RHS and check if it reduces to 0.

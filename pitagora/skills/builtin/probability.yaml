@@ -2,22 +2,22 @@ name: Probability and Statistics
 domain: Mathematics
 description: Probability distributions, expectation, joint probabilities, Bayes' theorem, and statistical inference.
 concepts:
-  - Probability axioms and conditioning
-  - Bayes' Theorem and posterior inference
-  - Discrete and continuous random variables
-  - Central Limit Theorem and Law of Large Numbers
+- Probability axioms and conditioning
+- Bayes' Theorem and posterior inference
+- Discrete and continuous random variables
+- Central Limit Theorem and Law of Large Numbers
 common_mistakes:
-  - Confusing independent events and mutually exclusive events.
-  - Adding probabilities of non-mutually exclusive events without subtracting their intersection.
-  - Forgetting to normalize probability density functions (integrals must equal 1).
+- Confusing independent events and mutually exclusive events.
+- Adding probabilities of non-mutually exclusive events without subtracting their intersection.
+- Forgetting to normalize probability density functions (integrals must equal 1).
 analogies:
-  - Bayes' theorem is like updating your guess of what crime occurred as new clues are uncovered.
-  - A probability distribution is like a map showing where rain is likely to fall.
+- Bayes' theorem is like updating your guess of what crime occurred as new clues are uncovered.
+- A probability distribution is like a map showing where rain is likely to fall.
 socratic_questions:
-  - Are these random variables independent? Do they have identical distributions?
-  - What is the prior probability before this evidence is considered?
-  - Does this distribution satisfy the properties of a valid probability density function?
+- Are these random variables independent? Do they have identical distributions?
+- What is the prior probability before this evidence is considered?
+- Does this distribution satisfy the properties of a valid probability density function?
 verification_strategies:
-  - Verify that the sum or integral of the probability distribution equals 1.
-  - Use expected value properties (e.g. linearity of expectation) to verify calculations.
-  - Perform simple Monte Carlo simulation to cross-check results.
+- Verify that the sum or integral of the probability distribution equals 1.
+- Use expected value properties (e.g. linearity of expectation) to verify calculations.
+- Perform simple Monte Carlo simulation to cross-check results.

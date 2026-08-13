@@ -1,0 +1,56 @@
+name: Philosophy of Mind
+domain: Philosophy
+version: 2
+description: 'Consciousness, qualia, the hard problem, the Chinese room, and functionalism vs. identity theory.
+
+  '
+trigger_patterns:
+- consciousness|qualia
+- hard problem
+- chinese room|searle
+- functionalism|identity theory|dualism
+- philosophy of mind
+template: '<approach>Philosophy-of-mind analysis</approach>
+
+  <steps>
+
+  1. Separate the easy problems (functions, behavior) from the hard problem (experience).
+
+  2. Identify the metaphysical position: dualism, identity, functionalism, eliminativism.
+
+  3. Test with a thought experiment (zombie, Chinese room, Mary''s room).
+
+  4. Check whether the position explains or explains away the phenomenon.
+
+  </steps>
+
+  <caution>Do not assume "we can imagine X" entails "X is possible" without scrutiny.</caution>
+
+  '
+concepts:
+- The hard problem of consciousness
+- Qualia and the knowledge argument (Mary's room)
+- The Chinese room argument against strong AI
+- Functionalism and multiple realizability
+- Type-identity theory and eliminative materialism
+common_mistakes:
+- Confusing the absence of a behavioral difference with the absence of an experiential one.
+- Treating functionalism as equivalent to behaviorism.
+- Assuming a thought experiment settles a metaphysical question without argument.
+analogies:
+- The hard problem is like explaining why the lights are on (function) vs. why there is something it is like (experience).
+- The Chinese room is a symbol manipulator that passes the test without understanding, like a person sorting mail by zip code without reading the letters.
+socratic_questions:
+- Could a perfect functional duplicate of you lack inner experience? What follows?
+- What does Mary learn when she first sees red?
+- Does the Chinese room show that computers cannot think, or only that simulation is not duplication?
+verification_strategies:
+- Check whether the argument depends on an unverifiable conceivability premise.
+- Test the theory against multiple realizability of mental states.
+exercises:
+- '[easy] Distinguish the easy from the hard problem of consciousness.'
+- '[easy] State what the Chinese room is meant to show.'
+- '[medium] Reconstruct the Mary''s room argument and one standard reply.'
+- '[medium] Compare functionalism with type-identity theory on multiple realizability.'
+- '[hard] Does conceivability entail metaphysical possibility? Argue with zombies in mind.'
+- '[hard] Evaluate eliminative materialism: could folk psychology be radically mistaken?'

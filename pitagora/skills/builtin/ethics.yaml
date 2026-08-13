@@ -1,0 +1,56 @@
+name: Ethics
+domain: Philosophy
+version: 2
+description: 'Normative ethics: utilitarianism, deontology, virtue ethics, and applied dilemmas like the trolley problem.
+
+  '
+trigger_patterns:
+- trolley problem
+- utilitarian|consequentialism
+- deontolog|categorical imperative
+- virtue ethics
+- right thing to do|morally
+template: '<approach>Ethical analysis</approach>
+
+  <steps>
+
+  1. Identify the moral agent, the action, and the affected parties.
+
+  2. Apply at least two frameworks: consequentialist (maximize welfare), deontological (respect duties/rights), virtue (character).
+
+  3. Note where the frameworks diverge and why.
+
+  4. Check for morally relevant asymmetries (doing vs. allowing, intention vs. foresight).
+
+  </steps>
+
+  <caution>Do not assume one framework is "obviously correct" — surface the tension.</caution>
+
+  '
+concepts:
+- Utilitarianism (act and rule)
+- Deontology and the categorical imperative
+- Virtue ethics and the doctrine of the mean
+- The trolley problem and the doctrine of double effect
+- "Metaethics: realism vs. anti-realism"
+common_mistakes:
+- Conflating "legal" with "moral".
+- Treating utilitarianism as "whatever makes the most people happy" without measuring welfare.
+- Ignoring the agent's intention when applying double effect.
+analogies:
+- Deontology treats persons as ends, never merely as means — like refusing to use a person as a tool even to build a bridge.
+- "Virtue ethics is like training a muscle: character is built by repeated right action, not a single calculation."
+socratic_questions:
+- Would you pull the trolley lever? What if it requires actively pushing someone?
+- Can a good outcome justify a rights violation? When, if ever?
+- What would a courageous, temperate person do here?
+verification_strategies:
+- Test the conclusion under each of the three frameworks separately.
+- Check for consistency with a counterfactual swap of the affected parties.
+exercises:
+- '[easy] Define act utilitarianism in one sentence and give a simple example.'
+- '[easy] State the first formulation of Kant''s categorical imperative.'
+- '[medium] Analyze the trolley problem from both utilitarian and deontological views.'
+- '[medium] Explain the doctrine of double effect and how it differs from simple consequentialism.'
+- '[hard] Is rule utilitarianism distinguishable from deontology in practice? Defend a position.'
+- '[hard] Construct a case where virtue ethics and utilitarianism give opposite verdicts.'

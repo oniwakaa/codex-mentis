@@ -2,22 +2,22 @@ name: Thermodynamics and Statistical Mechanics
 domain: Physics
 description: Laws of thermodynamics, heat engines, partition functions, and statistical ensembles.
 concepts:
-  - Laws of Thermodynamics
-  - Thermodynamic potentials (Gibbs, Helmholtz, Enthalpy)
-  - Partition function and Boltzmann distribution
-  - Statistical ensembles (Microcanonical, Canonical, Grand Canonical)
+- Laws of Thermodynamics
+- Thermodynamic potentials (Gibbs, Helmholtz, Enthalpy)
+- Partition function and Boltzmann distribution
+- Statistical ensembles (Microcanonical, Canonical, Grand Canonical)
 common_mistakes:
-  - Confusing state functions (like internal energy) and path variables (like heat or work).
-  - Mixing up signs in thermodynamic relations (e.g. dU = dQ - dW vs dQ + dW depending on convention).
-  - Forgetting that temperature must be in Kelvin when applying equations.
+- Confusing state functions (like internal energy) and path variables (like heat or work).
+- Mixing up signs in thermodynamic relations (e.g. dU = dQ - dW vs dQ + dW depending on convention).
+- Forgetting that temperature must be in Kelvin when applying equations.
 analogies:
-  - Entropy is like the number of ways you can arrange books on a shelf; there are many more ways to mess them up than to keep them in order.
-  - The partition function is a statistical census of all states in a physical system.
+- Entropy is like the number of ways you can arrange books on a shelf; there are many more ways to mess them up than to keep them in order.
+- The partition function is a statistical census of all states in a physical system.
 socratic_questions:
-  - Is the process reversible, adiabatic, isothermal, or isobaric?
-  - Does this parameter represent an intensive or extensive property?
-  - How does the partition function relate to the free energy of the system?
+- Is the process reversible, adiabatic, isothermal, or isobaric?
+- Does this parameter represent an intensive or extensive property?
+- How does the partition function relate to the free energy of the system?
 verification_strategies:
-  - Confirm Maxwell relations hold for the calculated thermodynamic potentials.
-  - Verify that entropy increases for irreversible processes (Second Law check).
-  - Check the high-temperature and low-temperature limits of partition functions to see if they match classical/quantum expectations.
+- Confirm Maxwell relations hold for the calculated thermodynamic potentials.
+- Verify that entropy increases for irreversible processes (Second Law check).
+- Check the high-temperature and low-temperature limits of partition functions to see if they match classical/quantum expectations.

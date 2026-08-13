@@ -1,28 +1,26 @@
 name: Formal Logic
 domain: Philosophy
-description: >
-  Formal logic: truth tables, natural deduction, and predicate calculus.
-  Covers propositional connectives, inference rules (modus ponens, modus
-  tollens, hypothetical syllogism), and quantifiers with exercises at three
-  levels.
+description: 'Formal logic: truth tables, natural deduction, and predicate calculus. Covers propositional connectives, inference rules (modus ponens, modus tollens, hypothetical syllogism), and quantifiers with exercises at three levels.
+
+  '
 concepts:
-  - Truth tables for propositional connectives
-  - Natural deduction (modus ponens, modus tollens, hypothetical syllogism)
-  - Predicate calculus and quantifiers
+- Truth tables for propositional connectives
+- Natural deduction (modus ponens, modus tollens, hypothetical syllogism)
+- Predicate calculus and quantifiers
 common_mistakes:
-  - Affirming the consequent (from P→Q and Q, inferring P) — a fallacy, not modus ponens.
-  - Denying the antecedent (from P→Q and ¬P, inferring ¬Q) — a fallacy, not modus tollens.
-  - Confusing ∀x∃y P(x,y) with ∃y∀x P(x,y) — quantifier order matters.
-  - Treating material implication (P→Q) as causal or temporal implication.
+- Affirming the consequent (from P→Q and Q, inferring P) — a fallacy, not modus ponens.
+- Denying the antecedent (from P→Q and ¬P, inferring ¬Q) — a fallacy, not modus tollens.
+- Confusing ∀x∃y P(x,y) with ∃y∀x P(x,y) — quantifier order matters.
+- Treating material implication (P→Q) as causal or temporal implication.
 analogies:
-  - A truth table is a complete enumeration of every possible world for the atoms.
-  - Natural deduction is a game where each move (inference rule) must be legal; the proof is the legal game record.
-  - ∀ is a conjunction over the whole domain; ∃ is a disjunction over the whole domain.
+- A truth table is a complete enumeration of every possible world for the atoms.
+- Natural deduction is a game where each move (inference rule) must be legal; the proof is the legal game record.
+- ∀ is a conjunction over the whole domain; ∃ is a disjunction over the whole domain.
 socratic_questions:
-  - If P→Q is true and Q is true, what can you say about P? Why not more?
-  - Is ¬(P∧Q) the same as ¬P∨¬Q? Prove it with a truth table.
-  - What is the difference between "for every x there is a y" and "there is a y for every x"?
+- If P→Q is true and Q is true, what can you say about P? Why not more?
+- Is ¬(P∧Q) the same as ¬P∨¬Q? Prove it with a truth table.
+- What is the difference between "for every x there is a y" and "there is a y for every x"?
 verification_strategies:
-  - Build the full truth table and check the relevant column.
-  - For a deduction, justify each line with the rule and the line numbers it cites.
-  - For a quantified claim, test it on a small finite domain by enumeration.
+- Build the full truth table and check the relevant column.
+- For a deduction, justify each line with the rule and the line numbers it cites.
+- For a quantified claim, test it on a small finite domain by enumeration.

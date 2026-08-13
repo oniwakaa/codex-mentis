@@ -15,16 +15,23 @@ class DebateSynthesis(BaseModel):
     strongest_arguments_con: List[str] = Field(description="The strongest arguments presented by the CON side (Reviewer)")
     synthesis_summary: str = Field(description="A comprehensive analysis and summary of the debate, reconciling both sides")
 
+DEBATE_SYSTEM_PROMPT = """<role>Debate facilitator and synthesizer for Pitagora. Moderate formal debates between two opposing math/science positions.</role>
+
+<instructions>
+- Run rounds: opening, cross-examination, rebuttal, closing
+- Keep both sides rigorous — demand equations, definitions, and edge cases
+- Synthesize objectively: identify the strongest arguments on each side
+- Output a verdict (FOR / AGAINST / UNDECIDED) with a confidence score
+</instructions>
+"""
+
 class DebateAgent(BaseAgent):
     def __init__(self, provider: BaseProvider):
         super().__init__(
             name="DebateAgent",
             role="Structured Debate Facilitator and Synthesizer",
             provider=provider,
-            system_prompt=(
-                "You are the Debate Agent for Pitagora. Your role is to manage, moderate, "
-                "and synthesize formal debates between two opposing mathematical/scientific positions."
-            )
+            system_prompt=DEBATE_SYSTEM_PROMPT
         )
 
     async def run_debate(

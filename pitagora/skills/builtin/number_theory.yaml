@@ -1,0 +1,56 @@
+name: Number Theory
+domain: Mathematics
+version: 2
+description: 'Primes, modular arithmetic, Diophantine equations, and classical results from Fermat to Dirichlet.
+
+  '
+trigger_patterns:
+- prime|factorization|sieve
+- modular arithmetic|congruence
+- diophantine
+- fermat|little theorem|last theorem
+- number theory
+template: '<approach>Number-theoretic reasoning</approach>
+
+  <steps>
+
+  1. Reduce the problem modulo a well-chosen prime or composite.
+
+  2. Identify the relevant theorem (Fermat, Euler, CRT, Dirichlet).
+
+  3. For Diophantine equations, search for obstructions (local solubility) before solutions.
+
+  4. Verify with explicit small cases or symbolic computation.
+
+  </steps>
+
+  <caution>A local obstruction mod p proves no integer solution exists.</caution>
+
+  '
+concepts:
+- Primes, unique factorization, and the sieve of Eratosthenes
+- Modular arithmetic and the Chinese remainder theorem
+- Fermat's little theorem and Euler's theorem
+- Diophantine equations and local-to-global principles
+- Dirichlet's theorem on primes in arithmetic progressions
+common_mistakes:
+- Treating divisibility in $\\mathbb{Z}$ like equality in fields.
+- Forgetting that $a \\equiv b \\pmod{m}$ does not imply $a/m \\equiv b/m$.
+- Assuming a Diophantine equation has global solutions from local ones.
+analogies:
+- "Modular arithmetic is arithmetic on a clock: after 12 comes 1, not 13."
+- A local obstruction is like a witness who says the suspect could not have been in two cities at once.
+socratic_questions:
+- Why does checking mod a small prime often settle a divisibility claim?
+- How does the Chinese remainder theorem glue congruences together?
+- What makes a Diophantine equation hard compared to a polynomial over $\\mathbb{R}$?
+verification_strategies:
+- Test the claim modulo several primes to find a contradiction.
+- Use sympy to factor or solve small instances.
+exercises:
+- '[easy] Compute $7^{100} \pmod{11}$ using Fermat''s little theorem.'
+- '[easy] List the primes below 30 by the sieve of Eratosthenes.'
+- '[medium] Solve the system $x \equiv 2 \pmod{3}$, $x \equiv 3 \pmod{5}$ via CRT.'
+- '[medium] Show there are infinitely many primes (Euclid''s proof).'
+- '[hard] Sketch why $x^2 + 1 \equiv 0 \pmod{p}$ is solvable iff $p \equiv 1 \pmod{4}$.'
+- '[hard] Explain the Hasse principle and a counterexample to it.'

@@ -1,0 +1,56 @@
+name: Category Theory
+domain: Mathematics
+version: 2
+description: 'Categories, functors, natural transformations, limits, and the Yoneda lemma.
+
+  '
+trigger_patterns:
+- functor|natural transformation
+- category|categorical
+- yoneda
+- limit|colimit|adjunction
+- universal property
+template: '<approach>Categorical reasoning</approach>
+
+  <steps>
+
+  1. Identify the category and its objects/morphisms.
+
+  2. Phrase the construction via a universal property rather than elements.
+
+  3. Locate the relevant functor and whether it preserves the property.
+
+  4. Apply Yoneda when a statement is about representable functors.
+
+  </steps>
+
+  <caution>Element-wise reasoning often obscures the universal property — think in arrows.</caution>
+
+  '
+concepts:
+- Categories, objects, morphisms, and composition
+- Functors and natural transformations
+- Universal properties, limits, and colimits
+- Adjunctions and adjoint functors
+- The Yoneda lemma and embedding
+common_mistakes:
+- Treating a functor as a function on elements rather than on arrows.
+- Confusing a limit with a colimit (pullback vs. pushout).
+- Assuming "natural" means "obvious" rather than "commuting with arrows".
+analogies:
+- A universal property is a "best" solution to a constraint, like the least upper bound being the smallest thing above both inputs.
+- Yoneda says an object is determined by how every other object sees it — like a person known only by their interactions.
+socratic_questions:
+- What is the universal property of the product in Set?
+- When is a functor left adjoint to another? What does it preserve?
+- What does the Yoneda lemma actually say about representable functors?
+verification_strategies:
+- Check the universal property by testing the defining arrow both directions.
+- Verify naturality by chasing a commutative square.
+exercises:
+- '[easy] Define a category with one object and one morphism.'
+- '[easy] State what a functor preserves.'
+- '[medium] Give the universal property of the product and verify it in Set.'
+- '[medium] Show that left adjoints preserve colimits.'
+- '[hard] State and prove the Yoneda lemma for a locally small category.'
+- '[hard] Construct the pullback as a limit and relate it to fiber products.'

@@ -2,22 +2,22 @@ name: Classical Mechanics
 domain: Physics
 description: Newtonian kinematics, Lagrangian mechanics, Hamiltonian dynamics, and rotational motion.
 concepts:
-  - Newton's Laws of Motion
-  - Conservation of Energy and Momentum
-  - Lagrangian and Euler-Lagrange equations
-  - Hamiltonian dynamics and Poisson brackets
+- Newton's Laws of Motion
+- Conservation of Energy and Momentum
+- Lagrangian and Euler-Lagrange equations
+- Hamiltonian dynamics and Poisson brackets
 common_mistakes:
-  - Misidentifying constraints and degrees of freedom in generalised coordinates.
-  - Forgetting to include potential energy signs correctly (e.g. V = -m*g*y vs +m*g*y depending on axis).
-  - Mixing up generalized coordinate derivations and momentum definitions.
+- Misidentifying constraints and degrees of freedom in generalised coordinates.
+- Forgetting to include potential energy signs correctly (e.g. V = -m*g*y vs +m*g*y depending on axis).
+- Mixing up generalized coordinate derivations and momentum definitions.
 analogies:
-  - The principle of least action is like a light ray choosing the path of shortest time through glass.
-  - Generalized coordinates are like selecting the best map system to describe a city.
+- The principle of least action is like a light ray choosing the path of shortest time through glass.
+- Generalized coordinates are like selecting the best map system to describe a city.
 socratic_questions:
-  - What are the degrees of freedom of this system? Are there any holonomic constraints?
-  - Does the Lagrangian have explicit time dependence? What conservation law does that imply?
-  - What is the conjugate momentum to this generalized coordinate?
+- What are the degrees of freedom of this system? Are there any holonomic constraints?
+- Does the Lagrangian have explicit time dependence? What conservation law does that imply?
+- What is the conjugate momentum to this generalized coordinate?
 verification_strategies:
-  - Verify that the dimensions and units of all terms in the equations of motion match.
-  - Evaluate limiting cases (e.g. set theta -> 0 or mass -> 0 and verify if it matches basic physics).
-  - Check if the total energy (H = T + V) is conserved over time.
+- Verify that the dimensions and units of all terms in the equations of motion match.
+- Evaluate limiting cases (e.g. set theta -> 0 or mass -> 0 and verify if it matches basic physics).
+- Check if the total energy (H = T + V) is conserved over time.

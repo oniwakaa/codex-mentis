@@ -1,0 +1,56 @@
+name: Cosmology
+domain: Physics
+version: 2
+description: 'Expansion of the universe, the cosmic microwave background, dark energy, and the multiverse hypotheses.
+
+  '
+trigger_patterns:
+- expansion|hubble|redshift
+- cosmic microwave background|CMB
+- dark energy|cosmological constant
+- big bang|inflation
+- cosmolog|multiverse
+template: '<approach>Cosmological reasoning</approach>
+
+  <steps>
+
+  1. Identify the cosmological model (FLRW, $\\Lambda$CDM) and its parameters.
+
+  2. Use the Friedmann equations to relate expansion, density, and curvature.
+
+  3. Track redshift $z$ and scale factor $a(t)$.
+
+  4. Distinguish observational evidence from speculative extension (multiverse).
+
+  </steps>
+
+  <caution>Separate the well-tested $\\Lambda$CDM core from speculative multiverse claims.</caution>
+
+  '
+concepts:
+- Hubble expansion and the scale factor $a(t)$
+- The Friedmann equations and density parameters $\\Omega$
+- The cosmic microwave background and its anisotropies
+- Dark energy ($\\Lambda$) and the accelerated expansion
+- Inflation and the multiverse hypotheses
+common_mistakes:
+- Treating the Big Bang as an explosion in pre-existing space rather than an expansion of space.
+- Confusing dark matter with dark energy.
+- Equating inflationary multiverse models with established cosmology.
+analogies:
+- 'Hubble expansion is like baking raisin bread: every raisin sees others receding, with no privileged center.'
+- 'The CMB is the universe''s baby photo: a glow from when it cooled enough to become transparent.'
+socratic_questions:
+- If space is expanding, what is it expanding into?
+- How does the CMB support the Big Bang model?
+- What distinguishes dark energy from a cosmological constant?
+verification_strategies:
+- Check that the Friedmann equations are satisfied for the claimed parameters.
+- Verify redshift-distance consistency via the Hubble law.
+exercises:
+- '[easy] State Hubble''s law and define redshift $z$.'
+- '[easy] Distinguish dark matter from dark energy.'
+- '[medium] Derive the critical density from the Friedmann equations.'
+- '[medium] Explain how the CMB anisotropies constrain cosmological parameters.'
+- '[hard] Show how a positive $\Lambda$ leads to accelerated expansion.'
+- '[hard] Evaluate the evidence for and problems with inflation.'

@@ -1,0 +1,56 @@
+name: Relativity
+domain: Physics
+version: 2
+description: 'Special and general relativity: spacetime, Lorentz transformations, geodesics, and black holes.
+
+  '
+trigger_patterns:
+- special relativity|lorentz|time dilation|length contraction
+- general relativity|einstein field
+- spacetime|metric tensor|geodesic
+- black hole|schwarzschild|event horizon
+- relativit
+template: '<approach>Relativistic reasoning</approach>
+
+  <steps>
+
+  1. Identify the frame and the relevant metric (Minkowski or curved).
+
+  2. Apply Lorentz transformations (special) or the geodesic equation (general).
+
+  3. Track invariants: $ds^2$, proper time $\\tau$, $p_\\mu p^\\mu = m^2 c^2$.
+
+  4. For GR, relate curvature to $T_{\\mu\\nu}$ via the Einstein field equations.
+
+  </steps>
+
+  <caution>Simultaneity is frame-dependent — never assume an absolute time ordering.</caution>
+
+  '
+concepts:
+- Lorentz transformations and invariance of $c$
+- Time dilation, length contraction, and the relativity of simultaneity
+- Minkowski spacetime and the invariant interval
+- The Einstein field equations $G_{\\mu\\nu} = 8\\pi G T_{\\mu\\nu}/c^4$
+- Schwarzschild metric and black hole horizons
+common_mistakes:
+- Treating time as absolute when transforming between frames.
+- Confusing coordinate time with proper time.
+- Applying Newtonian gravity near compact objects.
+analogies:
+- Lorentz transformations rotate a 4-vector in spacetime; time and space mix like x and y under a spatial rotation.
+- "A black hole horizon is a point of no return: light cones tilt inward so all future paths lead to the singularity."
+socratic_questions:
+- Why can nothing outrun light if simultaneity is relative?
+- What does $ds^2 = 0$ mean for a photon's proper time?
+- How does curvature produce what we call gravity?
+verification_strategies:
+- Check that the quantity is a Lorentz scalar (frame-invariant).
+- Verify the geodesic equation reduces to Newtonian motion in the weak-field limit.
+exercises:
+- '[easy] Derive time dilation from the invariance of the interval.'
+- '[easy] State the Schwarzschild radius $r_s = 2GM/c^2$.'
+- '[medium] Compute the Lorentz factor for $v = 0.8c$.'
+- '[medium] Show that $E^2 = (pc)^2 + (mc^2)^2$.'
+- '[hard] Derive the geodesic equation from the metric.'
+- '[hard] Explain why the event horizon is a coordinate singularity, not a physical one.'

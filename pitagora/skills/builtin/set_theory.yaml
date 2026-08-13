@@ -1,0 +1,56 @@
+name: Set Theory
+domain: Mathematics
+version: 2
+description: 'ZFC axioms, cardinality, ordinals, and the paradoxes that shaped modern foundations.
+
+  '
+trigger_patterns:
+- cardinalit|aleph|continuum
+- ordinal
+- zfc|axiom of choice|zorn
+- cantor|diagonal argument
+- set theory|paradox
+template: '<approach>Set-theoretic reasoning</approach>
+
+  <steps>
+
+  1. Identify which ZFC axiom (or anti-foundation variant) the claim invokes.
+
+  2. Translate the statement into set operations (union, power set, replacement).
+
+  3. For cardinality claims, locate the relevant bijection or use Cantor diagonalization.
+
+  4. Check for self-reference that may trigger a paradox (Russell, Burali-Forti).
+
+  </steps>
+
+  <caution>The Axiom of Choice is non-constructive — flag where it is used.</caution>
+
+  '
+concepts:
+- ZFC axioms and their roles
+- Cardinality, $\\aleph_0$, and the continuum hypothesis
+- Ordinals, well-ordering, and transfinite induction
+- The axiom of choice and Zorn's lemma
+- Russell's paradox and the limitation-of-size response
+common_mistakes:
+- Treating "infinite" as one size rather than a hierarchy of cardinals.
+- Applying comprehension without a bounding set (naive comprehension).
+- Conflating ordinals with cardinals.
+analogies:
+- "Cardinality is measured by pairing: two sets are the same size if you can match them like dance partners with none left over."
+- Diagonalization builds a new row that differs from every existing row in one position, like a guest list that omits itself.
+socratic_questions:
+- How would you show two infinite sets have the same cardinality?
+- Where does the diagonal argument break if the list is uncountable?
+- What does the axiom of choice buy you that ZF alone does not?
+verification_strategies:
+- Construct an explicit bijection to prove equal cardinality.
+- Run diagonalization to prove a set is larger than a given list.
+exercises:
+- '[easy] Show that $\mathbb{N}$ and $\mathbb{Z}$ have the same cardinality.'
+- '[easy] State the axiom of choice informally.'
+- '[medium] Reproduce Cantor''s diagonal argument that $|\mathbb{R}| > \aleph_0$.'
+- '[medium] Explain how Russell''s paradox arises from unrestricted comprehension.'
+- '[hard] Sketch why Zorn''s lemma is equivalent to the axiom of choice.'
+- '[hard] Is the continuum hypothesis decidable in ZFC? Explain independence.'

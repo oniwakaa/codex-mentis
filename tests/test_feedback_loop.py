@@ -106,7 +106,8 @@ class _FakeAnalyzer:
 
 
 def test_teaching_turn_records_real_quality():
-    """_run_teaching_turn feeds the improver with quality derived from the label."""
+    """A controller teaching turn feeds the improver with quality derived
+    from the learner's classified reply (correct → quality 5)."""
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     try:
@@ -119,14 +120,26 @@ def test_teaching_turn_records_real_quality():
         session = TeachingSession("algebra", ["quadratic formula"])
         analyzer = _FakeAnalyzer("correct", 0.15)
 
-        from pitagora.chat import _run_teaching_turn
-        from rich.console import Console
-        console = Console(record=True, width=80)
-
-        _run_teaching_turn(
-            console, session, analyzer, "I solved it", {}, "m", [],
-            improver=improver, skill_evo=skill_evo, skills_engine=skills_engine,
+        from pitagora.chat_controller import ChatController
+        controller = ChatController(
+            mode="study",
+            topic="algebra",
+            config={"default_model": "m"},
+            completion=lambda messages, model=None, config=None: "ok",
+            rag_lookup=lambda query: "",
+            concept_lookup=lambda topic: "",
+            verify_math=lambda response: None,
+            save_memory=lambda role, content, topic: None,
+            record_study=lambda topic, user_input: None,
+            due_reviews=lambda: None,
+            user_context="",
+            feedback_loop=(improver, skill_evo, skills_engine),
         )
+        controller.teaching_session = session
+        controller.teaching_analyzer = analyzer
+
+        # Drive one teaching turn through the controller (headless, no console).
+        list(controller.handle_input("I solved it"))
 
         # The improver should have recorded a quality-5 interaction (correct → 5)
         report = improver.strategy_report(topic="algebra")

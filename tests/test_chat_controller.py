@@ -248,3 +248,44 @@ def test_pause_shortcut_saves_and_leaves_teaching(monkeypatch):
     assert controller.teaching_session is None
     assert events[-1].kind == "state_changed"
     assert len(saved) == 1 and saved[0].topic == "limits"
+
+
+# ─── Rich adapter tests (Task 6) ───
+
+from rich.console import Console
+
+from pitagora.chat import launch_chat
+
+
+class FakeController:
+    mode = "study"
+    topic = "general"
+    model = "test-model"
+
+    def startup_events(self):
+        return [ChatEvent("status", "welcome")]
+
+    def handle_input(self, text):
+        if text == "/quit":
+            return iter(
+                [
+                    ChatEvent("status", "Goodbye! Keep reasoning."),
+                    ChatEvent("state_changed", metadata={"quit": True}),
+                ]
+            )
+        return iter([ChatEvent("markdown", "answer")])
+
+
+def test_launch_chat_renders_controller_events():
+    inputs = iter(["hello", "/quit"])
+    console = Console(record=True, width=80)
+
+    launch_chat(
+        controller=FakeController(),
+        input_reader=lambda mode, topic: next(inputs),
+        con=console,
+    )
+
+    output = console.export_text()
+    assert "answer" in output
+    assert "Goodbye! Keep reasoning." in output

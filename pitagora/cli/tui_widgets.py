@@ -20,6 +20,11 @@ class ContextSidebar(Static):
         table.add_row("Model", context.get("model", ""))
         table.add_row("Messages", str(context.get("message_count", 0)))
         
+        progress = context.get("progress", 0.0)
+        progress_bar = ProgressBar(total=100, completed=int(progress * 100))
+        
+        table.add_row("Progress", progress_bar)
+        
         self.update(table)
 
 
@@ -59,11 +64,24 @@ class Conversation(VerticalScroll):
         text = ""
         for child in self.children:
             if isinstance(child, Static):
-                rendered = child.render()
-                if hasattr(rendered, "plain"):
-                    text += rendered.plain + "\n"
-                elif isinstance(rendered, str):
-                    text += rendered + "\n"
+                # Check for textual's RichVisual which wraps Rich renderables
+                renderable = getattr(child, "renderable", child.render())
+                
+                # If it's a RichVisual, unwrap the actual renderable
+                if hasattr(renderable, "_renderable"):
+                    renderable = renderable._renderable
+                
+                if hasattr(renderable, "plain"):
+                    text += renderable.plain + "\n"
+                elif isinstance(renderable, str):
+                    text += renderable + "\n"
+                else:
+                    # Catch Panels and other rich renderables that might not have plain directly
+                    from rich.console import Console
+                    console = Console()
+                    with console.capture() as capture:
+                        console.print(renderable)
+                    text += capture.get() + "\n"
         return text
 
 

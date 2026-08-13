@@ -43,6 +43,7 @@ class PitagoraApp(App):
     #brand {
         width: auto;
         padding: 0 1;
+        color: gold;
     }
 
     #header-context {
@@ -139,8 +140,15 @@ class PitagoraApp(App):
             "[bold #ffd700]△ △ △ △ △[/]\n"
             "[bold #ffd700]PITAGORA[/]"
         )
-        conversation.mount(Static(banner_text, id="banner"))
-        conversation.mount(Static("Think. Prove. Understand.", id="tagline"))
+        from rich.panel import Panel
+        from pitagora.journeys.store import list_journeys
+        
+        journeys = list_journeys()
+        active_count = len([j for j in journeys if j.get("status") == "active"])
+        
+        welcome_text = f"{banner_text}\n\nThink. Prove. Understand.\n\nActive Journeys: {active_count}"
+        
+        conversation.mount(Static(Panel(welcome_text, title="Welcome to Pitagora", border_style="gold1"), id="welcome-panel"))
         
         # Call list_journeys once. In a real app we'd import it. 
         # But we need to use controller.context["due_reviews"]

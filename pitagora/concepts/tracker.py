@@ -1,18 +1,20 @@
-import os
-import math
 import datetime
-from typing import Dict, Any, List, Optional
+import math
+import os
+from typing import Any
+
 from sqlite_utils import Database
+
 from pitagora.concepts.graph import ConceptGraph
-from pitagora.core.models import ConceptMastery
 from pitagora.core.constants import MEMORY_DB
+
 
 class MasteryTracker:
     def __init__(
         self,
         db_path: str = str(MEMORY_DB),
-        concept_graph: Optional[ConceptGraph] = None,
-        decay_rate: float = 0.05
+        concept_graph: ConceptGraph | None = None,
+        decay_rate: float = 0.05,
     ):
         """
         Tracks concept mastery scores (0.0 to 1.0) in SQLite.
@@ -27,74 +29,114 @@ class MasteryTracker:
 
     def _init_db(self):
         if not self.db["concept_mastery"].exists():
-            self.db["concept_mastery"].create({
-                "concept": str,
-                "mastery_score": float,
-                "attempts": int,
-                "last_updated": str
-            }, pk="concept")
+            self.db["concept_mastery"].create(
+                {
+                    "concept": str,
+                    "mastery_score": float,
+                    "attempts": int,
+                    "last_updated": str,
+                    "created_at": str,
+                },
+                pk="concept",
+            )
 
     def get_mastery(self, concept: str, apply_decay: bool = True) -> float:
         """
         Retrieve mastery score for a concept, applying the forgetting curve decay if requested.
         """
-        db = self.db
         try:
-            row = db["concept_mastery"].get(concept)
-            score = row["mastery_score"]
+            row = self.db["concept_mastery"].get(concept)
+            if row is None:
+                return 0.0
+            score = float(row.get("mastery_score", 0.0))
             if not apply_decay:
                 return score
 
-            last_updated_str = row["last_updated"]
-            last_updated = datetime.datetime.strptime(last_updated_str, "%Y-%m-%d %H:%M:%S")
-            days_elapsed = (datetime.datetime.now() - last_updated).total_seconds() / (24.0 * 3600.0)
-            
+            last_updated_str = row.get("last_updated")
+            if not last_updated_str:
+                return score
+
+            try:
+                last_updated = datetime.datetime.strptime(last_updated_str, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                # If timestamp is corrupt, avoid corrupting score further; return raw
+                return score
+            days_elapsed = (datetime.datetime.now() - last_updated).total_seconds() / (
+                24.0 * 3600.0
+            )
+
             # Forgetting curve: S = S_0 * e^(-d * t)
             decayed_score = score * math.exp(-self.decay_rate * max(0.0, days_elapsed))
-            return max(0.0, min(1.0, decayed_score))
-        except Exception:
+            return max(0.0, min(1.0, float(decayed_score)))
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).warning("get_mastery failed for %s: %s", concept, exc)
             return 0.0
 
-    def update_mastery(self, concept: str, performance: float, spaced_rep: Optional[Any] = None):
+    def update_mastery(self, concept: str, performance: float, spaced_rep: Any | None = None):
         """
         Updates the mastery score using an Exponential Moving Average (EMA).
         performance: float in range [0.0, 1.0] representing success rate.
         If spaced_rep is provided, schedules a review dynamically based on performance.
         """
-        performance = max(0.0, min(1.0, performance))
-        db = self.db
-        
+        performance = max(0.0, min(1.0, float(performance)))
+
         try:
-            row = db["concept_mastery"].get(concept)
-            current_score = row["mastery_score"]
-            attempts = row["attempts"] + 1
-            # EMA update: weight current score heavily but allow progression
-            new_score = current_score * 0.75 + performance * 0.25
-        except Exception:
+            row = self.db["concept_mastery"].get(concept)
+            if row is not None:
+                current_score = float(row.get("mastery_score", 0.0))
+                attempts = int(row.get("attempts", 0)) + 1
+                new_score = current_score * 0.75 + performance * 0.25
+            else:
+                current_score = 0.0
+                attempts = 1
+                new_score = performance
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "update_mastery read failed for %s: %s", concept, exc
+            )
             new_score = performance
             attempts = 1
-            
-        new_score = max(0.0, min(1.0, new_score))
+
+        new_score = max(0.0, min(1.0, float(new_score)))
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        db["concept_mastery"].insert({
-            "concept": concept,
-            "mastery_score": new_score,
-            "attempts": attempts,
-            "last_updated": now_str
-        }, replace=True)
+
+        # Preserve created_at on upsert
+        try:
+            existing = self.db["concept_mastery"].get(concept)
+            created_at_str = existing.get("created_at") if existing else None
+        except Exception:
+            created_at_str = None
+        if not created_at_str:
+            created_at_str = now_str
+
+        self.db["concept_mastery"].insert(
+            {
+                "concept": concept,
+                "mastery_score": new_score,
+                "attempts": attempts,
+                "last_updated": now_str,
+                "created_at": created_at_str,
+            },
+            replace=True,
+        )
 
         # Integration with spaced repetition
-        if spaced_rep:
+        if spaced_rep is not None:
             try:
-                # Map performance [0.0, 1.0] to quality rating [0, 5]
                 quality = int(round(performance * 5.0))
-                # Call schedule_review, passing self as mastery_tracker=None to avoid recursion
                 spaced_rep.schedule_review(concept, quality, mastery_tracker=None)
-            except Exception:
-                pass
+            except Exception as exc:
+                import logging
 
-    def get_weak_areas(self, threshold: float = 0.5) -> List[Dict[str, Any]]:
+                logging.getLogger(__name__).warning(
+                    "schedule_review failed for %s: %s", concept, exc
+                )
+
+    def get_weak_areas(self, threshold: float = 0.5) -> list[dict[str, Any]]:
         """
         Get list of concepts with mastery score less than the threshold.
         """
@@ -103,19 +145,21 @@ class MasteryTracker:
             rows = list(db["concept_mastery"].rows)
         except Exception:
             rows = []
-            
+
         weak = []
         for row in rows:
             decayed = self.get_mastery(row["concept"], apply_decay=True)
             if decayed < threshold:
-                weak.append({
-                    "concept": row["concept"],
-                    "mastery_score": decayed,
-                    "attempts": row["attempts"]
-                })
+                weak.append(
+                    {
+                        "concept": row["concept"],
+                        "mastery_score": decayed,
+                        "attempts": row["attempts"],
+                    }
+                )
         return weak
 
-    def get_strong_areas(self, threshold: float = 0.8) -> List[Dict[str, Any]]:
+    def get_strong_areas(self, threshold: float = 0.8) -> list[dict[str, Any]]:
         """
         Get list of concepts with mastery score greater than or equal to the threshold.
         """
@@ -124,19 +168,21 @@ class MasteryTracker:
             rows = list(db["concept_mastery"].rows)
         except Exception:
             rows = []
-            
+
         strong = []
         for row in rows:
             decayed = self.get_mastery(row["concept"], apply_decay=True)
             if decayed >= threshold:
-                strong.append({
-                    "concept": row["concept"],
-                    "mastery_score": decayed,
-                    "attempts": row["attempts"]
-                })
+                strong.append(
+                    {
+                        "concept": row["concept"],
+                        "mastery_score": decayed,
+                        "attempts": row["attempts"],
+                    }
+                )
         return strong
 
-    def get_overall_progress(self, domain: Optional[str] = None) -> float:
+    def get_overall_progress(self, domain: str | None = None) -> float:
         """
         Calculates the average decayed mastery across concepts.
         If domain is specified, filters by concepts within that domain.
@@ -145,18 +191,18 @@ class MasteryTracker:
         for name, details in self.concept_graph.graph.items():
             if not domain or details.get("domain", "").lower() == domain.lower():
                 target_concepts.append(name)
-                
+
         if not target_concepts:
             return 0.0
 
         total_mastery = 0.0
         for concept in target_concepts:
             total_mastery += self.get_mastery(concept, apply_decay=True)
-            
+
         return total_mastery / len(target_concepts)
 
     # --- Progress Report & Analytics ---
-    def get_progress_report(self, domain: Optional[str] = None) -> Dict[str, Any]:
+    def get_progress_report(self, domain: str | None = None) -> dict[str, Any]:
         """
         Generates a comprehensive progress and mastery report.
         """
@@ -192,11 +238,11 @@ class MasteryTracker:
             "in_progress_list": in_progress,
             "not_started_count": len(not_started),
             "not_started_list": not_started,
-            "estimated_learning_time_completed_minutes": total_time_completed
+            "estimated_learning_time_completed_minutes": total_time_completed,
         }
 
     # --- Assessment Generation ---
-    def generate_assessment(self, concept: str, num_questions: int = 3) -> Dict[str, Any]:
+    def generate_assessment(self, concept: str, num_questions: int = 3) -> dict[str, Any]:
         """
         Generates structured assessment questions to test concept mastery.
         """
@@ -209,42 +255,50 @@ class MasteryTracker:
         domain = details.get("domain", "General")
 
         questions = []
-        
+
         # Q1: Conceptual explanation
-        questions.append({
-            "id": 1,
-            "type": "conceptual",
-            "question": f"Explain the core definition and physical/mathematical intuition behind '{concept}'.",
-            "rubric": "Check if they define the concept accurately and detail its core mechanics."
-        })
+        questions.append(
+            {
+                "id": 1,
+                "type": "conceptual",
+                "question": f"Explain the core definition and physical/mathematical intuition behind '{concept}'.",
+                "rubric": "Check if they define the concept accurately and detail its core mechanics.",
+            }
+        )
 
         # Q2: Relational question (if has prerequisites)
         if prereqs:
-            questions.append({
-                "id": 2,
-                "type": "relational",
-                "question": f"How does the concept of '{concept}' build upon its prerequisite '{prereqs[0]}'? Provide a concrete mathematical mapping or physical system example.",
-                "rubric": f"Ensure student demonstrates understanding of the dependency link between '{prereqs[0]}' and '{concept}'."
-            })
+            questions.append(
+                {
+                    "id": 2,
+                    "type": "relational",
+                    "question": f"How does the concept of '{concept}' build upon its prerequisite '{prereqs[0]}'? Provide a concrete mathematical mapping or physical system example.",
+                    "rubric": f"Ensure student demonstrates understanding of the dependency link between '{prereqs[0]}' and '{concept}'.",
+                }
+            )
         else:
-            questions.append({
-                "id": 2,
-                "type": "foundational",
-                "question": f"Identify two key fundamental mathematical principles that underpin the study of '{concept}'.",
-                "rubric": "Verify references to fundamental axioms, arithmetic or logical structures."
-            })
+            questions.append(
+                {
+                    "id": 2,
+                    "type": "foundational",
+                    "question": f"Identify two key fundamental mathematical principles that underpin the study of '{concept}'.",
+                    "rubric": "Verify references to fundamental axioms, arithmetic or logical structures.",
+                }
+            )
 
         # Q3: Computational / Problem-solving question
-        questions.append({
-            "id": 3,
-            "type": "computational",
-            "question": f"Draft a step-by-step mathematical proof or problem-solving flow showing how you calculate values or derive equations in '{concept}'.",
-            "rubric": f"Confirm formal derivation or step-by-step evaluation related to '{concept}'."
-        })
+        questions.append(
+            {
+                "id": 3,
+                "type": "computational",
+                "question": f"Draft a step-by-step mathematical proof or problem-solving flow showing how you calculate values or derive equations in '{concept}'.",
+                "rubric": f"Confirm formal derivation or step-by-step evaluation related to '{concept}'.",
+            }
+        )
 
         return {
             "concept": concept,
             "domain": domain,
             "difficulty": difficulty,
-            "questions": questions[:num_questions]
+            "questions": questions[:num_questions],
         }

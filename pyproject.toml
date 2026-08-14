@@ -4,7 +4,7 @@ version = "0.2.0"
 description = "An AI-powered CLI for studying, exploring, and reasoning through complex mathematics and physics. Multi-agent architecture with specialized tutor, researcher, prover, reviewer, explainer, and self-improving agents."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "Carlo Bizzaro", email = "carlobizzarocb@gmail.com"}
 ]
@@ -13,7 +13,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Education",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -93,11 +92,62 @@ pitagora = ["data/*.yaml", "skills/builtin/*.yaml"]
 [tool.black]
 line-length = 100
 target-version = ["py311"]
+extend-exclude = '''
+/(
+    dist
+  | build
+  | .eggs
+  | pitagora.egg-info
+)/
+'''
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
 
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "UP", "S"]
+ignore = [
+    "S110",   # try-except-pass: legitimate pattern in this codebase
+    "S112",   # try-except-continue: legitimate pattern
+    "S311",   # random.random not for crypto: fine for Thompson Sampling
+    "S324",   # hashlib insecure: used for content hashing, not security
+    "S603",   # subprocess without shell=True: intentional for sandbox
+    "S607",   # partial path for executable: sys.executable is absolute
+    "S608",   # hardcoded SQL: all SQL uses parameterized queries
+    "S314",   # xml.etree: used for arXiv API parsing, not untrusted input
+    "B008",   # function-call-in-default-argument: Typer pattern
+    "E402",   # module-import-not-at-top: intentional lazy imports
+    "B904",   # raise-without-from: style preference, not a bug
+    "B011",   # assert False: used in test assertions
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S110", "S112", "F401", "F841", "B011"]
+"test_*.py" = ["S101", "S110", "S112", "F401", "F841", "B011"]
+"**/__init__.py" = ["F401"]
+"**/journeys/model.py" = ["S101"]
+"**/journeys/store.py" = ["S101"]
+"**/teaching/analyzer.py" = ["S101"]
+"**/teaching/session.py" = ["S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pitagora"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_return_any = false
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = false
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+addopts = "-q"

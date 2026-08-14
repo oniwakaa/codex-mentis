@@ -1,18 +1,21 @@
 """Tests for the WS1/WS3a feedback-loop wiring (real quality signal)."""
+
 import os
 import tempfile
 
 import pytest
 
 from pitagora.agents.self_improver import (
-    SelfImproverAgent, quality_from_classification, CLASSIFICATION_QUALITY,
+    CLASSIFICATION_QUALITY,
+    SelfImproverAgent,
+    quality_from_classification,
 )
-from pitagora.teaching.session import TeachingSession, ALL_STYLES
+from pitagora.teaching.session import ALL_STYLES, TeachingSession
 from tests.conftest import MockProvider
 from tests.test_strategy import MockTutor
 
-
 # ─── quality mapping ─────────────────────────────────────────────────────────
+
 
 def test_quality_mapping():
     assert quality_from_classification("correct") == 5
@@ -24,11 +27,13 @@ def test_quality_mapping():
     assert quality_from_classification("nonsense") == 3
     # all canonical labels covered
     from pitagora.teaching.analyzer import Classification
+
     for label in Classification:
         assert label.value in CLASSIFICATION_QUALITY
 
 
 # ─── _seed_session_style ─────────────────────────────────────────────────────
+
 
 def test_seed_session_style_no_data():
     """With <5 interactions, the session keeps its default style."""
@@ -39,6 +44,7 @@ def test_seed_session_style_no_data():
         session = TeachingSession("calculus", ["limits"])
         original = session.current_style
         from pitagora.chat import _seed_session_style
+
         _seed_session_style(session, improver)
         assert session.current_style == original
     finally:
@@ -59,6 +65,7 @@ def test_seed_session_style_with_data():
             improver.record_interaction("calculus", "intermediate", "formal", 1)
         session = TeachingSession("calculus", ["limits"])
         from pitagora.chat import _seed_session_style
+
         _seed_session_style(session, improver)
         # socratic should win (higher avg quality)
         assert session.current_style == "socratic"
@@ -72,15 +79,18 @@ def test_seed_session_style_none_improver():
     session = TeachingSession("calculus", ["limits"])
     original = session.current_style
     from pitagora.chat import _seed_session_style
+
     _seed_session_style(session, None)
     assert session.current_style == original
 
 
 # ─── _build_feedback_loop ────────────────────────────────────────────────────
 
+
 def test_build_feedback_loop():
     """Best-effort construction returns the three components (or None)."""
     from pitagora.chat import _build_feedback_loop
+
     improver, skill_evo, skills_engine = _build_feedback_loop()
     # In a working environment, all three should be built.
     if improver is not None:
@@ -93,16 +103,20 @@ def test_build_feedback_loop():
 
 # ─── _run_teaching_turn records real quality ────────────────────────────────
 
+
 class _FakeAnalyzer:
     """Analyzer stub that returns a fixed classification."""
+
     def __init__(self, label, delta):
         self._label = label
         self._delta = delta
 
     def classify(self, reply, topic, sub_concept, config=None, model=None):
         from pitagora.teaching.analyzer import ResponseClassification
-        return ResponseClassification(label=self._label, delta=self._delta,
-                                      rationale="stub", via_shortcut=False)
+
+        return ResponseClassification(
+            label=self._label, delta=self._delta, rationale="stub", via_shortcut=False
+        )
 
 
 def test_teaching_turn_records_real_quality():
@@ -112,8 +126,9 @@ def test_teaching_turn_records_real_quality():
     os.close(fd)
     try:
         improver = SelfImproverAgent(MockProvider(), db_path=db_path)
-        from pitagora.skills.evolution import SkillEvolution
         from pitagora.skills.engine import SkillsEngine
+        from pitagora.skills.evolution import SkillEvolution
+
         skill_evo = SkillEvolution()
         skills_engine = SkillsEngine()
 
@@ -121,6 +136,7 @@ def test_teaching_turn_records_real_quality():
         analyzer = _FakeAnalyzer("correct", 0.15)
 
         from pitagora.chat_controller import ChatController
+
         controller = ChatController(
             mode="study",
             topic="algebra",
@@ -153,6 +169,7 @@ def test_teaching_turn_records_real_quality():
 
 
 # ─── rate_explanation (orchestrator one-shot path) ───────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_rate_explanation_parses_digit():
@@ -200,7 +217,9 @@ async def test_rate_explanation_rejects_out_of_range():
 
 def test_orchestrator_records_rated_quality():
     """The orchestrator one-shot tutor path records the LLM-rated quality."""
-    import tempfile, os
+    import os
+    import tempfile
+
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     try:
@@ -208,6 +227,7 @@ def test_orchestrator_records_rated_quality():
         # rate_explanation will pop this → quality 5
         improver.provider.responses.append({"content": "5", "tool_calls": []})
         from pitagora.agents.orchestrator import Orchestrator
+
         orch = Orchestrator(agents={"tutor": MockTutor()}, self_improver=improver)
         resp = orch.process("Explain calculus", mode="study")
         assert resp.content.startswith("athink")

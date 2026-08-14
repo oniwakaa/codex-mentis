@@ -1,6 +1,8 @@
 """Tests for the doctor and review commands."""
+
 import pytest
 from typer.testing import CliRunner
+
 from pitagora.cli.app import app
 
 runner = CliRunner()
@@ -20,7 +22,11 @@ def test_review_status():
     result = runner.invoke(app, ["review", "status"])
     assert result.exit_code == 0
     # Should show some kind of status
-    assert "review" in result.output.lower() or "card" in result.output.lower() or "due" in result.output.lower()
+    assert (
+        "review" in result.output.lower()
+        or "card" in result.output.lower()
+        or "due" in result.output.lower()
+    )
 
 
 def test_help_shows_all_commands():
@@ -28,7 +34,17 @@ def test_help_shows_all_commands():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
     # Check for key commands
-    for cmd in ["study", "explore", "derive", "verify", "plot", "research", "explain", "debate", "chat"]:
+    for cmd in [
+        "study",
+        "explore",
+        "derive",
+        "verify",
+        "plot",
+        "research",
+        "explain",
+        "debate",
+        "chat",
+    ]:
         assert cmd in result.output, f"Command '{cmd}' not found in help output"
     # Check for command groups
     for group in ["concept", "memory", "kb", "config", "skills", "review", "doctor"]:

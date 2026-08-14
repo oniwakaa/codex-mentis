@@ -1,4 +1,5 @@
 """Tests for the philosophy domain (TASK 4): concepts, workflow, skill YAML."""
+
 import os
 
 import pytest
@@ -10,7 +11,8 @@ def _data_dir():
     # pitagora/data/ — packaged data
     return os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "pitagora", "data",
+        "pitagora",
+        "data",
     )
 
 
@@ -19,9 +21,16 @@ def test_philosophy_concepts_loaded_from_default_yaml():
     cg = ConceptGraph()  # loads default packaged concepts.yaml
     phil_ids = [cid for cid, d in cg.graph.items() if d.get("domain") == "philosophy"]
     expected = {
-        "phil_formal_logic", "phil_propositional_logic", "phil_predicate_logic",
-        "phil_modal_logic", "phil_epistemology", "phil_metaphysics",
-        "phil_ethics", "phil_phil_math", "phil_phil_science", "phil_aesthetics",
+        "phil_formal_logic",
+        "phil_propositional_logic",
+        "phil_predicate_logic",
+        "phil_modal_logic",
+        "phil_epistemology",
+        "phil_metaphysics",
+        "phil_ethics",
+        "phil_phil_math",
+        "phil_phil_science",
+        "phil_aesthetics",
     }
     assert expected.issubset(set(phil_ids))
 
@@ -73,9 +82,7 @@ def test_philosophical_reasoning_workflow_yaml_exists():
 
 
 def test_logic_skill_yaml_loads():
-    path = os.path.join(
-        os.path.dirname(_data_dir()), "skills", "builtin", "logic.yaml"
-    )
+    path = os.path.join(os.path.dirname(_data_dir()), "skills", "builtin", "logic.yaml")
     assert os.path.exists(path)
     try:
         import yaml

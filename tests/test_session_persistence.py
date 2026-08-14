@@ -1,8 +1,9 @@
 """End-to-end session persistence test (TASK 6): save/load/list/delete."""
+
 import pytest
 
 import pitagora.sessions as sessions_mod
-from pitagora.sessions import save_session, load_session, list_sessions, delete_session
+from pitagora.sessions import delete_session, list_sessions, load_session, save_session
 
 
 @pytest.fixture(autouse=True)

@@ -1,17 +1,23 @@
 """Tests for visualization improvements (TASK 5)."""
+
 import io
 
 from rich.console import Console
 
 from pitagora.cli.rich_ui import (
-    print_concept_map, print_math, print_equation_block, print_mastery_dashboard,
-    show_pitagora_banner, show_welcome,
+    print_concept_map,
+    print_equation_block,
+    print_mastery_dashboard,
+    print_math,
+    show_pitagora_banner,
+    show_welcome,
 )
 
 
 def _capture(func, *args, **kwargs) -> str:
     """Run a rich_ui print function against a capturing console and return its output."""
     import pitagora.cli.rich_ui as ui
+
     buf = io.StringIO()
     orig = ui.console
     cap = Console(file=buf, force_terminal=False, width=120, color_system=None)
@@ -40,7 +46,11 @@ def test_print_concept_map_mastery_colors():
     names = {"root": "Root", "a": "Alpha", "b": "Beta"}
     mastery = {"a": 0.9, "b": 0.3}
     out = _capture(
-        print_concept_map, "root", relations, names, mastery_scores=mastery,
+        print_concept_map,
+        "root",
+        relations,
+        names,
+        mastery_scores=mastery,
         current_concept="a",
     )
     # Current concept marker present

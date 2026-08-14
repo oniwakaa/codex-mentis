@@ -1,9 +1,11 @@
 import pytest
+
 from pitagora.knowledge.extractor import KnowledgeExtractor
+
 
 def test_knowledge_extractor_with_real_math():
     extractor = KnowledgeExtractor()
-    
+
     math_paper_text = """
 # Quantum Mechanics Basics
 This is an introduction to wave mechanics.
@@ -27,34 +29,34 @@ Let us evaluate the Hamiltonian operator on the state. The Hamiltonian of the sy
 \\hat{H} = -\\frac{\\hbar^2}{2m} \\frac{d^2}{dx^2} + V(x)
 \\end{align}
     """
-    
+
     extracted = extractor.extract_knowledge(math_paper_text, topic="wave function")
-    
+
     # 1. Equations
     eqs = extracted["equations"]
     assert any("P(x, t) = |\\Psi(x, t)|^2" in eq for eq in eqs)
     assert any("\\int_{-\\infty}^{\\infty} |\\Psi(x, t)|^2 dx = 1" in eq for eq in eqs)
     assert any("\\hat{H} = -\\frac{\\hbar^2}{2m}" in eq for eq in eqs)
-    
+
     # 2. Definitions
     defs = extracted["definitions"]
     assert any("We define" in d for d in defs)
-    
+
     # 3. Theorems
     thms = extracted["theorems"]
     assert any("Theorem: The wave function must be normalized." in t for t in thms)
-    
+
     # 4. Key points
     kp = extracted["key_points"]
     assert any("fundamental postulate" in p for p in kp)
     assert any("implies" in p for p in kp)
-    
+
     # 5. Concepts
     concepts = extracted["concepts"]
     assert any("Hilbert space" in c for c in concepts)
     assert any("wave function" in c.lower() for c in concepts)
     assert any("Hamiltonian" in c for c in concepts)
-    
+
     # 6. Sections
     secs = extracted["sections"]
     assert "Quantum Mechanics Basics" in secs

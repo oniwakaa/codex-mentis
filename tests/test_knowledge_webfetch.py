@@ -1,22 +1,26 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from pitagora.knowledge.webfetch_bridge import WebfetchBridge
+
 
 def test_webfetch_bridge_is_available():
     bridge = WebfetchBridge()
     with patch("subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0
         assert bridge.is_available() is True
-        
+
         # Reset cached state
         bridge._available = None
         mock_run.return_value.returncode = 1
         assert bridge.is_available() is False
 
+
 def test_fallback_search():
     bridge = WebfetchBridge()
     bridge._available = False
-    
+
     mock_html = """
     <html>
     <body>
@@ -31,16 +35,18 @@ def test_fallback_search():
     </body>
     </html>
     """
-    
+
     class MockResponse:
         status_code = 200
         text = mock_html
-        
+
     class MockClient:
         def __enter__(self):
             return self
+
         def __exit__(self, exc_type, exc_val, exc_tb):
             pass
+
         def get(self, url, headers=None):
             return MockResponse()
 
@@ -52,10 +58,11 @@ def test_fallback_search():
         assert results[0]["snippet"] == "Snippet contents for result one."
         assert results[0]["source"] == "duckduckgo_fallback"
 
+
 def test_fallback_fetch():
     bridge = WebfetchBridge()
     bridge._available = False
-    
+
     mock_html = """
     <html>
     <head><title>My Physics Article</title></head>
@@ -67,16 +74,18 @@ def test_fallback_fetch():
     </body>
     </html>
     """
-    
+
     class MockResponse:
         status_code = 200
         text = mock_html
-        
+
     class MockClient:
         def __enter__(self):
             return self
+
         def __exit__(self, exc_type, exc_val, exc_tb):
             pass
+
         def get(self, url, headers=None):
             return MockResponse()
 
@@ -89,21 +98,27 @@ def test_fallback_fetch():
         assert "alert" not in result["text"]
         assert "color" not in result["text"]
 
+
 def test_search_and_fetch():
     bridge = WebfetchBridge()
     bridge._available = False
-    
+
     # Mock both search and fetch
-    search_mock = MagicMock(return_value=[
-        {"title": "Title 1", "url": "https://url1.com", "snippet": "snippet 1"}
-    ])
-    fetch_mock = MagicMock(return_value={
-        "title": "Page Title 1", "text": "Page text 1", "url": "https://url1.com", "cached": True
-    })
-    
+    search_mock = MagicMock(
+        return_value=[{"title": "Title 1", "url": "https://url1.com", "snippet": "snippet 1"}]
+    )
+    fetch_mock = MagicMock(
+        return_value={
+            "title": "Page Title 1",
+            "text": "Page text 1",
+            "url": "https://url1.com",
+            "cached": True,
+        }
+    )
+
     bridge.search = search_mock
     bridge.fetch_url = fetch_mock
-    
+
     results = bridge.search_and_fetch("search query")
     assert len(results) == 1
     assert results[0]["full_text"] == "Page text 1"

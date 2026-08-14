@@ -1,14 +1,17 @@
 """Tests for Learning Journeys persistence (TASK 3)."""
-import json
-import tempfile
-from pathlib import Path
+
+from datetime import datetime
 
 import pytest
 
-import pitagora.journeys.store as store
-from pitagora.journeys.model import LearningJourney, JourneyStatus
+from pitagora.journeys import store
+from pitagora.journeys.model import JourneyStatus, LearningJourney
 from pitagora.journeys.store import (
-    save_journey, load_journey, list_journeys, delete_journey, get_or_create_journey,
+    delete_journey,
+    get_or_create_journey,
+    list_journeys,
+    load_journey,
+    save_journey,
 )
 
 
@@ -97,3 +100,94 @@ def test_journey_serialization_round_trip():
 def test_journey_from_dict_ignores_unknown_keys():
     j = LearningJourney.from_dict({"topic": "t", "unknown_key": 42})
     assert j.topic == "t"
+
+
+def test_rejects_path_traversal_ids(tmp_journeys_dir):
+    outside = tmp_journeys_dir.parent / "outside.json"
+    outside.write_text('{"topic": "private"}')
+
+    assert load_journey("../outside") is None
+    assert delete_journey("../outside") is False
+    assert outside.exists()
+
+    with pytest.raises(ValueError):
+        save_journey(LearningJourney(topic="x", id="../outside"))
+
+
+def test_save_is_atomic_when_replace_fails(tmp_journeys_dir, monkeypatch):
+    journey = LearningJourney(topic="original", id="atomic-test")
+    save_journey(journey)
+    path = tmp_journeys_dir / "atomic-test.json"
+    original = path.read_text()
+    journey.topic = "updated"
+
+    def fail_replace(source, destination):
+        raise OSError("simulated replace failure")
+
+    monkeypatch.setattr(store.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="replace failure"):
+        save_journey(journey)
+
+    assert path.read_text() == original
+    assert not list(tmp_journeys_dir.glob("*.tmp"))
+
+
+def test_malformed_journey_files_are_ignored(tmp_journeys_dir):
+    tmp_journeys_dir.mkdir()
+    (tmp_journeys_dir / "broken.json").write_text("{not json")
+    (tmp_journeys_dir / "array.json").write_text("[]")
+    (tmp_journeys_dir / "missing-topic.json").write_text('{"id": "missing-topic"}')
+
+    assert load_journey("broken") is None
+    assert load_journey("array") is None
+    assert load_journey("missing-topic") is None
+    assert list_journeys() == []
+
+
+def test_filename_is_authoritative_over_stored_id(tmp_journeys_dir):
+    tmp_journeys_dir.mkdir()
+    (tmp_journeys_dir / "safe-id.json").write_text(
+        '{"id": "../outside", "topic": "limits", "updated_at": "2024-01-01T00:00:00Z"}'
+    )
+
+    loaded = load_journey("safe-id")
+
+    assert loaded is not None
+    assert loaded.id == "safe-id"
+    assert list_journeys()[0]["id"] == "safe-id"
+
+
+def test_journey_timestamps_are_timezone_aware():
+    journey = LearningJourney(topic="t")
+    assert datetime.fromisoformat(journey.created_at).tzinfo is not None
+    assert datetime.fromisoformat(journey.updated_at).tzinfo is not None
+
+
+def test_loads_legacy_journey_field_names():
+    journey = LearningJourney.from_dict(
+        {
+            "id": "legacy-id",
+            "topic": "limits",
+            "started_at": "2024-01-01T00:00:00",
+            "last_active": "2024-01-02T00:00:00",
+            "total_interactions": 7,
+            "unknown_key": "ignored",
+        }
+    )
+
+    assert journey.created_at == "2024-01-01T00:00:00+00:00"
+    assert journey.updated_at == "2024-01-02T00:00:00+00:00"
+    assert journey.interaction_count == 7
+
+
+def test_markdown_export_is_direct_and_readable():
+    journey = LearningJourney(
+        topic="Limits",
+        sub_concepts=[{"name": "Definition", "mastery": 0.8, "visited": True}],
+    )
+
+    markdown = journey.to_markdown()
+
+    assert markdown.startswith("# Learning Journey: Limits")
+    assert "Definition" in markdown
+    assert "80%" in markdown

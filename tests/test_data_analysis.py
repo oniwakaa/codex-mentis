@@ -1,4 +1,5 @@
 """Tests for WS5: data analysis module + data agent + data CLI."""
+
 import os
 import tempfile
 
@@ -15,35 +16,42 @@ runner = CliRunner()
 @pytest.fixture
 def sample_csv(tmp_path):
     p = tmp_path / "sample.csv"
-    df = pd.DataFrame({
-        "group": ["a", "a", "a", "b", "b", "b"],
-        "value": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-        "score": [10, 20, 30, 40, 50, 60],
-        "label": ["x", "y", "x", "y", "x", "y"],
-    })
+    df = pd.DataFrame(
+        {
+            "group": ["a", "a", "a", "b", "b", "b"],
+            "value": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            "score": [10, 20, 30, 40, 50, 60],
+            "label": ["x", "y", "x", "y", "x", "y"],
+        }
+    )
     df.to_csv(p, index=False)
     return str(p)
 
 
 # ─── loader ─────────────────────────────────────────────────────────────────
 
+
 def test_loader_csv(sample_csv):
-    from pitagora.data_analysis.loader import load_data, LoaderError
+    from pitagora.data_analysis.loader import LoaderError, load_data
+
     df = load_data(sample_csv)
     assert df.shape == (6, 4)
     assert "value" in df.columns
 
 
 def test_loader_missing_file():
-    from pitagora.data_analysis.loader import load_data, LoaderError
+    from pitagora.data_analysis.loader import LoaderError, load_data
+
     with pytest.raises(LoaderError):
         load_data("/nonexistent/path.csv")
 
 
 # ─── profiler ───────────────────────────────────────────────────────────────
 
+
 def test_profiler(sample_csv):
     from pitagora.data_analysis.profiler import profile_data
+
     df = pd.read_csv(sample_csv)
     prof = profile_data(df)
     assert prof.rows == 6
@@ -59,8 +67,10 @@ def test_profiler(sample_csv):
 
 # ─── analyzer ───────────────────────────────────────────────────────────────
 
+
 def test_analyzer_ttest():
     from pitagora.data_analysis.analyzer import run_ttest
+
     a = [1.0, 2.0, 3.0, 4.0]
     b = [10.0, 11.0, 12.0, 13.0]
     res = run_ttest(a, b)
@@ -71,6 +81,7 @@ def test_analyzer_ttest():
 
 def test_analyzer_chi_squared():
     from pitagora.data_analysis.analyzer import run_chi_squared
+
     table = pd.DataFrame({"yes": [10, 20], "no": [30, 40]})
     res = run_chi_squared(table)
     assert res.test == "chi_squared"
@@ -79,6 +90,7 @@ def test_analyzer_chi_squared():
 
 def test_analyzer_linear_regression(sample_csv):
     from pitagora.data_analysis.analyzer import linear_regression
+
     df = pd.read_csv(sample_csv)
     res = linear_regression(df, "score", ["value"])
     # value and score are perfectly correlated → R² ≈ 1
@@ -95,6 +107,7 @@ def test_analyzer_linear_regression(sample_csv):
 
 def test_analyzer_anova_insufficient():
     from pitagora.data_analysis.analyzer import run_anova
+
     res = run_anova([1.0, 2.0])
     assert res.p_value == 1.0
     assert "insufficient" in res.interpretation or "need" in res.interpretation
@@ -102,8 +115,10 @@ def test_analyzer_anova_insufficient():
 
 # ─── visualizer ─────────────────────────────────────────────────────────────
 
+
 def test_visualizer_hist(sample_csv):
     from pitagora.data_analysis.visualizer import create_plot
+
     df = pd.read_csv(sample_csv)
     out = create_plot(df, plot_type="hist", y="value")
     assert isinstance(out, str)
@@ -112,6 +127,7 @@ def test_visualizer_hist(sample_csv):
 
 def test_visualizer_save_png(sample_csv, tmp_path):
     from pitagora.data_analysis.visualizer import create_plot
+
     df = pd.read_csv(sample_csv)
     out_path = str(tmp_path / "plot.png")
     out = create_plot(df, plot_type="scatter", x="value", y="score", save_path=out_path)
@@ -121,12 +137,15 @@ def test_visualizer_save_png(sample_csv, tmp_path):
 
 # ─── data agent ─────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_data_agent_load_and_profile(sample_csv, mock_provider):
     from pitagora.agents.data_analyst import DataAnalystAgent
+
     agent = DataAnalystAgent(mock_provider)
     load_res = await agent.tool_load_data(sample_csv)
     import json
+
     d = json.loads(load_res)
     assert d["status"] == "ok"
     assert d["rows"] == 6
@@ -140,15 +159,18 @@ async def test_data_agent_load_and_profile(sample_csv, mock_provider):
 @pytest.mark.asyncio
 async def test_data_agent_run_analysis(sample_csv, mock_provider):
     from pitagora.agents.data_analyst import DataAnalystAgent
+
     agent = DataAnalystAgent(mock_provider)
     await agent.tool_load_data(sample_csv)
     res = await agent.tool_run_analysis("ttest", ["value", "score"])
     import json
+
     d = json.loads(res)
     assert d["test"] == "ttest"
 
 
 # ─── data CLI ───────────────────────────────────────────────────────────────
+
 
 def test_data_cli_help():
     result = runner.invoke(app, ["data", "--help"])

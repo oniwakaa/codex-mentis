@@ -1,18 +1,19 @@
 """Tests for WS1: strategy CLI + orchestrator feedback-loop wiring."""
+
 import pytest
 from typer.testing import CliRunner
 
-from pitagora.cli.app import app
-from pitagora.agents.orchestrator import Orchestrator
 from pitagora.agents.base import AgentResponse
+from pitagora.agents.orchestrator import Orchestrator
 from pitagora.agents.self_improver import SelfImproverAgent
-
+from pitagora.cli.app import app
 from tests.conftest import MockProvider
 
 runner = CliRunner()
 
 
 # ─── Strategy CLI ───────────────────────────────────────────────────────────
+
 
 def test_strategy_help_lists_subcommands():
     result = runner.invoke(app, ["strategy", "--help"])
@@ -42,6 +43,7 @@ def test_strategy_help_top_level():
 
 # ─── Orchestrator wiring ────────────────────────────────────────────────────
 
+
 class MockTutor:
     name = "Tutor"
     role = "tutor"
@@ -65,7 +67,9 @@ def test_orchestrator_with_self_improver_records_interaction():
     """With a self_improver, tutor dispatch records an interaction in the metrics DB."""
     improver = SelfImproverAgent(MockProvider(), db_path=":memory:")
     # In-memory DB won't persist across connections; use a temp file instead.
-    import tempfile, os
+    import os
+    import tempfile
+
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     try:

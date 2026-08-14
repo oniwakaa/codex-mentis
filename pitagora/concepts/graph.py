@@ -1,16 +1,18 @@
-import os
 import json
-from typing import Dict, Any, List, Optional, Set, Tuple
+import os
 from difflib import SequenceMatcher
+from typing import Any
 
 try:
     import yaml
+
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
 
+
 class ConceptGraph:
-    def __init__(self, yaml_path: Optional[str] = None):
+    def __init__(self, yaml_path: str | None = None):
         """
         Manages the DAG of math and physics concepts.
         """
@@ -20,7 +22,7 @@ class ConceptGraph:
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             self.yaml_path = os.path.join(base_dir, "data", "concepts.yaml")
 
-        self.graph: Dict[str, Dict[str, Any]] = {}
+        self.graph: dict[str, dict[str, Any]] = {}
         self.load()
 
     def load(self):
@@ -35,9 +37,9 @@ class ConceptGraph:
 
         if YAML_AVAILABLE:
             try:
-                with open(self.yaml_path, "r", encoding="utf-8") as f:
+                with open(self.yaml_path, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
-                
+
                 if not isinstance(data, dict):
                     self._create_seed_graph()
                     return
@@ -55,7 +57,9 @@ class ConceptGraph:
                                     "domain": domain,
                                     "description": concept.get("description", ""),
                                     "difficulty": concept.get("difficulty", 1),
-                                    "estimated_learning_time": concept.get("estimated_learning_time", 60),
+                                    "estimated_learning_time": concept.get(
+                                        "estimated_learning_time", 60
+                                    ),
                                 }
                     elif isinstance(concepts, dict):
                         # Already flat format
@@ -73,7 +77,7 @@ class ConceptGraph:
         Ensures all concepts have prerequisites and dependents list populated and synchronized.
         """
         # Ensure base structure
-        for name, details in self.graph.items():
+        for _name, details in self.graph.items():
             if "prerequisites" not in details or not isinstance(details["prerequisites"], list):
                 details["prerequisites"] = []
             if "dependents" not in details or not isinstance(details["dependents"], list):
@@ -100,7 +104,7 @@ class ConceptGraph:
         current_concept = None
         current_list_field = None
         try:
-            with open(self.yaml_path, "r", encoding="utf-8") as f:
+            with open(self.yaml_path, encoding="utf-8") as f:
                 for line in f:
                     line_stripped = line.strip()
                     if not line_stripped or line_stripped.startswith("#"):
@@ -146,7 +150,7 @@ class ConceptGraph:
                 "dependents": [],
                 "domain": "Mathematics",
                 "difficulty": 1,
-                "estimated_learning_time": 60
+                "estimated_learning_time": 60,
             },
             "Calculus": {
                 "description": "Limits, derivatives, integrals, and series.",
@@ -154,7 +158,7 @@ class ConceptGraph:
                 "dependents": [],
                 "domain": "Mathematics",
                 "difficulty": 3,
-                "estimated_learning_time": 180
+                "estimated_learning_time": 180,
             },
             "Linear Algebra": {
                 "description": "Vectors, matrices, linear transformations, and eigenvalues.",
@@ -162,7 +166,7 @@ class ConceptGraph:
                 "dependents": [],
                 "domain": "Mathematics",
                 "difficulty": 2,
-                "estimated_learning_time": 120
+                "estimated_learning_time": 120,
             },
             "Classical Mechanics": {
                 "description": "Newtonian dynamics, Lagrangian and Hamiltonian mechanics.",
@@ -170,7 +174,7 @@ class ConceptGraph:
                 "dependents": [],
                 "domain": "Physics",
                 "difficulty": 4,
-                "estimated_learning_time": 240
+                "estimated_learning_time": 240,
             },
             "Electromagnetism": {
                 "description": "Maxwell's equations, electrostatic forces, and radiation.",
@@ -178,7 +182,7 @@ class ConceptGraph:
                 "dependents": [],
                 "domain": "Physics",
                 "difficulty": 4,
-                "estimated_learning_time": 200
+                "estimated_learning_time": 200,
             },
             "Quantum Mechanics": {
                 "description": "Schrodinger equation, wavefunctions, and operators.",
@@ -186,8 +190,8 @@ class ConceptGraph:
                 "dependents": [],
                 "domain": "Physics",
                 "difficulty": 5,
-                "estimated_learning_time": 300
-            }
+                "estimated_learning_time": 300,
+            },
         }
         self._sync_bidirectional()
         self.save()
@@ -212,17 +216,19 @@ class ConceptGraph:
                         f.write(f"  description: \"{details.get('description', '')}\"\n")
                         f.write(f"  domain: \"{details.get('domain', '')}\"\n")
                         f.write(f"  difficulty: {details.get('difficulty', 1)}\n")
-                        f.write(f"  estimated_learning_time: {details.get('estimated_learning_time', 60)}\n")
+                        f.write(
+                            f"  estimated_learning_time: {details.get('estimated_learning_time', 60)}\n"
+                        )
                         f.write("  prerequisites:\n")
                         for prereq in details.get("prerequisites", []):
-                            f.write(f"    - \"{prereq}\"\n")
+                            f.write(f'    - "{prereq}"\n')
                         f.write("  dependents:\n")
                         for dep in details.get("dependents", []):
-                            f.write(f"    - \"{dep}\"\n")
+                            f.write(f'    - "{dep}"\n')
             except Exception:
                 pass
 
-    def _resolve_concept(self, name_or_id: str) -> Optional[str]:
+    def _resolve_concept(self, name_or_id: str) -> str | None:
         """Resolve a concept by name or ID. Returns the graph key or None."""
         # Direct key match
         if name_or_id in self.graph:
@@ -257,7 +263,7 @@ class ConceptGraph:
             return best_match
         return None
 
-    def get_prerequisites(self, concept: str) -> List[str]:
+    def get_prerequisites(self, concept: str) -> list[str]:
         """
         Returns the list of direct prerequisites of a concept.
         Accepts concept name or ID.
@@ -268,23 +274,23 @@ class ConceptGraph:
             return [self.graph.get(p, {}).get("name", p) for p in prereq_ids if p in self.graph]
         return []
 
-    def get_dependents(self, concept: str) -> List[str]:
+    def get_dependents(self, concept: str) -> list[str]:
         """
         Returns the concepts that require the given concept as a prerequisite.
         """
         cid = self._resolve_concept(concept)
         return self.graph.get(cid, {}).get("dependents", []) if cid else []
 
-    def get_learning_path(self, target: str) -> List[str]:
+    def get_learning_path(self, target: str) -> list[str]:
         """
         Computes a topologically sorted list of concepts needed to understand the target.
         """
         cid = self._resolve_concept(target)
         if not cid:
             return []
-        
-        visited: Set[str] = set()
-        path: List[str] = []
+
+        visited: set[str] = set()
+        path: list[str] = []
 
         def dfs(node: str):
             if node in visited:
@@ -299,7 +305,9 @@ class ConceptGraph:
         dfs(cid)
         return path
 
-    def get_optimized_path(self, target: str, mastered_concepts: Optional[List[str]] = None) -> List[str]:
+    def get_optimized_path(
+        self, target: str, mastered_concepts: list[str] | None = None
+    ) -> list[str]:
         """
         Computes an optimized learning path to master a target concept, sorting available
         nodes dynamically by difficulty and estimated learning time (e.g. build up from easiest).
@@ -307,7 +315,9 @@ class ConceptGraph:
         mastered = set(mastered_concepts or [])
         # get_learning_path returns display names; resolve to IDs for internal processing
         name_to_id = {details.get("name", cid): cid for cid, details in self.graph.items()}
-        needed = set(name_to_id.get(name, name) for name in self.get_learning_path(target)) - mastered
+        needed = (
+            set(name_to_id.get(name, name) for name in self.get_learning_path(target)) - mastered
+        )
 
         if not needed:
             return []
@@ -327,10 +337,12 @@ class ConceptGraph:
             if not available:
                 break
 
-            available.sort(key=lambda x: (
-                self.graph[x].get("difficulty", 1),
-                self.graph[x].get("estimated_learning_time", 60)
-            ))
+            available.sort(
+                key=lambda x: (
+                    self.graph[x].get("difficulty", 1),
+                    self.graph[x].get("estimated_learning_time", 60),
+                )
+            )
 
             next_concept = available[0]
             path.append(next_concept)
@@ -339,13 +351,13 @@ class ConceptGraph:
         return path
 
     def add_concept(
-        self, 
-        concept: str, 
-        prerequisites: List[str], 
-        description: str = "", 
+        self,
+        concept: str,
+        prerequisites: list[str],
+        description: str = "",
         domain: str = "",
         difficulty: int = 1,
-        estimated_learning_time: int = 60
+        estimated_learning_time: int = 60,
     ):
         """
         Adds a new concept and updates bidirectional relations, then persists the graph.
@@ -356,12 +368,12 @@ class ConceptGraph:
             "dependents": [],
             "domain": domain,
             "difficulty": difficulty,
-            "estimated_learning_time": estimated_learning_time
+            "estimated_learning_time": estimated_learning_time,
         }
         self._sync_bidirectional()
         self.save()
 
-    def get_clusters_by_domain(self) -> Dict[str, List[str]]:
+    def get_clusters_by_domain(self) -> dict[str, list[str]]:
         """
         Clusters concepts by their domain.
         """
@@ -373,7 +385,7 @@ class ConceptGraph:
             clusters[domain].append(concept)
         return clusters
 
-    def search_concepts(self, query: str, threshold: float = 0.4) -> List[Tuple[str, float]]:
+    def search_concepts(self, query: str, threshold: float = 0.4) -> list[tuple[str, float]]:
         """
         Fuzzy matches concept names and descriptions to rank them by relevance.
         """
@@ -381,7 +393,7 @@ class ConceptGraph:
         for name, details in self.graph.items():
             # Check name similarity
             name_score = SequenceMatcher(None, query.lower(), name.lower()).ratio()
-            
+
             # Check description similarity
             desc = details.get("description", "")
             desc_score = 0.0
@@ -390,12 +402,18 @@ class ConceptGraph:
                 if query.lower() in desc.lower():
                     desc_score = 0.5
                 else:
-                    desc_score = max(SequenceMatcher(None, query.lower(), word.lower()).ratio() for word in desc.split()) * 0.4
-                    
+                    desc_score = (
+                        max(
+                            SequenceMatcher(None, query.lower(), word.lower()).ratio()
+                            for word in desc.split()
+                        )
+                        * 0.4
+                    )
+
             combined_score = max(name_score, desc_score)
             if combined_score >= threshold:
                 results.append((name, combined_score))
-                
+
         results.sort(key=lambda x: x[1], reverse=True)
         return results
 
@@ -410,23 +428,27 @@ class ConceptGraph:
         """Exports the graph structure to a Graphviz DOT file."""
         dest_path = os.path.expanduser(dest_path)
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-        
-        lines = ["digraph ConceptGraph {", "    rankdir=LR;", "    node [shape=box, style=filled, color=lightblue];"]
-        
+
+        lines = [
+            "digraph ConceptGraph {",
+            "    rankdir=LR;",
+            "    node [shape=box, style=filled, color=lightblue];",
+        ]
+
         # Write node attributes
         for name, details in self.graph.items():
             difficulty = details.get("difficulty", 1)
             domain = details.get("domain", "General")
             label = f"{name}\\nDomain: {domain}\\nDiff: {difficulty}"
-            lines.append(f"    \"{name}\" [label=\"{label}\"];")
-            
+            lines.append(f'    "{name}" [label="{label}"];')
+
         # Write edges
         for name, details in self.graph.items():
             for prereq in details.get("prerequisites", []):
-                lines.append(f"    \"{prereq}\" -> \"{name}\";")
-                
+                lines.append(f'    "{prereq}" -> "{name}";')
+
         lines.append("}")
-        
+
         with open(dest_path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
 
@@ -443,7 +465,7 @@ class ConceptGraph:
             desc_str = f" ({desc[:35]}... | Diff: {diff})" if desc else f" (Diff: {diff})"
             connector = "└── " if is_last else "├── "
             lines.append(f"{prefix}{connector}{node}{desc_str}")
-            
+
             prereqs = self.get_prerequisites(node)
             new_prefix = prefix + ("    " if is_last else "│   ")
             for i, pr in enumerate(prereqs):

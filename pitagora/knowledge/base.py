@@ -1,10 +1,10 @@
 """Knowledge base manager — ingests, stores, and retrieves documents for RAG."""
-import os
+
 import json
+import os
 import sqlite3
-from pathlib import Path
-from typing import List, Dict, Any, Optional
 from datetime import datetime
+from typing import Any
 
 from pitagora.core.constants import DB_DIR
 
@@ -12,7 +12,7 @@ from pitagora.core.constants import DB_DIR
 class KnowledgeBase:
     """Manages the document knowledge base with semantic search."""
 
-    def __init__(self, db_path: Optional[str] = None, embedding_db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None, embedding_db_path: str | None = None):
         self.db_path = db_path or str(DB_DIR / "knowledge.db")
         self.embedding_db_path = embedding_db_path
         self._ensure_db()
@@ -50,12 +50,17 @@ class KnowledgeBase:
         """)
         conn.close()
 
-    def add_document(self, path: str, title: str, subject: str = "general",
-                     chunks: Optional[List[Dict[str, Any]]] = None,
-                     metadata: Optional[Dict[str, Any]] = None) -> int:
+    def add_document(
+        self,
+        path: str,
+        title: str,
+        subject: str = "general",
+        chunks: list[dict[str, Any]] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> int:
         """Add a document and its chunks to the knowledge base."""
-        from pitagora.knowledge.ingester import DocumentIngester
         from pitagora.knowledge.chunker import SmartChunker
+        from pitagora.knowledge.ingester import DocumentIngester
 
         conn = sqlite3.connect(self.db_path)
         now = datetime.now().isoformat()
@@ -70,7 +75,7 @@ class KnowledgeBase:
         # Insert document
         conn.execute(
             "INSERT OR REPLACE INTO documents (path, title, subject, ingested_at, chunk_count, metadata) VALUES (?, ?, ?, ?, ?, ?)",
-            (path, title, subject, now, len(chunks), json.dumps(metadata or {}))
+            (path, title, subject, now, len(chunks), json.dumps(metadata or {})),
         )
         doc_id = conn.execute("SELECT id FROM documents WHERE path = ?", (path,)).fetchone()[0]
 
@@ -78,14 +83,16 @@ class KnowledgeBase:
         for i, chunk in enumerate(chunks):
             conn.execute(
                 "INSERT INTO chunks (doc_id, chunk_index, text, metadata) VALUES (?, ?, ?, ?)",
-                (doc_id, i, chunk.get("text", ""), json.dumps(chunk.get("metadata", {})))
+                (doc_id, i, chunk.get("text", ""), json.dumps(chunk.get("metadata", {}))),
             )
 
         conn.commit()
         conn.close()
         return doc_id
 
-    def search(self, query: str, limit: int = 5, subject: Optional[str] = None, top_k: Optional[int] = None) -> List[Dict[str, Any]]:
+    def search(
+        self, query: str, limit: int = 5, subject: str | None = None, top_k: int | None = None
+    ) -> list[dict[str, Any]]:
         """Search the knowledge base using text matching (upgradeable to vector search)."""
         if top_k is not None:
             limit = top_k
@@ -93,19 +100,25 @@ class KnowledgeBase:
         conn.row_factory = sqlite3.Row
 
         if subject:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT c.text, c.metadata, d.title, d.path, d.subject
                 FROM chunks c JOIN documents d ON c.doc_id = d.id
                 WHERE d.subject = ? AND c.text LIKE ?
                 ORDER BY c.id DESC LIMIT ?
-            """, (subject, f"%{query}%", limit)).fetchall()
+            """,
+                (subject, f"%{query}%", limit),
+            ).fetchall()
         else:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT c.text, c.metadata, d.title, d.path, d.subject
                 FROM chunks c JOIN documents d ON c.doc_id = d.id
                 WHERE c.text LIKE ?
                 ORDER BY c.id DESC LIMIT ?
-            """, (f"%{query}%", limit)).fetchall()
+            """,
+                (f"%{query}%", limit),
+            ).fetchall()
 
         conn.close()
         return [
@@ -116,12 +129,12 @@ class KnowledgeBase:
                 "source": row["title"],
                 "path": row["path"],
                 "subject": row["subject"],
-                "metadata": json.loads(row["metadata"]) if row["metadata"] else {}
+                "metadata": json.loads(row["metadata"]) if row["metadata"] else {},
             }
             for row in rows
         ]
 
-    def list_documents(self, subject: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_documents(self, subject: str | None = None) -> list[dict[str, Any]]:
         """List all documents in the knowledge base."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
@@ -149,7 +162,7 @@ class KnowledgeBase:
         conn.close()
         return True
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get knowledge base statistics."""
         conn = sqlite3.connect(self.db_path)
         doc_count = conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
@@ -161,9 +174,9 @@ class KnowledgeBase:
         return {
             "documents": doc_count,
             "chunks": chunk_count,
-            "subjects": {row[0]: row[1] for row in subjects}
+            "subjects": {row[0]: row[1] for row in subjects},
         }
 
-    def retrieve(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    def retrieve(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
         """Retrieve relevant chunks — alias for search with compatibility."""
         return self.search(query, limit=top_k)

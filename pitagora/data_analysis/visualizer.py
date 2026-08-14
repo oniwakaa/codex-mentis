@@ -1,10 +1,10 @@
 """Dataset visualizer — terminal (plotext) + file (matplotlib) charts."""
+
 from __future__ import annotations
 
 import os
 import sys
 from io import StringIO
-from typing import Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -13,10 +13,10 @@ import pandas as pd
 def create_plot(
     df: pd.DataFrame,
     plot_type: str = "line",
-    x: Optional[str] = None,
-    y: Optional[str] = None,
-    save_path: Optional[str] = None,
-    title: Optional[str] = None,
+    x: str | None = None,
+    y: str | None = None,
+    save_path: str | None = None,
+    title: str | None = None,
 ) -> str:
     """Generate a terminal ASCII plot and optionally save a PNG.
 
@@ -27,6 +27,7 @@ def create_plot(
 
     try:
         import plotext as plt
+
         plt.clear_data()
         plt.clear_terminal()
 
@@ -67,13 +68,13 @@ def create_plot(
     return out
 
 
-def _series(df: pd.DataFrame, col: Optional[str]):
+def _series(df: pd.DataFrame, col: str | None):
     if not col or col not in df.columns:
         return list(range(len(df)))
     return [str(v) for v in df[col].tolist()]
 
 
-def _series_numeric(df: pd.DataFrame, col: Optional[str]) -> np.ndarray:
+def _series_numeric(df: pd.DataFrame, col: str | None) -> np.ndarray:
     if not col or col not in df.columns:
         return np.arange(len(df))
     return pd.to_numeric(df[col], errors="coerce").dropna().to_numpy(dtype=float)
@@ -82,6 +83,7 @@ def _series_numeric(df: pd.DataFrame, col: Optional[str]) -> np.ndarray:
 def _save_matplotlib(df, plot_type, x, y, save_path, title) -> str:
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:

@@ -1,10 +1,12 @@
 """Smart chunking for math/science content — preserves equations and context."""
+
 import re
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 
 class Chunk:
     """Represents a chunk of document text with associated metadata."""
+
     def __init__(self, text: str, metadata: dict):
         self.text = text
         self.metadata = metadata
@@ -25,29 +27,35 @@ class SmartChunker:
         self.overlap = overlap
         self.preserve_equations = preserve_equations
 
-    def chunk(self, text: str, max_tokens: int = 100) -> List[Chunk]:
+    def chunk(self, text: str, max_tokens: int = 100) -> list[Chunk]:
         """Backward compatibility for tests expecting Chunk objects with metadata attributes."""
         dict_chunks = self.chunk_text(text)
         return [Chunk(c["text"], c["metadata"]) for c in dict_chunks]
 
-    def chunk_text(self, text: str, source: str = "") -> List[Dict[str, Any]]:
+    def chunk_text(self, text: str, source: str = "") -> list[dict[str, Any]]:
         """Chunk text into semantically meaningful pieces."""
         # First, split into sections by headers
         sections = self._split_sections(text)
 
         chunks = []
         for section_title, section_text in sections:
-            has_eq = bool(re.search(r"\$\$.*?\$\$|\\begin\{(?:equation|align|eqnarray)", section_text, re.DOTALL))
+            has_eq = bool(
+                re.search(
+                    r"\$\$.*?\$\$|\\begin\{(?:equation|align|eqnarray)", section_text, re.DOTALL
+                )
+            )
             if len(section_text) <= self.max_chunk_size:
-                chunks.append({
-                    "text": section_text,
-                    "metadata": {
-                        "source": source,
-                        "section": section_title,
-                        "char_count": len(section_text),
-                        "has_equation": has_eq,
+                chunks.append(
+                    {
+                        "text": section_text,
+                        "metadata": {
+                            "source": source,
+                            "section": section_title,
+                            "char_count": len(section_text),
+                            "has_equation": has_eq,
+                        },
                     }
-                })
+                )
             else:
                 # Split large sections into paragraphs
                 sub_chunks = self._chunk_section(section_text, section_title, source)
@@ -55,12 +63,11 @@ class SmartChunker:
 
         return chunks
 
-    def _split_sections(self, text: str) -> List[tuple]:
+    def _split_sections(self, text: str) -> list[tuple]:
         """Split text into sections by headers."""
         # Match markdown headers, LaTeX sections, or double newlines
         header_pattern = re.compile(
-            r"^(#{1,6}\s+.+|\\(?:sub)*section\*?\{[^}]+\})\s*$",
-            re.MULTILINE
+            r"^(#{1,6}\s+.+|\\(?:sub)*section\*?\{[^}]+\})\s*$", re.MULTILINE
         )
 
         sections = []
@@ -69,7 +76,7 @@ class SmartChunker:
 
         for match in header_pattern.finditer(text):
             if match.start() > last_pos:
-                section_text = text[last_pos:match.start()].strip()
+                section_text = text[last_pos : match.start()].strip()
                 if section_text:
                     sections.append((last_title, section_text))
             last_title = match.group(0).strip().lstrip("#").strip()
@@ -86,7 +93,7 @@ class SmartChunker:
 
         return sections
 
-    def _chunk_section(self, text: str, section: str, source: str) -> List[Dict[str, Any]]:
+    def _chunk_section(self, text: str, section: str, source: str) -> list[dict[str, Any]]:
         """Chunk a large section preserving equations and paragraph boundaries."""
         # Split by double newlines (paragraphs)
         paragraphs = re.split(r"\n\s*\n", text)
@@ -101,20 +108,24 @@ class SmartChunker:
                 continue
 
             # Check if paragraph contains a math block
-            has_equation = bool(re.search(r"\$\$.*?\$\$|\\begin\{(?:equation|align|eqnarray)", para, re.DOTALL))
+            has_equation = bool(
+                re.search(r"\$\$.*?\$\$|\\begin\{(?:equation|align|eqnarray)", para, re.DOTALL)
+            )
 
             # If adding this paragraph exceeds max, start new chunk
             if current_chunk and len(current_chunk) + len(para) > self.max_chunk_size:
                 if len(current_chunk) >= self.min_chunk_size:
-                    chunks.append({
-                        "text": current_chunk.strip(),
-                        "metadata": {
-                            "source": source,
-                            "section": section,
-                            "char_count": len(current_chunk),
-                            "has_equation": current_equation is not None,
+                    chunks.append(
+                        {
+                            "text": current_chunk.strip(),
+                            "metadata": {
+                                "source": source,
+                                "section": section,
+                                "char_count": len(current_chunk),
+                                "has_equation": current_equation is not None,
+                            },
                         }
-                    })
+                    )
                     # Overlap: keep last sentence for context
                     overlap_text = self._get_overlap_text(current_chunk)
                     current_chunk = overlap_text + "\n\n" + para
@@ -132,15 +143,17 @@ class SmartChunker:
 
         # Final chunk
         if current_chunk.strip():
-            chunks.append({
-                "text": current_chunk.strip(),
-                "metadata": {
-                    "source": source,
-                    "section": section,
-                    "char_count": len(current_chunk),
-                    "has_equation": current_equation is not None,
+            chunks.append(
+                {
+                    "text": current_chunk.strip(),
+                    "metadata": {
+                        "source": source,
+                        "section": section,
+                        "char_count": len(current_chunk),
+                        "has_equation": current_equation is not None,
+                    },
                 }
-            })
+            )
 
         return chunks
 
@@ -156,12 +169,12 @@ class SmartChunker:
             overlap_text = sentence + " " + overlap_text
         return overlap_text.strip()
 
-    def chunk_equation_block(self, text: str) -> List[Dict[str, Any]]:
+    def chunk_equation_block(self, text: str) -> list[dict[str, Any]]:
         """Special chunking that keeps equations with their explanations."""
         # Split at equation boundaries but keep equation + explanation together
         pattern = re.compile(
             r"(\$\$.*?\$\$|\\begin\{(?:equation|align|eqnarray)\*?\}.*?\\end\{(?:equation|align|eqnarray)\*?\})",
-            re.DOTALL
+            re.DOTALL,
         )
 
         parts = pattern.split(text)
@@ -177,19 +190,23 @@ class SmartChunker:
                 i += 1
 
             if chunk_text and len(chunk_text) >= self.min_chunk_size:
-                chunks.append({
-                    "text": chunk_text,
-                    "metadata": {"has_equation": True, "char_count": len(chunk_text)}
-                })
+                chunks.append(
+                    {
+                        "text": chunk_text,
+                        "metadata": {"has_equation": True, "char_count": len(chunk_text)},
+                    }
+                )
             elif chunk_text:
                 # Merge small chunks
                 if chunks:
                     chunks[-1]["text"] += "\n\n" + chunk_text
                     chunks[-1]["metadata"]["char_count"] += len(chunk_text) + 2
                 else:
-                    chunks.append({
-                        "text": chunk_text,
-                        "metadata": {"has_equation": False, "char_count": len(chunk_text)}
-                    })
+                    chunks.append(
+                        {
+                            "text": chunk_text,
+                            "metadata": {"has_equation": False, "char_count": len(chunk_text)},
+                        }
+                    )
 
         return chunks

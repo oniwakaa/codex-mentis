@@ -11,10 +11,11 @@ Instead of hardcoded concepts, agents discover knowledge by:
 Install: pip install webfetch-llm
 MCP: uvx webfetch-llm (runs as MCP server)
 """
+
 from pitagora.knowledge.acquisition import KnowledgeAcquisition
 from pitagora.knowledge.base import KnowledgeBase
-from pitagora.knowledge.webfetch_bridge import WebfetchBridge
 from pitagora.knowledge.extractor import KnowledgeExtractor
+from pitagora.knowledge.webfetch_bridge import WebfetchBridge
 
 __all__ = [
     "KnowledgeAcquisition",

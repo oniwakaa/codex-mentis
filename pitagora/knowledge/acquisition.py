@@ -12,12 +12,13 @@ Pipeline:
   5. Store   → Save to knowledge base with full citations
   6. Graph   → Update concept graph with discovered relationships
 """
-import re
-from typing import Any, Dict, List, Optional
-from datetime import datetime
 
-from pitagora.knowledge.webfetch_bridge import WebfetchBridge
+import re
+from datetime import datetime
+from typing import Any
+
 from pitagora.knowledge.extractor import KnowledgeExtractor
+from pitagora.knowledge.webfetch_bridge import WebfetchBridge
 
 
 class KnowledgeAcquisition:
@@ -29,8 +30,9 @@ class KnowledgeAcquisition:
         self.kb = knowledge_base
         self.cg = concept_graph
 
-    def research_topic(self, topic: str, depth: str = "medium",
-                       max_sources: int = 5) -> Dict[str, Any]:
+    def research_topic(
+        self, topic: str, depth: str = "medium", max_sources: int = 5
+    ) -> dict[str, Any]:
         """Research a topic end-to-end: search → fetch → extract → store.
 
         Args:
@@ -62,13 +64,15 @@ class KnowledgeAcquisition:
                 continue
             fetched = self.webfetch.fetch_url(url)
             if fetched.get("text"):
-                sources.append({
-                    "url": url,
-                    "title": fetched.get("title", result.get("title", "")),
-                    "text": fetched["text"],
-                    "snippet": result.get("snippet", ""),
-                    "search_score": result.get("score", 0.0),
-                })
+                sources.append(
+                    {
+                        "url": url,
+                        "title": fetched.get("title", result.get("title", "")),
+                        "text": fetched["text"],
+                        "snippet": result.get("snippet", ""),
+                        "search_score": result.get("score", 0.0),
+                    }
+                )
 
         if not sources:
             return {
@@ -85,21 +89,19 @@ class KnowledgeAcquisition:
         citations = []
 
         for source in sources:
-            extracted = self.extractor.extract_knowledge(
-                source["text"], topic=topic
-            )
+            extracted = self.extractor.extract_knowledge(source["text"], topic=topic)
             source["extracted"] = extracted
             all_findings.extend(extracted.get("key_points", []))
             all_concepts.update(extracted.get("concepts", []))
             if extracted.get("equations"):
-                all_findings.extend(
-                    [f"Equation: {eq}" for eq in extracted["equations"]]
-                )
-            citations.append({
-                "title": source["title"],
-                "url": source["url"],
-                "relevance": source["search_score"],
-            })
+                all_findings.extend([f"Equation: {eq}" for eq in extracted["equations"]])
+            citations.append(
+                {
+                    "title": source["title"],
+                    "url": source["url"],
+                    "relevance": source["search_score"],
+                }
+            )
 
         # Step 4: Store in knowledge base if available
         if self.kb:
@@ -127,8 +129,7 @@ class KnowledgeAcquisition:
         return {
             "topic": topic,
             "sources": [
-                {"title": s["title"], "url": s["url"], "snippet": s["snippet"]}
-                for s in sources
+                {"title": s["title"], "url": s["url"], "snippet": s["snippet"]} for s in sources
             ],
             "findings": all_findings,
             "concepts_found": list(all_concepts),
@@ -136,7 +137,7 @@ class KnowledgeAcquisition:
             "total_sources_crawled": len(sources),
         }
 
-    def search_papers(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    def search_papers(self, query: str, max_results: int = 5) -> list[dict[str, Any]]:
         """Search for academic papers specifically."""
         # Try arxiv-specific search
         arxiv_query = f"site:arxiv.org {query}"
@@ -158,7 +159,7 @@ class KnowledgeAcquisition:
 
         return combined[:max_results]
 
-    def fetch_paper(self, arxiv_url: str) -> Dict[str, Any]:
+    def fetch_paper(self, arxiv_url: str) -> dict[str, Any]:
         """Fetch and extract content from an arxiv paper page or PDF."""
         # If it's an arxiv abstract page, fetch it
         if "arxiv.org/abs/" in arxiv_url:
@@ -172,7 +173,7 @@ class KnowledgeAcquisition:
         fetched = self.webfetch.fetch_url(arxiv_url)
         return self._process_paper(fetched, arxiv_url)
 
-    def _process_paper(self, fetched: Dict[str, Any], original_url: str) -> Dict[str, Any]:
+    def _process_paper(self, fetched: dict[str, Any], original_url: str) -> dict[str, Any]:
         """Process fetched paper content into structured knowledge."""
         text = fetched.get("text", "")
         if not text:
@@ -195,7 +196,8 @@ class KnowledgeAcquisition:
         # Look for "Abstract" section
         abstract_match = re.search(
             r"(?:Abstract|ABSTRACT)[:\s]*(.*?)(?:\n\n|Introduction|INTRODUCTION|1\.|Keywords)",
-            text, re.DOTALL | re.IGNORECASE
+            text,
+            re.DOTALL | re.IGNORECASE,
         )
         if abstract_match:
             return abstract_match.group(1).strip()[:1000]

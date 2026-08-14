@@ -3,9 +3,8 @@
 Returns a DataProfile (pydantic model) with per-column type, missing-value
 counts, basic stats, cardinality, correlation matrix, and distribution shape.
 """
-from __future__ import annotations
 
-from typing import Dict, List, Optional
+from __future__ import annotations
 
 import numpy as np
 import pandas as pd
@@ -13,6 +12,7 @@ from pydantic import BaseModel, Field
 
 try:
     from scipy import stats as _scipy_stats
+
     _HAVE_SCIPY = True
 except Exception:  # pragma: no cover - scipy is a core dep
     _HAVE_SCIPY = False
@@ -25,20 +25,20 @@ class ColumnProfile(BaseModel):
     missing_pct: float
     cardinality: int
     # numeric-only stats (None otherwise)
-    mean: Optional[float] = None
-    median: Optional[float] = None
-    std: Optional[float] = None
-    min: Optional[float] = None
-    max: Optional[float] = None
-    skewness: Optional[float] = None
-    kurtosis: Optional[float] = None
+    mean: float | None = None
+    median: float | None = None
+    std: float | None = None
+    min: float | None = None
+    max: float | None = None
+    skewness: float | None = None
+    kurtosis: float | None = None
 
 
 class DataProfile(BaseModel):
     rows: int
     cols: int
-    columns: List[ColumnProfile]
-    correlation: Dict[str, Dict[str, float]] = Field(default_factory=dict)
+    columns: list[ColumnProfile]
+    correlation: dict[str, dict[str, float]] = Field(default_factory=dict)
 
 
 def _infer_type(series: pd.Series) -> str:
@@ -58,7 +58,7 @@ def _infer_type(series: pd.Series) -> str:
 def profile_data(df: pd.DataFrame) -> DataProfile:
     """Profile a DataFrame: per-column stats, missing values, correlations."""
     rows, cols = df.shape
-    col_profiles: List[ColumnProfile] = []
+    col_profiles: list[ColumnProfile] = []
 
     for name in df.columns:
         series = df[name]
@@ -92,7 +92,7 @@ def profile_data(df: pd.DataFrame) -> DataProfile:
 
         col_profiles.append(cp)
 
-    correlation: Dict[str, Dict[str, float]] = {}
+    correlation: dict[str, dict[str, float]] = {}
     numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
     if len(numeric_cols) >= 2:
         corr = df[numeric_cols].corr()

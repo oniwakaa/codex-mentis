@@ -6,18 +6,18 @@ and degrades gracefully (no subprocess execution). The ceiling is: without
 the `mcp` package, call_tool raises NotImplementedError. Upgrade path: install
 the extra and the same call_tool works against a real server.
 """
+
 from __future__ import annotations
 
 import json
 import os
-import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from pitagora.core.constants import MCP_CONFIG_PATH, CONFIG_DIR
+from pitagora.core.constants import MCP_CONFIG_PATH
 
-DEFAULT_MCP_SERVERS: Dict[str, Dict[str, Any]] = {
+DEFAULT_MCP_SERVERS: dict[str, dict[str, Any]] = {
     "evermemos": {
         "command": "npx",
         "args": ["-y", "evermemos-mcp"],
@@ -39,7 +39,12 @@ DEFAULT_MCP_SERVERS: Dict[str, Dict[str, Any]] = {
     },
     "sqlite": {
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-sqlite", "--db-path", "${HOME}/.pitagora/data.db"],
+        "args": [
+            "-y",
+            "@modelcontextprotocol/server-sqlite",
+            "--db-path",
+            "${HOME}/.pitagora/data.db",
+        ],
         "description": "Query pitagora's database directly",
         "enabled": False,
     },
@@ -63,14 +68,14 @@ DEFAULT_MCP_SERVERS: Dict[str, Dict[str, Any]] = {
 class MCPServer:
     name: str
     command: str
-    args: List[str] = field(default_factory=list)
-    env: Dict[str, str] = field(default_factory=dict)
+    args: list[str] = field(default_factory=list)
+    env: dict[str, str] = field(default_factory=dict)
     enabled: bool = True
     description: str = ""
     _proc: Any = None
 
     @classmethod
-    def from_config(cls, name: str, cfg: Dict[str, Any]) -> "MCPServer":
+    def from_config(cls, name: str, cfg: dict[str, Any]) -> MCPServer:
         return cls(
             name=name,
             command=cfg.get("command", ""),
@@ -80,8 +85,8 @@ class MCPServer:
             description=cfg.get("description", ""),
         )
 
-    def to_config(self) -> Dict[str, Any]:
-        cfg: Dict[str, Any] = {
+    def to_config(self) -> dict[str, Any]:
+        cfg: dict[str, Any] = {
             "command": self.command,
             "args": self.args,
             "enabled": self.enabled,
@@ -101,9 +106,9 @@ def _expand_env(value: str) -> str:
 class MCPManager:
     """Manages MCP server connections for Pitagora agents."""
 
-    def __init__(self, config_path: Optional[Path] = None):
+    def __init__(self, config_path: Path | None = None):
         self.config_path = Path(config_path) if config_path else MCP_CONFIG_PATH
-        self.servers: Dict[str, MCPServer] = {}
+        self.servers: dict[str, MCPServer] = {}
         self._load_config(self.config_path)
 
     def _load_config(self, path: Path) -> None:
@@ -119,27 +124,23 @@ class MCPManager:
         for name, cfg in merged.items():
             self.servers[name] = MCPServer.from_config(name, cfg)
 
-    def save_config(self, path: Optional[Path] = None) -> Path:
+    def save_config(self, path: Path | None = None) -> Path:
         """Persist current server config to mcp.json."""
         out_path = Path(path) if path else self.config_path
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        data = {
-            "mcpServers": {
-                name: srv.to_config() for name, srv in self.servers.items()
-            }
-        }
+        data = {"mcpServers": {name: srv.to_config() for name, srv in self.servers.items()}}
         with open(out_path, "w") as f:
             json.dump(data, f, indent=2)
         return out_path
 
-    def get_enabled_servers(self) -> List[MCPServer]:
+    def get_enabled_servers(self) -> list[MCPServer]:
         return [s for s in self.servers.values() if s.enabled]
 
     def set_enabled(self, name: str, enabled: bool) -> None:
         if name in self.servers:
             self.servers[name].enabled = enabled
 
-    def list_available_tools(self) -> Dict[str, List[str]]:
+    def list_available_tools(self) -> dict[str, list[str]]:
         """List tools per enabled server. Requires the `mcp` SDK and a running
         server; returns empty lists when unavailable (graceful degradation)."""
         # ponytail: full tool discovery needs a live handshake; without the SDK
@@ -166,9 +167,7 @@ class MCPManager:
         env = {k: _expand_env(v) for k, v in srv.env.items()}
         env.update(os.environ)
         args_expanded = [_expand_env(a) for a in srv.args]
-        params = StdioServerParameters(
-            command=srv.command, args=args_expanded, env=env
-        )
+        params = StdioServerParameters(command=srv.command, args=args_expanded, env=env)
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()

@@ -3,14 +3,14 @@
 The data agent decides which test is appropriate; these functions execute it
 and return a structured AnalysisResult. No magic selection — explicit calls.
 """
+
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
-
 from scipy import stats as sps
 
 
@@ -18,8 +18,8 @@ class AnalysisResult(BaseModel):
     test: str
     statistic: float
     p_value: float
-    effect_size: Optional[float] = None
-    extra: Dict[str, float] = Field(default_factory=dict)
+    effect_size: float | None = None
+    extra: dict[str, float] = Field(default_factory=dict)
     interpretation: str = ""
 
 
@@ -33,23 +33,28 @@ def run_ttest(a, b, equal_var: bool = True) -> AnalysisResult:
     """Two-sample t-test. Cohen's d as effect size."""
     x, y = _clean_numeric(a), _clean_numeric(b)
     if len(x) < 2 or len(y) < 2:
-        return AnalysisResult(test="ttest", statistic=0.0, p_value=1.0,
-                              interpretation="insufficient data (need ≥2 per group)")
+        return AnalysisResult(
+            test="ttest",
+            statistic=0.0,
+            p_value=1.0,
+            interpretation="insufficient data (need ≥2 per group)",
+        )
     t, p = sps.ttest_ind(x, y, equal_var=equal_var)
     # Cohen's d
-    pooled = np.sqrt(((len(x) - 1) * x.var(ddof=1) + (len(y) - 1) * y.var(ddof=1))
-                     / max(len(x) + len(y) - 2, 1))
+    pooled = np.sqrt(
+        ((len(x) - 1) * x.var(ddof=1) + (len(y) - 1) * y.var(ddof=1)) / max(len(x) + len(y) - 2, 1)
+    )
     d = float((x.mean() - y.mean()) / pooled) if pooled else 0.0
-    return AnalysisResult(test="ttest", statistic=float(t), p_value=float(p),
-                          effect_size=d)
+    return AnalysisResult(test="ttest", statistic=float(t), p_value=float(p), effect_size=d)
 
 
 def run_mann_whitney(a, b) -> AnalysisResult:
     """Mann-Whitney U non-parametric two-sample test."""
     x, y = _clean_numeric(a), _clean_numeric(b)
     if len(x) < 1 or len(y) < 1:
-        return AnalysisResult(test="mann_whitney", statistic=0.0, p_value=1.0,
-                              interpretation="insufficient data")
+        return AnalysisResult(
+            test="mann_whitney", statistic=0.0, p_value=1.0, interpretation="insufficient data"
+        )
     u, p = sps.mannwhitneyu(x, y, alternative="two-sided")
     return AnalysisResult(test="mann_whitney", statistic=float(u), p_value=float(p))
 
@@ -59,8 +64,9 @@ def run_anova(*groups) -> AnalysisResult:
     cleaned = [_clean_numeric(g) for g in groups]
     cleaned = [c for c in cleaned if len(c) > 0]
     if len(cleaned) < 2:
-        return AnalysisResult(test="anova", statistic=0.0, p_value=1.0,
-                              interpretation="need ≥2 groups")
+        return AnalysisResult(
+            test="anova", statistic=0.0, p_value=1.0, interpretation="need ≥2 groups"
+        )
     f, p = sps.f_oneway(*cleaned)
     # eta-squared = SS_between / SS_total
     all_vals = np.concatenate(cleaned)
@@ -68,8 +74,7 @@ def run_anova(*groups) -> AnalysisResult:
     ss_total = float(((all_vals - grand_mean) ** 2).sum())
     ss_between = sum(len(c) * (c.mean() - grand_mean) ** 2 for c in cleaned)
     eta2 = float(ss_between / ss_total) if ss_total else 0.0
-    return AnalysisResult(test="anova", statistic=float(f), p_value=float(p),
-                          effect_size=eta2)
+    return AnalysisResult(test="anova", statistic=float(f), p_value=float(p), effect_size=eta2)
 
 
 def run_chi_squared(table) -> AnalysisResult:
@@ -79,15 +84,24 @@ def run_chi_squared(table) -> AnalysisResult:
     else:
         arr = np.asarray(table)
     if arr.ndim != 2 or arr.shape[0] < 2 or arr.shape[1] < 2:
-        return AnalysisResult(test="chi_squared", statistic=0.0, p_value=1.0,
-                              interpretation="need a 2D contingency table")
+        return AnalysisResult(
+            test="chi_squared",
+            statistic=0.0,
+            p_value=1.0,
+            interpretation="need a 2D contingency table",
+        )
     chi2, p, dof, _ = sps.chi2_contingency(arr)
     # Cramér's V
     n = arr.sum()
     r, c = arr.shape
     v = float(np.sqrt(chi2 / (n * (min(r, c) - 1)))) if n and min(r, c) > 1 else 0.0
-    return AnalysisResult(test="chi_squared", statistic=float(chi2), p_value=float(p),
-                          effect_size=v, extra={"dof": float(dof)})
+    return AnalysisResult(
+        test="chi_squared",
+        statistic=float(chi2),
+        p_value=float(p),
+        effect_size=v,
+        extra={"dof": float(dof)},
+    )
 
 
 def linear_regression(df: pd.DataFrame, y_col: str, x_cols: Sequence[str]) -> AnalysisResult:
@@ -104,13 +118,17 @@ def linear_regression(df: pd.DataFrame, y_col: str, x_cols: Sequence[str]) -> An
     Xv = X[mask].to_numpy(dtype=float)
     n, k = Xv.shape
     if n < k + 2:  # need ≥ k+2 for residual df ≥ 1
-        return AnalysisResult(test="linear_regression", statistic=0.0, p_value=1.0,
-                              interpretation=f"insufficient rows ({n}) for {k} predictors (need ≥{k+2})")
+        return AnalysisResult(
+            test="linear_regression",
+            statistic=0.0,
+            p_value=1.0,
+            interpretation=f"insufficient rows ({n}) for {k} predictors (need ≥{k+2})",
+        )
 
     Xd = np.column_stack([np.ones(n), Xv])
     beta, *_ = np.linalg.lstsq(Xd, yv, rcond=None)
     resid = yv - Xd @ beta
-    ss_res = float((resid ** 2).sum())
+    ss_res = float((resid**2).sum())
     ss_tot = float(((yv - yv.mean()) ** 2).sum())
     r2 = 1.0 - (ss_res / ss_tot) if ss_tot else 0.0
 
@@ -136,17 +154,19 @@ def linear_regression(df: pd.DataFrame, y_col: str, x_cols: Sequence[str]) -> An
     ci_high = beta + t_crit * se
 
     names = ["intercept", *x_cols]
-    extra = {f"coef_{nm}": float(b) for nm, b in zip(names, beta)}
-    for nm, s, t, pv, lo, hi in zip(names, se, t_stats, p_vals, ci_low, ci_high):
+    extra = {f"coef_{nm}": float(b) for nm, b in zip(names, beta, strict=False)}
+    for nm, s, t, pv, lo, hi in zip(names, se, t_stats, p_vals, ci_low, ci_high, strict=False):
         extra[f"se_{nm}"] = float(s)
         extra[f"t_{nm}"] = float(t)
         extra[f"p_{nm}"] = float(pv)
         extra[f"ci95_{nm}_low"] = float(lo)
         extra[f"ci95_{nm}_high"] = float(hi)
 
-    sig = [nm for nm, pv in zip(names, p_vals) if pv < 0.05]
-    interp = (f"R²={r2:.4f}, F({df_reg},{df_res})={f:.3f} (p={p_f:.4g}). "
-              f"Significant (p<0.05): {', '.join(sig) if sig else 'none'}")
+    sig = [nm for nm, pv in zip(names, p_vals, strict=False) if pv < 0.05]
+    interp = (
+        f"R²={r2:.4f}, F({df_reg},{df_res})={f:.3f} (p={p_f:.4g}). "
+        f"Significant (p<0.05): {', '.join(sig) if sig else 'none'}"
+    )
     return AnalysisResult(
         test="linear_regression",
         statistic=float(f),

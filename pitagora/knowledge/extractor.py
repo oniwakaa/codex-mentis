@@ -3,8 +3,9 @@
 This is the NLP layer that turns crawled web content into structured knowledge.
 No LLM calls needed — uses regex heuristics and pattern matching for math/science content.
 """
+
 import re
-from typing import Any, Dict, List, Set
+from typing import Any
 
 
 class KnowledgeExtractor:
@@ -40,7 +41,7 @@ class KnowledgeExtractor:
         r"\\(?:sub)*section\*?\{(.*?)\}",  # LaTeX sections
     ]
 
-    def extract_knowledge(self, text: str, topic: str = "") -> Dict[str, Any]:
+    def extract_knowledge(self, text: str, topic: str = "") -> dict[str, Any]:
         """Extract structured knowledge from text.
 
         Returns:
@@ -69,7 +70,7 @@ class KnowledgeExtractor:
             "sections": sections,
         }
 
-    def _extract_equations(self, text: str) -> List[str]:
+    def _extract_equations(self, text: str) -> list[str]:
         """Extract LaTeX equations from text."""
         equations = []
         for pattern in self.EQUATION_PATTERNS:
@@ -80,7 +81,7 @@ class KnowledgeExtractor:
                     eq = re.sub(r"\s+", " ", eq)
                     equations.append(eq)
         # Deduplicate while preserving order
-        seen: Set[str] = set()
+        seen: set[str] = set()
         unique = []
         for eq in equations:
             if eq not in seen:
@@ -88,7 +89,7 @@ class KnowledgeExtractor:
                 unique.append(eq)
         return unique[:50]  # Cap at 50 equations
 
-    def _extract_definitions(self, text: str) -> List[str]:
+    def _extract_definitions(self, text: str) -> list[str]:
         """Extract definitions from text."""
         definitions = []
         for pattern in self.DEFINITION_PATTERNS:
@@ -98,7 +99,7 @@ class KnowledgeExtractor:
                     definitions.append(defn)
         return definitions[:20]
 
-    def _extract_theorems(self, text: str) -> List[str]:
+    def _extract_theorems(self, text: str) -> list[str]:
         """Extract theorems, lemmas, propositions from text."""
         theorems = []
         for pattern in self.THEOREM_PATTERNS:
@@ -108,18 +109,35 @@ class KnowledgeExtractor:
                     theorems.append(thm)
         return theorems[:20]
 
-    def _extract_key_points(self, text: str, topic: str) -> List[str]:
+    def _extract_key_points(self, text: str, topic: str) -> list[str]:
         """Extract key points — sentences that seem important."""
         # Split into sentences
         sentences = re.split(r"(?<=[.!?])\s+", text)
         key_points = []
 
         importance_signals = [
-            "important", "key", "fundamental", "crucial", "essential",
-            "note that", "observe", "remark", "result", "consequence",
-            "follows that", "implies", "therefore", "thus", "hence",
-            "we show", "we prove", "we derive", "main result",
-            "in particular", "specifically", "notably",
+            "important",
+            "key",
+            "fundamental",
+            "crucial",
+            "essential",
+            "note that",
+            "observe",
+            "remark",
+            "result",
+            "consequence",
+            "follows that",
+            "implies",
+            "therefore",
+            "thus",
+            "hence",
+            "we show",
+            "we prove",
+            "we derive",
+            "main result",
+            "in particular",
+            "specifically",
+            "notably",
         ]
 
         for sentence in sentences:
@@ -136,7 +154,7 @@ class KnowledgeExtractor:
 
         return key_points[:30]
 
-    def _extract_concepts(self, text: str) -> List[str]:
+    def _extract_concepts(self, text: str) -> list[str]:
         """Extract mathematical/scientific concept names from text."""
         # Known math/physics concept patterns
         concept_patterns = [
@@ -154,7 +172,7 @@ class KnowledgeExtractor:
             r")(?:\s+of\s+\w+)?)\b",
         ]
 
-        concepts: Set[str] = set()
+        concepts: set[str] = set()
         for pattern in concept_patterns:
             for match in re.finditer(pattern, text):
                 concept = match.group(1).strip()
@@ -163,7 +181,7 @@ class KnowledgeExtractor:
 
         return sorted(concepts)[:50]
 
-    def _extract_sections(self, text: str) -> List[str]:
+    def _extract_sections(self, text: str) -> list[str]:
         """Extract section headers from text."""
         sections = []
         for pattern in self.SECTION_PATTERNS:

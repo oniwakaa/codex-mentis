@@ -1,38 +1,41 @@
 import os
 import re
-import yaml
-import httpx
-from typing import List, Dict, Any, Optional, Tuple
-from pydantic import BaseModel, Field
 from difflib import SequenceMatcher
+from typing import Any
+
+import httpx
+import yaml
+from pydantic import BaseModel, Field
+
 
 class Skill(BaseModel):
     name: str
     domain: str = "General"
     description: str = ""
-    concepts: List[str] = Field(default_factory=list)
-    common_mistakes: List[str] = Field(default_factory=list)
-    analogies: List[str] = Field(default_factory=list)
-    socratic_questions: List[str] = Field(default_factory=list)
-    verification_strategies: List[str] = Field(default_factory=list)
-    exercises: List[str] = Field(default_factory=list)
-    prompt_template: Optional[str] = None
+    concepts: list[str] = Field(default_factory=list)
+    common_mistakes: list[str] = Field(default_factory=list)
+    analogies: list[str] = Field(default_factory=list)
+    socratic_questions: list[str] = Field(default_factory=list)
+    verification_strategies: list[str] = Field(default_factory=list)
+    exercises: list[str] = Field(default_factory=list)
+    prompt_template: str | None = None
     # WS3: dynamic skills extension (backward-compatible — all optional)
-    trigger_patterns: List[str] = Field(default_factory=list)
-    template: Optional[str] = None
-    tools_used: List[str] = Field(default_factory=list)
+    trigger_patterns: list[str] = Field(default_factory=list)
+    template: str | None = None
+    tools_used: list[str] = Field(default_factory=list)
     origin: str = Field(default="builtin")  # builtin | model_created | imported
     enabled: bool = Field(default=True)
     version: int = Field(default=1)
 
+
 class SkillsEngine:
-    def __init__(self, skills_dir: Optional[str] = None):
+    def __init__(self, skills_dir: str | None = None):
         if skills_dir is None:
             # Default directory is pitagora/skills/builtin
             skills_dir = os.path.join(os.path.dirname(__file__), "builtin")
         self.skills_dir = os.path.abspath(skills_dir)
         os.makedirs(self.skills_dir, exist_ok=True)
-        self.skills_cache: Dict[str, Skill] = {}
+        self.skills_cache: dict[str, Skill] = {}
 
     def load_skill(self, name: str) -> Skill:
         """Loads a skill from YAML file by name."""
@@ -43,26 +46,26 @@ class SkillsEngine:
         if not os.path.exists(yaml_path):
             raise FileNotFoundError(f"Skill '{name}' not found at path: {yaml_path}")
 
-        with open(yaml_path, 'r', encoding='utf-8') as f:
+        with open(yaml_path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
 
         skill = Skill(
-            name=data.get('name', name),
-            domain=data.get('domain', 'General'),
-            description=data.get('description', ''),
-            concepts=data.get('concepts', []),
-            common_mistakes=data.get('common_mistakes', []),
-            analogies=data.get('analogies', []),
-            socratic_questions=data.get('socratic_questions', []),
-            verification_strategies=data.get('verification_strategies', []),
-            exercises=data.get('exercises', []),
-            prompt_template=data.get('prompt_template', None),
-            trigger_patterns=data.get('trigger_patterns', []),
-            template=data.get('template', None),
-            tools_used=data.get('tools_used', []),
-            origin=data.get('origin', 'builtin'),
-            enabled=data.get('enabled', True),
-            version=data.get('version', 1)
+            name=data.get("name", name),
+            domain=data.get("domain", "General"),
+            description=data.get("description", ""),
+            concepts=data.get("concepts", []),
+            common_mistakes=data.get("common_mistakes", []),
+            analogies=data.get("analogies", []),
+            socratic_questions=data.get("socratic_questions", []),
+            verification_strategies=data.get("verification_strategies", []),
+            exercises=data.get("exercises", []),
+            prompt_template=data.get("prompt_template", None),
+            trigger_patterns=data.get("trigger_patterns", []),
+            template=data.get("template", None),
+            tools_used=data.get("tools_used", []),
+            origin=data.get("origin", "builtin"),
+            enabled=data.get("enabled", True),
+            version=data.get("version", 1),
         )
         self.skills_cache[name] = skill
         return skill
@@ -72,18 +75,18 @@ class SkillsEngine:
         yaml_path = os.path.join(self.skills_dir, f"{skill.name.lower()}.yaml")
         # Pydantic v2 dump
         data = skill.model_dump()
-        with open(yaml_path, 'w', encoding='utf-8') as f:
+        with open(yaml_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
         self.skills_cache[skill.name] = skill
 
-    def list_skills(self, domain: Optional[str] = None) -> List[str]:
+    def list_skills(self, domain: str | None = None) -> list[str]:
         """Lists available skills, optionally filtered by domain."""
         if not os.path.exists(self.skills_dir):
             return []
-        
+
         skill_names = []
         for file in os.listdir(self.skills_dir):
-            if file.endswith('.yaml'):
+            if file.endswith(".yaml"):
                 name = os.path.splitext(file)[0]
                 try:
                     skill = self.load_skill(name)
@@ -95,7 +98,7 @@ class SkillsEngine:
                         skill_names.append(name)
         return skill_names
 
-    def get_prompt(self, skill: Skill, context: Dict[str, Any]) -> str:
+    def get_prompt(self, skill: Skill, context: dict[str, Any]) -> str:
         """Renders the skill as a prompt utilizing the domain knowledge."""
         template = skill.prompt_template
         if not template:
@@ -124,7 +127,7 @@ Description: {description}
 
 Please solve the problem or respond to the query in the context of the above guidelines. Ensure your response is mathematically rigorous and leverages the verification strategies.
 """
-        
+
         concepts_list = "\n".join(f"- {c}" for c in skill.concepts)
         mistakes_list = "\n".join(f"- {m}" for m in skill.common_mistakes)
         analogies_list = "\n".join(f"- {a}" for a in skill.analogies)
@@ -143,16 +146,16 @@ Please solve the problem or respond to the query in the context of the above gui
             socratic_list=socratic_list,
             verification_list=verification_list,
             user_context=user_context_str,
-            version=skill.version
+            version=skill.version,
         )
 
-    def execute_skill(self, name: str, context: Dict[str, Any]) -> str:
+    def execute_skill(self, name: str, context: dict[str, Any]) -> str:
         """Executes a skill by rendering the prompt."""
         skill = self.load_skill(name)
         return self.get_prompt(skill, context)
 
     # --- Skill Matching ---
-    def match_skills(self, topic: str, problem_text: Optional[str] = None) -> List[Skill]:
+    def match_skills(self, topic: str, problem_text: str | None = None) -> list[Skill]:
         """
         Matches and ranks skills relevant to a topic and/or problem text.
         Trigger patterns (regex) take priority; falls back to keyword/fuzzy scoring.
@@ -198,7 +201,13 @@ Please solve the problem or respond to the query in the context of the above gui
             name_sim = SequenceMatcher(None, skill.name.lower(), topic.lower()).ratio()
             desc_sim = 0.0
             if skill.description:
-                desc_sim = max(SequenceMatcher(None, word.lower(), topic.lower()).ratio() for word in skill.description.split()) * 0.3
+                desc_sim = (
+                    max(
+                        SequenceMatcher(None, word.lower(), topic.lower()).ratio()
+                        for word in skill.description.split()
+                    )
+                    * 0.3
+                )
 
             score += max(name_sim, desc_sim)
 
@@ -208,7 +217,7 @@ Please solve the problem or respond to the query in the context of the above gui
         scored_skills.sort(key=lambda x: x[1], reverse=True)
         return [skill for skill, _ in scored_skills]
 
-    def render_template(self, skill: Skill, context: Dict[str, Any]) -> Optional[str]:
+    def render_template(self, skill: Skill, context: dict[str, Any]) -> str | None:
         """Render a skill's `template` with {{variable}} placeholders from context.
 
         Returns None when the skill has no template (callers fall back to get_prompt).
@@ -221,32 +230,34 @@ Please solve the problem or respond to the query in the context of the above gui
         return rendered
 
     # --- Skill Composition ---
-    def create_composite_skill(self, composite_name: str, skill_names: List[str]) -> Skill:
+    def create_composite_skill(self, composite_name: str, skill_names: list[str]) -> Skill:
         """
         Chains multiple skills together to create a single composite Skill.
         """
         skills = [self.load_skill(name) for name in skill_names]
         if not skills:
             raise ValueError("No valid skills provided for composition.")
-            
+
         merged_concepts = []
         merged_mistakes = []
         merged_analogies = []
         merged_socratic = []
         merged_verification = []
-        
+
         for sk in skills:
             merged_concepts.extend(c for c in sk.concepts if c not in merged_concepts)
             merged_mistakes.extend(m for m in sk.common_mistakes if m not in merged_mistakes)
             merged_analogies.extend(a for a in sk.analogies if a not in merged_analogies)
             merged_socratic.extend(q for q in sk.socratic_questions if q not in merged_socratic)
-            merged_verification.extend(v for v in sk.verification_strategies if v not in merged_verification)
-            
+            merged_verification.extend(
+                v for v in sk.verification_strategies if v not in merged_verification
+            )
+
         domains = list(set(sk.domain for sk in skills))
         composite_domain = domains[0] if len(domains) == 1 else "Composite / Multidisciplinary"
-        
+
         composite_desc = f"Composite skill composed of: {', '.join(skill_names)}."
-        
+
         return Skill(
             name=composite_name,
             domain=composite_domain,
@@ -256,7 +267,7 @@ Please solve the problem or respond to the query in the context of the above gui
             analogies=merged_analogies,
             socratic_questions=merged_socratic,
             verification_strategies=merged_verification,
-            version=1
+            version=1,
         )
 
     # --- Community Skill Installation ---
@@ -267,12 +278,14 @@ Please solve the problem or respond to the query in the context of the above gui
         """
         resp = httpx.get(url, follow_redirects=True)
         if resp.status_code != 200:
-            raise httpx.HTTPStatusError(f"Failed to fetch skill from URL: {url}", request=resp.request, response=resp)
-            
+            raise httpx.HTTPStatusError(
+                f"Failed to fetch skill from URL: {url}", request=resp.request, response=resp
+            )
+
         data = yaml.safe_load(resp.text)
         if not isinstance(data, dict) or "name" not in data:
             raise ValueError("Invalid skill definition format.")
-            
+
         skill = Skill(
             name=data["name"],
             domain=data.get("domain", "General"),
@@ -289,8 +302,8 @@ Please solve the problem or respond to the query in the context of the above gui
             tools_used=data.get("tools_used", []),
             origin=data.get("origin", "imported"),
             enabled=data.get("enabled", True),
-            version=data.get("version", 1)
+            version=data.get("version", 1),
         )
-        
+
         self.save_skill(skill)
         return skill.name

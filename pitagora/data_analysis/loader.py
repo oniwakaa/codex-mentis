@@ -4,11 +4,10 @@ Supports local paths and URLs. Formats: CSV, TSV, JSON, Parquet, Excel.
 Parquet/Excel require the optional ``data`` extra; the loader raises a clear
 LoaderError when the engine is missing instead of a bare ImportError.
 """
+
 from __future__ import annotations
 
 import os
-from pathlib import Path
-from typing import Optional
 from urllib.parse import urlparse
 
 import pandas as pd

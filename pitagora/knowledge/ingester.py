@@ -1,14 +1,24 @@
 """Document ingestion — extracts text from PDF, Markdown, LaTeX, and plain text."""
+
 import os
 import re
 from pathlib import Path
-from typing import Optional
 
 
 class DocumentIngester:
     """Extracts readable text from various document formats."""
 
-    SUPPORTED_EXTENSIONS = {".pdf", ".md", ".markdown", ".tex", ".latex", ".txt", ".rst", ".html", ".htm"}
+    SUPPORTED_EXTENSIONS = {
+        ".pdf",
+        ".md",
+        ".markdown",
+        ".tex",
+        ".latex",
+        ".txt",
+        ".rst",
+        ".html",
+        ".htm",
+    }
 
     def extract_text(self, path: str) -> str:
         """Extract text from a file based on its extension."""
@@ -33,6 +43,7 @@ class DocumentIngester:
         """Extract text from PDF using pymupdf or marker-pdf."""
         try:
             import pymupdf
+
             doc = pymupdf.open(path)
             text_parts = []
             for page in doc:
@@ -44,6 +55,7 @@ class DocumentIngester:
 
         try:
             from marker_pdf import convert_pdf
+
             return convert_pdf(path)
         except ImportError:
             pass
@@ -51,7 +63,10 @@ class DocumentIngester:
         # Fallback: try pdftotext CLI
         try:
             import subprocess
-            result = subprocess.run(["pdftotext", path, "-"], capture_output=True, text=True, timeout=30)
+
+            result = subprocess.run(
+                ["pdftotext", path, "-"], capture_output=True, text=True, timeout=30
+            )
             if result.returncode == 0 and result.stdout.strip():
                 return result.stdout
         except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -63,7 +78,7 @@ class DocumentIngester:
 
     def _extract_markdown(self, path: str) -> str:
         """Extract text from Markdown, preserving structure."""
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             text = f.read()
         # Remove HTML tags but keep content
         text = re.sub(r"<[^>]+>", "", text)
@@ -72,7 +87,7 @@ class DocumentIngester:
 
     def _extract_latex(self, path: str) -> str:
         """Extract text from LaTeX, converting math to readable form."""
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             text = f.read()
 
         # Remove comments
@@ -99,7 +114,8 @@ class DocumentIngester:
         """Extract text from HTML."""
         try:
             from bs4 import BeautifulSoup
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
+
+            with open(path, encoding="utf-8", errors="replace") as f:
                 soup = BeautifulSoup(f.read(), "html.parser")
             # Remove script/style
             for tag in soup(["script", "style"]):
@@ -107,7 +123,7 @@ class DocumentIngester:
             return soup.get_text(separator="\n", strip=True)
         except ImportError:
             # Fallback: basic regex
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
+            with open(path, encoding="utf-8", errors="replace") as f:
                 text = f.read()
             text = re.sub(r"<script[^>]*>.*?</script>", "", text, flags=re.DOTALL | re.IGNORECASE)
             text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
@@ -117,5 +133,5 @@ class DocumentIngester:
 
     def _extract_text(self, path: str) -> str:
         """Extract plain text."""
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             return f.read()

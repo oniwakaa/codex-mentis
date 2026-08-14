@@ -1,6 +1,7 @@
 """Setup wizard — configure providers, API keys, and preferences interactively."""
+
 import os
-from typing import Dict, Any
+from typing import Any
 
 import typer
 
@@ -19,22 +20,22 @@ def setup_main(ctx: typer.Context):
 
 def run_setup(console=None, quick: bool = False):
     """Run the interactive setup wizard."""
+    import yaml
     from rich.console import Console
     from rich.panel import Panel
-    from rich.prompt import Prompt, Confirm, IntPrompt
-    from rich.table import Table
-    from rich.text import Text
-    import yaml
+    from rich.prompt import Confirm, Prompt
 
     if console is None:
         console = Console()
 
-    console.print(Panel(
-        "[bold cyan]⚙️  Pitagora Setup Wizard[/bold cyan]\n\n"
-        "Configure your AI providers, model preferences, and features.\n"
-        "You can always re-run this with `pitagora setup`.",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel(
+            "[bold cyan]⚙️  Pitagora Setup Wizard[/bold cyan]\n\n"
+            "Configure your AI providers, model preferences, and features.\n"
+            "You can always re-run this with `pitagora setup`.",
+            border_style="cyan",
+        )
+    )
 
     config_dir = CONFIG_DIR
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -55,19 +56,22 @@ def run_setup(console=None, quick: bool = False):
     console.print("  [cyan]5[/cyan] = Ollama (local models)")
     console.print("  [cyan]6[/cyan] = Custom (OpenAI-compatible endpoint)")
 
-    choice = Prompt.ask("Provider", choices=["1", "2", "3", "4", "5", "6"],
-                       default="1" if quick else None)
+    choice = Prompt.ask(
+        "Provider", choices=["1", "2", "3", "4", "5", "6"], default="1" if quick else None
+    )
 
     providers_config = _configure_provider(choice, console, existing)
-    
+
     # ─── Step 2: Model Selection ───
     console.print("\n[bold]Step 2: Choose default model[/bold]\n")
-    
+
     default_model = providers_config.get("default_model", "")
     if not default_model:
         if choice == "1":
             console.print("  Recommended: [cyan]google/gemini-3.6-flash-high[/cyan]")
-            console.print("  Also available: google/gemini-3.6-high, google/gemini-3.5-flash-medium")
+            console.print(
+                "  Also available: google/gemini-3.6-high, google/gemini-3.5-flash-medium"
+            )
             default_model = Prompt.ask("Model", default="google/gemini-3.6-flash-high")
         elif choice == "2":
             default_model = Prompt.ask("Model", default="gpt-4o")
@@ -124,30 +128,32 @@ def run_setup(console=None, quick: bool = False):
     _verify_connection(providers_config, default_model, console)
 
     # ─── Done ───
-    console.print(Panel(
-        f"[green]✓ Configuration saved to {config_path}[/green]\n\n"
-        f"Provider: [cyan]{providers_config.get('name', 'cliproxy')}[/cyan]\n"
-        f"Model: [cyan]{default_model}[/cyan]\n"
-        f"Embeddings: [cyan]{'enabled' if enable_embeddings else 'disabled'}[/cyan]\n"
-        f"Spaced Repetition: [cyan]{'enabled' if enable_spaced_rep else 'disabled'}[/cyan]\n\n"
-        "[bold]Get started:[/bold]\n"
-        "  pitagora                    Launch the interactive chat\n"
-        "  pitagora onboard            Set up your learning profile\n"
-        "  pitagora study \"calculus\"   Start learning\n"
-        "  pitagora doctor             Check system health",
-        title="✅ Setup Complete",
-        border_style="green",
-    ))
+    console.print(
+        Panel(
+            f"[green]✓ Configuration saved to {config_path}[/green]\n\n"
+            f"Provider: [cyan]{providers_config.get('name', 'cliproxy')}[/cyan]\n"
+            f"Model: [cyan]{default_model}[/cyan]\n"
+            f"Embeddings: [cyan]{'enabled' if enable_embeddings else 'disabled'}[/cyan]\n"
+            f"Spaced Repetition: [cyan]{'enabled' if enable_spaced_rep else 'disabled'}[/cyan]\n\n"
+            "[bold]Get started:[/bold]\n"
+            "  pitagora                    Launch the interactive chat\n"
+            "  pitagora onboard            Set up your learning profile\n"
+            '  pitagora study "calculus"   Start learning\n'
+            "  pitagora doctor             Check system health",
+            title="✅ Setup Complete",
+            border_style="green",
+        )
+    )
 
 
-def _configure_provider(choice: str, console, existing: Dict) -> Dict[str, Any]:
+def _configure_provider(choice: str, console, existing: dict) -> dict[str, Any]:
     """Configure a specific provider and return its config dict."""
     from rich.prompt import Prompt
 
     if choice == "1":  # CLIProxy
         api_url = Prompt.ask("CLIProxy API URL", default="http://localhost:8317/v1")
         api_key = Prompt.ask("API Key", default="cliproxy-sk-local")
-        
+
         config = {
             "name": "cliproxy",
             "type": "openai_compatible",
@@ -155,11 +161,11 @@ def _configure_provider(choice: str, console, existing: Dict) -> Dict[str, Any]:
             "api_key": api_key,
             "default_model": "google/gemini-3.6-flash-high",
         }
-        
+
         # Set environment variable
         os.environ["OPENAI_API_KEY"] = api_key
         os.environ["OPENAI_BASE_URL"] = api_url
-        
+
         console.print(f"  [green]✓[/green] CLIProxy configured at {api_url}")
         return config
 
@@ -188,7 +194,9 @@ def _configure_provider(choice: str, console, existing: Dict) -> Dict[str, Any]:
         return config
 
     elif choice == "4":  # Gemini direct
-        api_key = Prompt.ask("Google API Key", default=os.getenv("GOOGLE_API_KEY", os.getenv("GEMINI_API_KEY", "")))
+        api_key = Prompt.ask(
+            "Google API Key", default=os.getenv("GOOGLE_API_KEY", os.getenv("GEMINI_API_KEY", ""))
+        )
         config = {
             "name": "gemini",
             "type": "gemini",
@@ -229,6 +237,7 @@ def _configure_provider(choice: str, console, existing: Dict) -> Dict[str, Any]:
 def _configure_mcp(console) -> None:
     """Toggle MCP servers and write ~/.pitagora/mcp.json."""
     from rich.prompt import Prompt
+
     from pitagora.mcp_integration import MCPManager
 
     mgr = MCPManager()
@@ -259,7 +268,7 @@ def _select_skill_packs(console) -> None:
     from pitagora.skills.engine import SkillsEngine
 
     eng = SkillsEngine()
-    packs: Dict[str, int] = {}
+    packs: dict[str, int] = {}
     for name in eng.list_skills():
         try:
             skill = eng.load_skill(name)
@@ -268,22 +277,24 @@ def _select_skill_packs(console) -> None:
             continue
     for i, (domain, count) in enumerate(sorted(packs.items()), 1):
         console.print(f"  [green]x[/green] [cyan]{i}[/cyan] = {domain:<20} {count} skill(s)")
-    console.print("  [dim]All builtin skills are available by default. Use `pitagora skills list` to inspect.[/dim]")
+    console.print(
+        "  [dim]All builtin skills are available by default. Use `pitagora skills list` to inspect.[/dim]"
+    )
 
 
-def _verify_connection(config: Dict, model: str, console):
+def _verify_connection(config: dict, model: str, console):
     """Try a test completion to verify the provider works."""
     import httpx
 
     base_url = config.get("base_url", "")
     api_key = config.get("api_key", "")
-    
+
     if not base_url or not api_key:
         console.print("  [yellow]⚠ Skipping verification (no URL/key)[/yellow]")
         return
 
     console.print("  Testing connection...", end=" ")
-    
+
     try:
         with httpx.Client(timeout=15.0) as client:
             response = client.post(
@@ -298,13 +309,17 @@ def _verify_connection(config: Dict, model: str, console):
                     "max_tokens": 10,
                 },
             )
-        
+
         if response.status_code == 200:
             data = response.json()
             content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
             console.print(f"[green]✓ Connected! Response: '{content.strip()}'[/green]")
         else:
-            console.print(f"[yellow]⚠ Got status {response.status_code}: {response.text[:100]}[/yellow]")
+            console.print(
+                f"[yellow]⚠ Got status {response.status_code}: {response.text[:100]}[/yellow]"
+            )
     except Exception as e:
         console.print(f"[red]✗ Connection failed: {e}[/red]")
-        console.print("  [dim]You can still use Pitagora — configure the provider later with `pitagora setup`[/dim]")
+        console.print(
+            "  [dim]You can still use Pitagora — configure the provider later with `pitagora setup`[/dim]"
+        )

@@ -1,21 +1,24 @@
 """Skills CLI — list, inspect, import, forge, and activate reasoning skills."""
+
 import os
-from typing import Optional
 
 import typer
 
+from pitagora.cli.rich_ui import print_panel, print_table
 from pitagora.core.constants import CONFIG_DIR
-from pitagora.cli.rich_ui import print_table, print_panel
 
 app = typer.Typer(help="Manage and inspect reasoning skills")
 
-BUILTIN_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "skills", "builtin")
+BUILTIN_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "skills", "builtin"
+)
 USER_SKILLS_DIR = str(CONFIG_DIR / "skills")
 
 
 def _engines():
     """Return (builtin_engine, user_engine)."""
     from pitagora.skills.engine import SkillsEngine
+
     builtin = SkillsEngine(skills_dir=BUILTIN_DIR)
     user = SkillsEngine(skills_dir=USER_SKILLS_DIR)
     return builtin, user
@@ -88,6 +91,7 @@ def show_skill(name: str = typer.Argument(..., help="Skill name to inspect")):
 def activate_skill(name: str = typer.Argument(..., help="Skill to enable")):
     """Enable a skill for matching."""
     from pitagora.skills.evolution import SkillForge
+
     forge = SkillForge(USER_SKILLS_DIR)
     try:
         forge.activate(name)
@@ -101,6 +105,7 @@ def activate_skill(name: str = typer.Argument(..., help="Skill to enable")):
 def deactivate_skill(name: str = typer.Argument(..., help="Skill to disable")):
     """Disable a skill from matching."""
     from pitagora.skills.engine import SkillsEngine
+
     eng = SkillsEngine(skills_dir=USER_SKILLS_DIR)
     try:
         skill = eng.load_skill(name)
@@ -116,6 +121,7 @@ def deactivate_skill(name: str = typer.Argument(..., help="Skill to disable")):
 def forge_list():
     """Show model-created skills pending review."""
     from pitagora.skills.evolution import SkillForge
+
     forge = SkillForge(USER_SKILLS_DIR)
     pending = forge.pending_review()
     if not pending:
@@ -129,6 +135,7 @@ def forge_list():
 def review_skill(name: str = typer.Argument(..., help="Skill to review")):
     """Review a model-created skill, then activate or reject it."""
     from pitagora.skills.evolution import SkillForge
+
     forge = SkillForge(USER_SKILLS_DIR)
     pending = {s.name: s for s in forge.pending_review()}
     if name not in pending:
@@ -152,6 +159,7 @@ def import_skills(
 ):
     """Import skills from Claude Code (.md) or a directory of .yaml/.md files."""
     from pitagora.skills.engine import SkillsEngine
+
     eng = SkillsEngine(skills_dir=USER_SKILLS_DIR)
     src_dir = source
     if source == "claude-code":
@@ -176,11 +184,13 @@ def import_skills(
 
 def _import_yaml(eng, path: str) -> None:
     import yaml
+
     with open(path) as f:
         data = yaml.safe_load(f) or {}
     if not isinstance(data, dict) or "name" not in data:
         return
     from pitagora.skills.engine import Skill
+
     skill = Skill(
         name=data["name"],
         domain=data.get("domain", "General"),
@@ -209,6 +219,7 @@ def _import_markdown(eng, path: str) -> None:
     for a first import; refine manually via `pitagora skills show`.
     """
     import re
+
     with open(path) as f:
         text = f.read()
     name = os.path.splitext(os.path.basename(path))[0]
@@ -223,6 +234,7 @@ def _import_markdown(eng, path: str) -> None:
     if not triggers:
         triggers = [name]
     from pitagora.skills.engine import Skill
+
     skill = Skill(
         name=name.replace(" ", "_").lower(),
         domain="Imported",
@@ -238,9 +250,10 @@ def _import_markdown(eng, path: str) -> None:
 
 
 @app.command("evolve")
-def evolve_skill(name: Optional[str] = typer.Argument(None, help="Skill to evolve")):
+def evolve_skill(name: str | None = typer.Argument(None, help="Skill to evolve")):
     """Display evolution history / performance metrics for a skill."""
     from pitagora.skills.evolution import SkillEvolution
+
     evo = SkillEvolution()
     if name:
         stats = evo.get_stats(name)
@@ -253,4 +266,6 @@ def evolve_skill(name: Optional[str] = typer.Argument(None, help="Skill to evolv
         )
     else:
         dash = evo.get_performance_dashboard()
-        typer.echo(f"Total uses: {dash['total_usage_count']}  Overall success: {dash['overall_success_rate']:.1%}")
+        typer.echo(
+            f"Total uses: {dash['total_usage_count']}  Overall success: {dash['overall_success_rate']:.1%}"
+        )

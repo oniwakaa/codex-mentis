@@ -299,7 +299,7 @@ class PitagoraApp(App):
         elif event.kind == "controls":
             conversation.mount(Static(build_controls()))
         elif event.kind == "state_changed":
-            header_context = self.query_one("#header-context", Static)
+            self.query_one("#header-context", Static)
             self._refresh_elapsed()
             sidebar = self.query_one("#sidebar", ContextSidebar)
             sidebar.update_context(event.metadata["context"])

@@ -1,6 +1,5 @@
 """Onboarding system — first-run experience with level assessment."""
-from pathlib import Path
-from typing import Dict, Optional
+
 from datetime import datetime
 
 from pitagora.core.constants import CONFIG_DIR
@@ -13,9 +12,10 @@ def has_profile() -> bool:
     return PROFILE_PATH.expanduser().exists()
 
 
-def load_profile() -> Optional[Dict]:
+def load_profile() -> dict | None:
     """Load user profile from disk."""
     import yaml
+
     path = PROFILE_PATH.expanduser()
     if not path.exists():
         return None
@@ -23,9 +23,10 @@ def load_profile() -> Optional[Dict]:
         return yaml.safe_load(f)
 
 
-def save_profile(profile: Dict) -> None:
+def save_profile(profile: dict) -> None:
     """Save user profile to disk."""
     import yaml
+
     path = PROFILE_PATH.expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
@@ -88,13 +89,11 @@ PHYSICS_QUESTIONS = [
 ]
 
 
-def run_onboarding(console=None, skip: bool = False, level_override: Optional[str] = None) -> Dict:
+def run_onboarding(console=None, skip: bool = False, level_override: str | None = None) -> dict:
     """Run the onboarding flow. Returns the profile dict."""
     from rich.console import Console
     from rich.panel import Panel
-    from rich.prompt import Prompt, Confirm
-    from rich.text import Text
-    from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.prompt import Prompt
 
     if console is None:
         console = Console()
@@ -103,7 +102,10 @@ def run_onboarding(console=None, skip: bool = False, level_override: Optional[st
         profile = {
             "name": "User",
             "interests": ["mathematics", "physics"],
-            "levels": {"mathematics": level_override or "intermediate", "physics": level_override or "intermediate"},
+            "levels": {
+                "mathematics": level_override or "intermediate",
+                "physics": level_override or "intermediate",
+            },
             "onboarding_date": datetime.now().isoformat(),
             "diagnostic_scores": {},
         }
@@ -123,12 +125,14 @@ def run_onboarding(console=None, skip: bool = False, level_override: Optional[st
     console.print(banner, style="bold cyan")
     console.print()
 
-    console.print(Panel(
-        "Welcome to Pitagora! Let's set up your learning profile.\n"
-        "This takes about 2 minutes and helps me personalize your experience.",
-        title="👋 Welcome",
-        border_style="blue",
-    ))
+    console.print(
+        Panel(
+            "Welcome to Pitagora! Let's set up your learning profile.\n"
+            "This takes about 2 minutes and helps me personalize your experience.",
+            title="👋 Welcome",
+            border_style="blue",
+        )
+    )
 
     # Step 2: Name and interests
     name = Prompt.ask("What's your name?", default="Scholar")
@@ -152,7 +156,9 @@ def run_onboarding(console=None, skip: bool = False, level_override: Optional[st
 
     for subject in interests:
         console.print(f"\n[bold cyan]📊 Quick assessment: {subject.title()}[/bold cyan]")
-        console.print("[dim]Answer these questions to help me gauge your level. Don't worry — there's no wrong answer![/dim]\n")
+        console.print(
+            "[dim]Answer these questions to help me gauge your level. Don't worry — there's no wrong answer![/dim]\n"
+        )
 
         questions = MATH_QUESTIONS if subject == "mathematics" else PHYSICS_QUESTIONS
         correct = 0
@@ -161,11 +167,11 @@ def run_onboarding(console=None, skip: bool = False, level_override: Optional[st
         for i, q in enumerate(questions, 1):
             console.print(f"[bold]Q{i}:[/bold] {q['question']}")
             answer = Prompt.ask("  Your answer", default="")
-            
+
             # Simple keyword matching
             answer_lower = answer.lower()
             matched = any(kw.lower() in answer_lower for kw in q["keywords"])
-            
+
             if matched:
                 correct += 1
                 console.print("  [green]✓ Good![/green]\n")
@@ -185,9 +191,11 @@ def run_onboarding(console=None, skip: bool = False, level_override: Optional[st
 
         levels[subject] = level
         scores[subject] = {"correct": correct, "total": total, "percentage": pct}
-        
+
         color = "green" if level == "advanced" else "yellow" if level == "intermediate" else "blue"
-        console.print(f"  Your {subject} level: [bold {color}]{level.title()}[/bold {color}] ({correct}/{total})")
+        console.print(
+            f"  Your {subject} level: [bold {color}]{level.title()}[/bold {color}] ({correct}/{total})"
+        )
 
     # Step 4: Save profile
     profile = {
@@ -200,14 +208,16 @@ def run_onboarding(console=None, skip: bool = False, level_override: Optional[st
     save_profile(profile)
 
     # Step 5: Show results
-    console.print(Panel(
-        f"[bold green]Profile created![/bold green]\n\n"
-        f"Name: {name}\n"
-        f"Interests: {', '.join(interests)}\n" +
-        "\n".join(f"  {subj}: {lvl.title()}" for subj, lvl in levels.items()),
-        title="🎓 Your Profile",
-        border_style="green",
-    ))
+    console.print(
+        Panel(
+            f"[bold green]Profile created![/bold green]\n\n"
+            f"Name: {name}\n"
+            f"Interests: {', '.join(interests)}\n"
+            + "\n".join(f"  {subj}: {lvl.title()}" for subj, lvl in levels.items()),
+            title="🎓 Your Profile",
+            border_style="green",
+        )
+    )
 
     # Step 6: Recommended learning path
     console.print("\n[bold]📚 Recommended Learning Paths:[/bold]")
@@ -216,10 +226,14 @@ def run_onboarding(console=None, skip: bool = False, level_override: Optional[st
         if level == "beginner":
             console.print("  [cyan]Mathematics:[/cyan] Algebra → Calculus → Linear Algebra")
         elif level == "intermediate":
-            console.print("  [cyan]Mathematics:[/cyan] Multivariable Calculus → Differential Equations → Real Analysis")
+            console.print(
+                "  [cyan]Mathematics:[/cyan] Multivariable Calculus → Differential Equations → Real Analysis"
+            )
         else:
-            console.print("  [cyan]Mathematics:[/cyan] Topology → Complex Analysis → Abstract Algebra")
-    
+            console.print(
+                "  [cyan]Mathematics:[/cyan] Topology → Complex Analysis → Abstract Algebra"
+            )
+
     if "physics" in interests:
         level = levels.get("physics", "beginner")
         if level == "beginner":
@@ -230,18 +244,20 @@ def run_onboarding(console=None, skip: bool = False, level_override: Optional[st
             console.print("  [cyan]Physics:[/cyan] Quantum Mechanics → Statistical Mechanics → QFT")
 
     # Step 7: Available commands
-    console.print(Panel(
-        "[bold]Get started:[/bold]\n\n"
-        "  pitagora study \"Lagrangian mechanics\"    Start a Socratic lesson\n"
-        "  pitagora explain \"eigenvalues\" --level beginner\n"
-        "  pitagora research \"topological insulators\"  Web research\n"
-        "  pitagora ingest ./papers/               Analyze your documents\n"
-        "  pitagora derive \"Euler-Lagrange\"        Derive with verification\n"
-        "  pitagora review start                   Daily spaced repetition\n"
-        "  pitagora doctor                         Check system health\n"
-        "  pitagora profile                        View your profile\n",
-        title="🚀 Quick Start",
-        border_style="cyan",
-    ))
+    console.print(
+        Panel(
+            "[bold]Get started:[/bold]\n\n"
+            '  pitagora study "Lagrangian mechanics"    Start a Socratic lesson\n'
+            '  pitagora explain "eigenvalues" --level beginner\n'
+            '  pitagora research "topological insulators"  Web research\n'
+            "  pitagora ingest ./papers/               Analyze your documents\n"
+            '  pitagora derive "Euler-Lagrange"        Derive with verification\n'
+            "  pitagora review start                   Daily spaced repetition\n"
+            "  pitagora doctor                         Check system health\n"
+            "  pitagora profile                        View your profile\n",
+            title="🚀 Quick Start",
+            border_style="cyan",
+        )
+    )
 
     return profile

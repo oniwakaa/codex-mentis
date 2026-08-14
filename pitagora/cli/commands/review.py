@@ -1,6 +1,6 @@
 """Spaced repetition review command — daily practice to maintain mastery."""
+
 import typer
-from typing import Optional
 
 app = typer.Typer(help="Spaced repetition review system")
 
@@ -8,17 +8,15 @@ app = typer.Typer(help="Spaced repetition review system")
 @app.command("start")
 def review_start(
     count: int = typer.Option(10, "--count", "-n", help="Number of cards to review"),
-    subject: Optional[str] = typer.Option(None, "--subject", "-s", help="Filter by subject"),
+    subject: str | None = typer.Option(None, "--subject", "-s", help="Filter by subject"),
 ):
     """Start a spaced repetition review session."""
     from rich.console import Console
     from rich.panel import Panel
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.prompt import Prompt, Confirm
-    from rich.markdown import Markdown
-    from rich.text import Text
-    from pitagora.memory.spaced_repetition import SpacedRepetition
+    from rich.prompt import Prompt
+
     from pitagora.concepts.graph import ConceptGraph
+    from pitagora.memory.spaced_repetition import SpacedRepetition
 
     console = Console()
     sr = SpacedRepetition()
@@ -28,25 +26,29 @@ def review_start(
     due = sr.get_due_reviews()
 
     if not due:
-        console.print(Panel(
-            "[green]No cards due for review! Your spaced repetition schedule is up to date.[/green]\n\n"
-            "Cards appear for review based on the SM-2 algorithm:\n"
-            "  - New cards: reviewed daily\n"
-            "  - Learning cards: reviewed at increasing intervals\n"
-            "  - Mastered cards: reviewed every few weeks\n\n"
-            "[dim]Use `pitagora study <topic>` to add new concepts to your review deck.[/dim]",
-            title="📚 Review Status",
-            border_style="green",
-        ))
+        console.print(
+            Panel(
+                "[green]No cards due for review! Your spaced repetition schedule is up to date.[/green]\n\n"
+                "Cards appear for review based on the SM-2 algorithm:\n"
+                "  - New cards: reviewed daily\n"
+                "  - Learning cards: reviewed at increasing intervals\n"
+                "  - Mastered cards: reviewed every few weeks\n\n"
+                "[dim]Use `pitagora study <topic>` to add new concepts to your review deck.[/dim]",
+                title="📚 Review Status",
+                border_style="green",
+            )
+        )
         return
 
-    console.print(Panel(
-        f"[bold]Starting review session[/bold]\n"
-        f"Cards due: [cyan]{len(due)}[/cyan]\n"
-        f"Subject filter: [cyan]{subject or 'all'}[/cyan]",
-        title="📚 Spaced Repetition Review",
-        border_style="blue",
-    ))
+    console.print(
+        Panel(
+            f"[bold]Starting review session[/bold]\n"
+            f"Cards due: [cyan]{len(due)}[/cyan]\n"
+            f"Subject filter: [cyan]{subject or 'all'}[/cyan]",
+            title="📚 Spaced Repetition Review",
+            border_style="blue",
+        )
+    )
 
     correct = 0
     total = 0
@@ -100,26 +102,28 @@ def review_start(
             next_date = sr.get_review_metrics(concept).get("next_review", "?")
             console.print(f"[green]✓ Recorded — next review: {next_date}[/green]")
         else:
-            console.print(f"[yellow]↺ Will review again sooner[/yellow]")
+            console.print("[yellow]↺ Will review again sooner[/yellow]")
 
     # Show summary
     if total > 0:
         pct = (correct / total) * 100
         color = "green" if pct >= 80 else "yellow" if pct >= 50 else "red"
-        console.print(Panel(
-            f"[bold {color}]{correct}/{total} recalled ({pct:.0f}%)[/bold {color}]\n\n"
-            f"{'Excellent work! Keep it up.' if pct >= 80 else 'Keep practicing — it gets easier with repetition.' if pct >= 50 else 'Consider revisiting these concepts with `pitagora study`.'}",
-            title="📊 Review Summary",
-            border_style=color,
-        ))
+        console.print(
+            Panel(
+                f"[bold {color}]{correct}/{total} recalled ({pct:.0f}%)[/bold {color}]\n\n"
+                f"{'Excellent work! Keep it up.' if pct >= 80 else 'Keep practicing — it gets easier with repetition.' if pct >= 50 else 'Consider revisiting these concepts with `pitagora study`.'}",
+                title="📊 Review Summary",
+                border_style=color,
+            )
+        )
 
 
 @app.command("status")
 def review_status():
     """Show spaced repetition status — how many cards are due."""
     from rich.console import Console
-    from rich.panel import Panel
     from rich.table import Table
+
     from pitagora.memory.spaced_repetition import SpacedRepetition
 
     console = Console()
@@ -157,6 +161,7 @@ def review_add(
 ):
     """Add a concept to the spaced repetition deck."""
     from rich.console import Console
+
     from pitagora.memory.spaced_repetition import SpacedRepetition
 
     console = Console()

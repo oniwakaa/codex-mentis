@@ -5,7 +5,6 @@ pitagora data profile
 pitagora data analyze "question"
 pitagora data plot <type> [--x ...] [--y ...] [--save PATH]
 """
-from typing import Optional
 
 import typer
 
@@ -21,7 +20,8 @@ _LOADED: dict = {}
 
 
 def _load_or_exit(path_or_url: str):
-    from pitagora.data_analysis.loader import load_data, LoaderError
+    from pitagora.data_analysis.loader import LoaderError, load_data
+
     try:
         return load_data(path_or_url)
     except LoaderError as e:
@@ -37,20 +37,27 @@ def load_cmd(
     df = _load_or_exit(path_or_url)
     _LOADED["df"] = df
     from pitagora.data_analysis.profiler import profile_data
+
     prof = profile_data(df)
     typer.echo(f"Loaded {prof.rows} rows × {prof.cols} cols")
     rows = [
-        [c.name, c.inferred_type, str(c.missing_count), str(c.cardinality),
-         f"{c.mean:.3f}" if c.mean is not None else "-"]
+        [
+            c.name,
+            c.inferred_type,
+            str(c.missing_count),
+            str(c.cardinality),
+            f"{c.mean:.3f}" if c.mean is not None else "-",
+        ]
         for c in prof.columns
     ]
-    print_table(["Column", "Type", "Missing", "Cardinality", "Mean"],
-                rows, title=f"Profile: {path_or_url}")
+    print_table(
+        ["Column", "Type", "Missing", "Cardinality", "Mean"], rows, title=f"Profile: {path_or_url}"
+    )
 
 
 @app.command("profile")
 def profile_cmd(
-    path_or_url: Optional[str] = typer.Option(None, "--path", "-p", help="Dataset path (reloads)"),
+    path_or_url: str | None = typer.Option(None, "--path", "-p", help="Dataset path (reloads)"),
 ):
     """Show the full profile of a loaded (or reloaded) dataset."""
     if path_or_url:
@@ -60,6 +67,7 @@ def profile_cmd(
         typer.echo("No dataset loaded. Use `pitagora data load <path>` or `--path`.")
         raise typer.Exit(1)
     from pitagora.data_analysis.profiler import profile_data
+
     prof = profile_data(df)
     lines = [f"Rows: {prof.rows}  Cols: {prof.cols}"]
     for c in prof.columns:
@@ -81,12 +89,13 @@ def profile_cmd(
 @app.command("analyze")
 def analyze_cmd(
     question: str = typer.Argument(..., help="Analytical question"),
-    path_or_url: Optional[str] = typer.Option(None, "--path", "-p", help="Dataset path"),
+    path_or_url: str | None = typer.Option(None, "--path", "-p", help="Dataset path"),
 ):
     """Interactive analysis — the agent decides and runs the appropriate test."""
     from rich.console import Console
     from rich.markdown import Markdown
-    from pitagora.chat import load_provider_config, chat_completion
+
+    from pitagora.chat import chat_completion, load_provider_config
 
     console = Console()
     df = _LOADED.get("df")
@@ -98,6 +107,7 @@ def analyze_cmd(
         raise typer.Exit(1)
 
     from pitagora.data_analysis.profiler import profile_data
+
     prof = profile_data(df)
     context = (
         f"Dataset profile: {prof.rows} rows × {prof.cols} cols.\n"
@@ -119,10 +129,10 @@ def analyze_cmd(
 @app.command("plot")
 def plot_cmd(
     plot_type: str = typer.Argument("hist", help="line | scatter | hist | bar"),
-    x: Optional[str] = typer.Option(None, "--x", help="X column"),
-    y: Optional[str] = typer.Option(None, "--y", help="Y column"),
-    save: Optional[str] = typer.Option(None, "--save", help="Save PNG to path"),
-    path_or_url: Optional[str] = typer.Option(None, "--path", "-p", help="Dataset path"),
+    x: str | None = typer.Option(None, "--x", help="X column"),
+    y: str | None = typer.Option(None, "--y", help="Y column"),
+    save: str | None = typer.Option(None, "--save", help="Save PNG to path"),
+    path_or_url: str | None = typer.Option(None, "--path", "-p", help="Dataset path"),
 ):
     """Generate a visualization for a loaded dataset."""
     if path_or_url:
@@ -132,5 +142,6 @@ def plot_cmd(
         typer.echo("No dataset loaded. Use `pitagora data load <path>` or `--path`.")
         raise typer.Exit(1)
     from pitagora.data_analysis.visualizer import create_plot
+
     out = create_plot(df, plot_type=plot_type, x=x, y=y, save_path=save)
     typer.echo(out)

@@ -1,4 +1,5 @@
 """Doctor command — check system health and diagnose issues."""
+
 import typer
 
 from pitagora.core.constants import CONFIG_DIR
@@ -12,13 +13,13 @@ def doctor(ctx: typer.Context):
     from rich.console import Console
     from rich.panel import Panel
     from rich.table import Table
-    from rich.text import Text
 
     console = Console()
     checks = []
 
     # 1. Check Python version
     import sys
+
     py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     py_ok = sys.version_info >= (3, 11)
     checks.append(("Python ≥ 3.11", py_ok, py_ver))
@@ -64,20 +65,24 @@ def doctor(ctx: typer.Context):
     if config_exists:
         config_file = config_dir / "config.yaml"
         checks.append(("Config file", config_file.exists(), str(config_file)))
-        
+
         profile_file = config_dir / "profile.yaml"
         checks.append(("User profile", profile_file.exists(), str(profile_file)))
 
     # 5. Check webfetch
     try:
-        import webfetch
+        import webfetch  # noqa: F401
+
         checks.append(("webfetch (web search)", True, "installed — free web search enabled"))
     except ImportError:
-        checks.append(("webfetch (web search)", False, "MISSING — install: pip install webfetch-llm"))
+        checks.append(
+            ("webfetch (web search)", False, "MISSING — install: pip install webfetch-llm")
+        )
 
     # 6. Check SymPy sandbox
     try:
         from pitagora.math_engine.sandbox import SymPySandbox
+
         sandbox = SymPySandbox()
         result = sandbox.evaluate("x**2 + 2*x + 1")
         sympy_ok = result.verified
@@ -88,9 +93,12 @@ def doctor(ctx: typer.Context):
     # 7. Check database
     try:
         from pitagora.knowledge.base import KnowledgeBase
+
         kb = KnowledgeBase()
         stats = kb.get_stats()
-        checks.append(("Knowledge base", True, f"{stats['documents']} docs, {stats['chunks']} chunks"))
+        checks.append(
+            ("Knowledge base", True, f"{stats['documents']} docs, {stats['chunks']} chunks")
+        )
     except Exception as e:
         checks.append(("Knowledge base", False, str(e)))
 
@@ -113,13 +121,17 @@ def doctor(ctx: typer.Context):
     console.print(table)
 
     if all_ok:
-        console.print(Panel(
-            "[green]All systems operational! Pitagora is ready.[/green]",
-            border_style="green",
-        ))
+        console.print(
+            Panel(
+                "[green]All systems operational! Pitagora is ready.[/green]",
+                border_style="green",
+            )
+        )
     else:
-        console.print(Panel(
-            "[yellow]Some checks failed. Install missing packages with:[/yellow]\n"
-            "  pip install pitagora[all]",
-            border_style="yellow",
-        ))
+        console.print(
+            Panel(
+                "[yellow]Some checks failed. Install missing packages with:[/yellow]\n"
+                "  pip install pitagora[all]",
+                border_style="yellow",
+            )
+        )

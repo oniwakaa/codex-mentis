@@ -1,19 +1,21 @@
 """Pitagora CLI module."""
+
 from pitagora.cli.rich_ui import (
-    print_markdown,
-    print_panel,
-    print_math,
-    print_plot,
-    print_concept_map,
-    print_table,
     create_spinner,
     format_proof,
+    print_concept_map,
+    print_markdown,
+    print_math,
+    print_panel,
+    print_plot,
+    print_table,
 )
 
 
 def launch_repl(**kwargs):
     """Launch the chat REPL (lazy import)."""
     from pitagora.chat import launch_chat
+
     return launch_chat(**kwargs)
 
 

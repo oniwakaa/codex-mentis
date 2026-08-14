@@ -4,10 +4,10 @@ Typing ``/`` pops up the menu of available slash commands; the bottom toolbar
 shows context + hints. Falls back to plain ``input()`` when prompt_toolkit is
 unavailable or stdin is not a TTY (so tests / piped input keep working).
 """
+
 from __future__ import annotations
 
 import sys
-from typing import Optional
 
 from pitagora.core.constants import CONFIG_DIR
 
@@ -16,6 +16,7 @@ try:
     from prompt_toolkit.completion import NestedCompleter
     from prompt_toolkit.history import FileHistory
     from prompt_toolkit.styles import Style
+
     _HAVE_PTK = True
 except Exception:  # pragma: no cover - optional dep
     _HAVE_PTK = False
@@ -26,10 +27,19 @@ except Exception:  # pragma: no cover - optional dep
 # use None so the menu doesn't fire after the command name.
 COMMAND_TREE = {
     "/mode": {
-        "study": None, "explore": None, "reason": None, "verify": None,
-        "tutor": None, "researcher": None, "prover": None, "reviewer": None,
-        "visualizer": None, "explainer": None,
-        "data": None, "data_analyst": None, "analyze": None,
+        "study": None,
+        "explore": None,
+        "reason": None,
+        "verify": None,
+        "tutor": None,
+        "researcher": None,
+        "prover": None,
+        "reviewer": None,
+        "visualizer": None,
+        "explainer": None,
+        "data": None,
+        "data_analyst": None,
+        "analyze": None,
     },
     "/topic": None,
     "/model": None,
@@ -45,8 +55,12 @@ COMMAND_TREE = {
     "/journeys": None,
     "/dashboard": None,
     "/workflow": {
-        "teach": None, "derive_and_prove": None, "concept_mastery": None,
-        "debate": None, "deep_research": None, "philosophical_reasoning": None,
+        "teach": None,
+        "derive_and_prove": None,
+        "concept_mastery": None,
+        "debate": None,
+        "deep_research": None,
+        "philosophical_reasoning": None,
     },
     "/latex": None,
     "/rate": {"1": None, "2": None, "3": None, "4": None, "5": None},
@@ -59,17 +73,19 @@ COMMAND_TREE = {
 
 _HISTORY_PATH = str(CONFIG_DIR / "repl_history")
 
-_STYLE = Style.from_dict({
-    "prompt": "bold ansigreen",
-    "bottom-toolbar": "bg:#1a1a2a #888888",
-    "bottom-toolbar.key": "bold #6ab0f3",
-})
+_STYLE = Style.from_dict(
+    {
+        "prompt": "bold ansigreen",
+        "bottom-toolbar": "bg:#1a1a2a #888888",
+        "bottom-toolbar.key": "bold #6ab0f3",
+    }
+)
 
 # Single shared session so history + completion state persist across turns.
-_session: "Optional[PromptSession]" = None
+_session: PromptSession | None = None
 
 
-def _build_session() -> "PromptSession":
+def _build_session() -> PromptSession:
     try:
         history = FileHistory(_HISTORY_PATH)
     except Exception:
@@ -84,6 +100,7 @@ def _build_session() -> "PromptSession":
 
 def _toolbar(mode: str, topic: str):
     """Bottom status bar — context + the key hint, Claude Code-style."""
+
     def _fn():
         return [
             ("class:bottom-toolbar", f" {mode}:{topic}   "),
@@ -94,6 +111,7 @@ def _toolbar(mode: str, topic: str):
             ("class:bottom-toolbar.key", "/quit"),
             ("class:bottom-toolbar", " to exit"),
         ]
+
     return _fn
 
 

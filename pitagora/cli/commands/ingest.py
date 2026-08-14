@@ -1,6 +1,6 @@
 """Folder ingestion — analyze papers, books, and documents in a directory."""
+
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -12,9 +12,13 @@ def ingest_main(
     ctx: typer.Context,
     path: str = typer.Argument(..., help="Path to folder or file to ingest"),
     subject: str = typer.Option("general", "--subject", "-s", help="Subject tag for all documents"),
-    recursive: bool = typer.Option(True, "--recursive/--no-recursive", "-r", help="Scan subdirectories"),
-    stats: bool = typer.Option(False, "--stats", help="Show knowledge base statistics instead of ingesting"),
-    search: Optional[str] = typer.Option(None, "--search", help="Search ingested documents"),
+    recursive: bool = typer.Option(
+        True, "--recursive/--no-recursive", "-r", help="Scan subdirectories"
+    ),
+    stats: bool = typer.Option(
+        False, "--stats", help="Show knowledge base statistics instead of ingesting"
+    ),
+    search: str | None = typer.Option(None, "--search", help="Search ingested documents"),
 ):
     """Ingest documents from a folder into the knowledge base.
 
@@ -23,8 +27,7 @@ def ingest_main(
     """
     from rich.console import Console
     from rich.panel import Panel
-    from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TaskProgressColumn
-    from rich.table import Table
+    from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 
     console = Console()
 
@@ -42,7 +45,18 @@ def ingest_main(
         raise typer.Exit(1)
 
     # Collect files
-    extensions = {".pdf", ".md", ".markdown", ".tex", ".latex", ".txt", ".rst", ".ipynb", ".html", ".htm"}
+    extensions = {
+        ".pdf",
+        ".md",
+        ".markdown",
+        ".tex",
+        ".latex",
+        ".txt",
+        ".rst",
+        ".ipynb",
+        ".html",
+        ".htm",
+    }
     files = []
     if target.is_file():
         files = [target]
@@ -57,18 +71,20 @@ def ingest_main(
         console.print(f"[dim]Supported formats: {', '.join(sorted(extensions))}[/dim]")
         return
 
-    console.print(Panel(
-        f"Found [bold cyan]{len(files)}[/bold cyan] documents to ingest\n"
-        f"Subject: [cyan]{subject}[/cyan]\n"
-        f"Path: [cyan]{target}[/cyan]",
-        title="📥 Document Ingestion",
-        border_style="blue",
-    ))
+    console.print(
+        Panel(
+            f"Found [bold cyan]{len(files)}[/bold cyan] documents to ingest\n"
+            f"Subject: [cyan]{subject}[/cyan]\n"
+            f"Path: [cyan]{target}[/cyan]",
+            title="📥 Document Ingestion",
+            border_style="blue",
+        )
+    )
 
     # Ingest
     from pitagora.knowledge.base import KnowledgeBase
-    from pitagora.knowledge.ingester import DocumentIngester
     from pitagora.knowledge.chunker import SmartChunker
+    from pitagora.knowledge.ingester import DocumentIngester
 
     kb = KnowledgeBase()
     ingester = DocumentIngester()
@@ -89,7 +105,7 @@ def ingest_main(
 
         for f in files:
             progress.update(task, description=f"[cyan]{f.name}[/cyan]")
-            
+
             try:
                 # Check if already ingested
                 existing = kb.search(f.name, limit=1)
@@ -106,7 +122,7 @@ def ingest_main(
 
                 # Chunk
                 chunks = chunker.chunk_text(text, source=str(f))
-                
+
                 # Store
                 kb.add_document(
                     path=str(f),
@@ -118,25 +134,28 @@ def ingest_main(
 
                 success += 1
                 total_chunks += len(chunks)
-            except Exception as e:
+            except Exception:
                 failed += 1
 
             progress.advance(task)
 
     # Summary
-    console.print(Panel(
-        f"[green]✓ {success} documents ingested successfully[/green]\n"
-        f"[red]✗ {failed} failed[/red]\n"
-        f"[cyan]📦 {total_chunks} chunks created[/cyan]\n\n"
-        f"[dim]Search with: pitagora ingest --search \"your query\"[/dim]",
-        title="📥 Ingestion Complete",
-        border_style="green" if failed == 0 else "yellow",
-    ))
+    console.print(
+        Panel(
+            f"[green]✓ {success} documents ingested successfully[/green]\n"
+            f"[red]✗ {failed} failed[/red]\n"
+            f"[cyan]📦 {total_chunks} chunks created[/cyan]\n\n"
+            f'[dim]Search with: pitagora ingest --search "your query"[/dim]',
+            title="📥 Ingestion Complete",
+            border_style="green" if failed == 0 else "yellow",
+        )
+    )
 
 
 def _show_stats(console):
     """Show knowledge base statistics."""
     from rich.table import Table
+
     from pitagora.knowledge.base import KnowledgeBase
 
     kb = KnowledgeBase()
@@ -157,8 +176,8 @@ def _show_stats(console):
 
 def _search_docs(console, query: str):
     """Search ingested documents."""
-    from rich.markdown import Markdown
     from rich.panel import Panel
+
     from pitagora.knowledge.base import KnowledgeBase
 
     kb = KnowledgeBase()
@@ -170,10 +189,12 @@ def _search_docs(console, query: str):
 
     console.print(f"[bold]Search results for:[/bold] {query}\n")
     for i, r in enumerate(results, 1):
-        console.print(Panel(
-            f"**Source:** {r.get('source', 'Unknown')}\n"
-            f"**Subject:** {r.get('subject', 'General')}\n\n"
-            f"{r.get('content', '')[:500]}",
-            title=f"Result {i}",
-            border_style="cyan",
-        ))
+        console.print(
+            Panel(
+                f"**Source:** {r.get('source', 'Unknown')}\n"
+                f"**Subject:** {r.get('subject', 'General')}\n\n"
+                f"{r.get('content', '')[:500]}",
+                title=f"Result {i}",
+                border_style="cyan",
+            )
+        )

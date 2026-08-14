@@ -122,8 +122,44 @@ if onboard:
 app.command("study")(study.study)
 app.command("explore")(explore.explore)
 app.command("derive")(reason.derive)
+app.command("solve")(reason.derive)
 app.command("verify")(verify.verify)
 app.command("plot")(visualize.plot_expression)
+
+
+@app.command("dashboard")
+def dashboard_cmd():
+    """Show learning progress: active journeys, concept mastery, and review queue."""
+    from rich.console import Console
+    from rich.table import Table
+
+    from pitagora.journeys.store import list_journeys
+
+    console = Console()
+
+    # Active journeys
+    journeys = list_journeys()
+    if journeys:
+        table = Table(title="Active Learning Journeys", show_lines=True)
+        table.add_column("Topic", style="cyan")
+        table.add_column("Status", style="yellow")
+        table.add_column("Interactions", justify="right")
+        table.add_column("Updated")
+        for j in journeys:
+            table.add_row(
+                str(j.get("topic", "?")),
+                str(j.get("status", "?")),
+                str(j.get("interaction_count", 0)),
+                str(j.get("updated_at", "?"))[:19],
+            )
+        console.print(table)
+    else:
+        console.print("[dim]No active journeys. Use `pitagora explore <topic>` to start one.[/dim]")
+
+    console.print()
+    concept.show_status()
+    console.print()
+    concept.show_review_queue()
 
 
 @app.command("research")

@@ -1,8 +1,8 @@
 """Session management — track study sessions with timers."""
+
 import os
 import sqlite3
 from datetime import datetime
-from typing import Optional
 
 import typer
 
@@ -11,6 +11,7 @@ app = typer.Typer(help="Study session management")
 
 def _get_db_path():
     from pitagora.core.config import CONFIG_DIR
+
     return str(CONFIG_DIR / "sessions.db")
 
 
@@ -44,14 +45,16 @@ def session_start(
     console = Console()
     db_path = _init_db()
     conn = sqlite3.connect(db_path)
-    
+
     # Check for active session
     active = conn.execute(
         "SELECT id, topic, started_at FROM sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1"
     ).fetchone()
-    
+
     if active:
-        console.print(f"[yellow]Session already active: '{active[1]}' (started {active[2][:16]})[/yellow]")
+        console.print(
+            f"[yellow]Session already active: '{active[1]}' (started {active[2][:16]})[/yellow]"
+        )
         console.print("[dim]Run `pitagora session end` first.[/dim]")
         conn.close()
         return
@@ -61,14 +64,16 @@ def session_start(
     conn.commit()
     conn.close()
 
-    console.print(Panel(
-        f"[green]Study session started![/green]\n\n"
-        f"Topic: [bold]{topic}[/bold]\n"
-        f"Started: [cyan]{now[:16]}[/cyan]\n\n"
-        f"[dim]When done, run: pitagora session end[/dim]",
-        title="⏱️ Session",
-        border_style="green",
-    ))
+    console.print(
+        Panel(
+            f"[green]Study session started![/green]\n\n"
+            f"Topic: [bold]{topic}[/bold]\n"
+            f"Started: [cyan]{now[:16]}[/cyan]\n\n"
+            f"[dim]When done, run: pitagora session end[/dim]",
+            title="⏱️ Session",
+            border_style="green",
+        )
+    )
 
 
 @app.command("end")
@@ -82,13 +87,15 @@ def session_end(
     console = Console()
     db_path = _get_db_path()
     conn = sqlite3.connect(db_path)
-    
+
     active = conn.execute(
         "SELECT id, topic, started_at FROM sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1"
     ).fetchone()
-    
+
     if not active:
-        console.print("[yellow]No active session. Start one with: pitagora session start <topic>[/yellow]")
+        console.print(
+            "[yellow]No active session. Start one with: pitagora session start <topic>[/yellow]"
+        )
         conn.close()
         return
 
@@ -99,15 +106,16 @@ def session_end(
 
     conn.execute(
         "UPDATE sessions SET ended_at = ?, duration_minutes = ?, notes = ? WHERE id = ?",
-        (now.isoformat(), round(duration, 1), notes, session_id)
+        (now.isoformat(), round(duration, 1), notes, session_id),
     )
     conn.commit()
     conn.close()
 
     # Record in user graph
     try:
-        from pitagora.memory.user_graph import UserGraph
         from pitagora.cli.commands.onboard import load_profile
+        from pitagora.memory.user_graph import UserGraph
+
         profile = load_profile()
         if profile:
             ug = UserGraph()
@@ -115,14 +123,16 @@ def session_end(
     except Exception:
         pass
 
-    console.print(Panel(
-        f"[green]Session complete![/green]\n\n"
-        f"Topic: [bold]{topic}[/bold]\n"
-        f"Duration: [cyan]{duration:.0f} minutes[/cyan]\n"
-        f"{'Notes: ' + notes if notes else ''}",
-        title="📊 Session Summary",
-        border_style="green",
-    ))
+    console.print(
+        Panel(
+            f"[green]Session complete![/green]\n\n"
+            f"Topic: [bold]{topic}[/bold]\n"
+            f"Duration: [cyan]{duration:.0f} minutes[/cyan]\n"
+            f"{'Notes: ' + notes if notes else ''}",
+            title="📊 Session Summary",
+            border_style="green",
+        )
+    )
 
 
 @app.command("log")
@@ -136,10 +146,10 @@ def session_log(
     console = Console()
     db_path = _init_db()
     conn = sqlite3.connect(db_path)
-    
+
     rows = conn.execute(
         "SELECT topic, started_at, duration_minutes, notes FROM sessions WHERE ended_at IS NOT NULL ORDER BY id DESC LIMIT ?",
-        (limit,)
+        (limit,),
     ).fetchall()
     conn.close()
 

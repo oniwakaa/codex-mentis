@@ -3,11 +3,10 @@
 Surfaces the SelfImprover's `strategy_report` and `digest` methods so the
 feedback loop is observable from the command line.
 """
-from typing import Optional
 
 import typer
 
-from pitagora.cli.rich_ui import print_table, print_panel
+from pitagora.cli.rich_ui import print_panel, print_table
 
 app = typer.Typer(help="Self-improving strategy metrics and digests")
 
@@ -21,8 +20,8 @@ def _improver():
     offline. Upgrade path: reuse the shared provider loader when it's reliable
     in all environments.
     """
-    from pitagora.agents.self_improver import SelfImproverAgent
     from pitagora.agents.providers.base import BaseProvider, ProviderConfig
+    from pitagora.agents.self_improver import SelfImproverAgent
 
     class _NullProvider(BaseProvider):
         def __init__(self):
@@ -51,9 +50,11 @@ def _improver():
 
 @app.command("report")
 def strategy_report(
-    topic: Optional[str] = typer.Option(None, "--topic", "-t", help="Filter by topic"),
-    level: Optional[str] = typer.Option(None, "--level", "-l", help="Filter by level"),
-    last_n: Optional[int] = typer.Option(None, "--last", "-n", help="Only consider the last N interactions"),
+    topic: str | None = typer.Option(None, "--topic", "-t", help="Filter by topic"),
+    level: str | None = typer.Option(None, "--level", "-l", help="Filter by level"),
+    last_n: int | None = typer.Option(
+        None, "--last", "-n", help="Only consider the last N interactions"
+    ),
 ):
     """Aggregate performance metrics per strategy (optionally filtered)."""
     improver = _improver()
@@ -63,13 +64,15 @@ def strategy_report(
         return
     table_rows = []
     for r in rows:
-        table_rows.append([
-            r.get("strategy_used", "?"),
-            str(r.get("uses", 0)),
-            f"{r.get('avg_quality', 0):.2f}" if r.get("avg_quality") is not None else "-",
-            f"{r.get('avg_hints', 0):.2f}" if r.get("avg_hints") is not None else "-",
-            f"{r.get('success_rate', 0) * 100:.0f}%",
-        ])
+        table_rows.append(
+            [
+                r.get("strategy_used", "?"),
+                str(r.get("uses", 0)),
+                f"{r.get('avg_quality', 0):.2f}" if r.get("avg_quality") is not None else "-",
+                f"{r.get('avg_hints', 0):.2f}" if r.get("avg_hints") is not None else "-",
+                f"{r.get('success_rate', 0) * 100:.0f}%",
+            ]
+        )
     print_table(
         ["Strategy", "Uses", "Avg Quality", "Avg Hints", "Success"],
         table_rows,

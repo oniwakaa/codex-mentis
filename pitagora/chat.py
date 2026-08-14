@@ -9,26 +9,29 @@ This is the core chat loop. It connects ALL systems:
 - Memory (save/load conversations)
 - Spaced repetition (trigger reviews)
 """
-import os
+
 import logging
-from typing import Optional, Dict, Any, List
+import os
+from typing import Any
 
 import httpx
 
 from pitagora.core.constants import (
-    CONFIG_PATH, DEFAULT_BASE_URL, DEFAULT_API_KEY, DEFAULT_MODEL,
+    CONFIG_PATH,
+    DEFAULT_API_KEY,
+    DEFAULT_BASE_URL,
+    DEFAULT_MODEL,
 )
 
 log = logging.getLogger(__name__)
 
 
-def load_provider_config() -> Dict[str, Any]:
+def load_provider_config() -> dict[str, Any]:
     """Load provider configuration from config.yaml or environment."""
-    from pathlib import Path
     import yaml
 
     config_path = CONFIG_PATH
-    
+
     if config_path.exists():
         with open(config_path) as f:
             config = yaml.safe_load(f) or {}
@@ -39,7 +42,7 @@ def load_provider_config() -> Dict[str, Any]:
 
     api_key = os.getenv("OPENAI_API_KEY", os.getenv("CLIPROXY_API_KEY", ""))
     base_url = os.getenv("OPENAI_BASE_URL", "")
-    
+
     if base_url and api_key:
         return {
             "name": "cliproxy",
@@ -60,8 +63,8 @@ def load_provider_config() -> Dict[str, Any]:
 
 def chat_completion(
     messages: list,
-    model: Optional[str] = None,
-    config: Optional[Dict] = None,
+    model: str | None = None,
+    config: dict | None = None,
     stream: bool = False,
 ) -> str:
     """Send a chat completion request and return the response."""
@@ -145,8 +148,9 @@ def _build_feedback_loop():
         log.debug("feedback loop improver unavailable: %s", e)
 
     try:
-        from pitagora.skills.evolution import SkillEvolution
         from pitagora.skills.engine import SkillsEngine
+        from pitagora.skills.evolution import SkillEvolution
+
         skill_evo = SkillEvolution()
         skills_engine = SkillsEngine()
     except Exception as e:
@@ -175,6 +179,7 @@ def _seed_session_style(session, improver) -> None:
         return
     try:
         from pitagora.teaching.session import ALL_STYLES
+
         report = {r["strategy_used"]: r for r in improver.strategy_report(topic=session.topic)}
         total = sum(r.get("uses", 0) for r in report.values())
         if total < 5:
@@ -191,17 +196,18 @@ def _get_rag_context(query: str, max_tokens: int = 2000) -> str:
     """Retrieve relevant context from knowledge base for RAG."""
     try:
         from pitagora.knowledge.base import KnowledgeBase
+
         kb = KnowledgeBase()
         results = kb.search(query, limit=3)
         if not results:
             return ""
-        
+
         context_parts = ["[Relevant knowledge from your documents:]"]
         for r in results:
             source = r.get("source", "Unknown")
             content = r.get("content", "")[:500]
             context_parts.append(f"- [{source}]: {content}")
-        
+
         return "\n".join(context_parts)
     except Exception:
         return ""
@@ -211,8 +217,9 @@ def _get_concept_context(topic: str) -> str:
     """Get concept graph context — prerequisites, learning path."""
     try:
         from pitagora.concepts.graph import ConceptGraph
+
         cg = ConceptGraph()
-        
+
         # Check if topic exists in graph
         if topic.lower() in [k.lower() for k in cg.graph.keys()]:
             prereqs = cg.get_prerequisites(topic)
@@ -233,25 +240,26 @@ def _get_user_context() -> str:
     """Get user profile context — level, mastery, recent activity."""
     try:
         from pitagora.cli.commands.onboard import load_profile
+
         profile = load_profile()
         if not profile:
             return ""
-        
+
         parts = [f"[User profile: {profile.get('name', 'Student')}]"]
         levels = profile.get("levels", {})
         for subj, level in levels.items():
             parts.append(f"  {subj}: {level}")
-        
+
         interests = profile.get("interests", [])
         if interests:
             parts.append(f"  Interests: {', '.join(interests)}")
-        
+
         return "\n".join(parts)
     except Exception:
         return ""
 
 
-def _verify_math(response: str) -> Optional[str]:
+def _verify_math(response: str) -> str | None:
     """Check if response contains math claims and verify with SymPy.
 
     Logs unexpected errors instead of silently swallowing them; only the
@@ -263,12 +271,13 @@ def _verify_math(response: str) -> Optional[str]:
 
     log = logging.getLogger(__name__)
 
-    equations = re.findall(r'\$([^$]+)\$', response)
+    equations = re.findall(r"\$([^$]+)\$", response)
     if not equations:
         return None
 
     try:
         from pitagora.math_engine.sandbox import SymPySandbox
+
         sandbox = SymPySandbox()
     except Exception as e:
         # Sandbox unavailable — log and bail, don't swallow silently.
@@ -295,8 +304,9 @@ def _verify_math(response: str) -> Optional[str]:
 def _save_to_memory(role: str, content: str, topic: str = "general") -> None:
     """Save message to memory store."""
     try:
-        from pitagora.memory.store import MemoryStore
         from pitagora.core.models import MemoryEntry
+        from pitagora.memory.store import MemoryStore
+
         store = MemoryStore()
         entry = MemoryEntry(
             layer="L1",
@@ -311,8 +321,9 @@ def _save_to_memory(role: str, content: str, topic: str = "general") -> None:
 def _record_study(topic: str, user_input: str) -> None:
     """Record study activity in user graph."""
     try:
-        from pitagora.memory.user_graph import UserGraph
         from pitagora.cli.commands.onboard import load_profile
+        from pitagora.memory.user_graph import UserGraph
+
         profile = load_profile()
         if profile:
             ug = UserGraph()
@@ -321,10 +332,11 @@ def _record_study(topic: str, user_input: str) -> None:
         log.debug("failed to record study activity: %s", e)
 
 
-def _check_due_reviews() -> Optional[str]:
+def _check_due_reviews() -> str | None:
     """Check if there are cards due for spaced repetition review."""
     try:
         from pitagora.memory.spaced_repetition import SpacedRepetition
+
         sr = SpacedRepetition()
         due = sr.get_due_reviews()
         if due and len(due) > 0:
@@ -339,7 +351,7 @@ def _check_due_reviews() -> Optional[str]:
 SUBCONCEPT_GEN_PROMPT = (
     "You are a curriculum designer. Break the given topic into 3 to 6 ordered "
     "sub-concepts that a learner should cover, from foundational to advanced. "
-    "Return ONLY a JSON object: {\"sub_concepts\": [\"name1\", \"name2\", ...]}. "
+    'Return ONLY a JSON object: {"sub_concepts": ["name1", "name2", ...]}. '
     "No extra text, no markdown fences."
 )
 
@@ -353,7 +365,7 @@ STYLE_GUIDES = {
 }
 
 
-def _generate_sub_concepts(topic: str, config: Dict[str, Any], model: str) -> List[str]:
+def _generate_sub_concepts(topic: str, config: dict[str, Any], model: str) -> list[str]:
     """Ask the LLM to decompose a topic into ordered sub-concepts."""
     messages = [
         {"role": "system", "content": SUBCONCEPT_GEN_PROMPT},
@@ -361,6 +373,7 @@ def _generate_sub_concepts(topic: str, config: Dict[str, Any], model: str) -> Li
     ]
     raw = chat_completion(messages, model=model, config=config)
     import json as _json
+
     try:
         s = raw.strip()
         if s.startswith("```"):
@@ -419,6 +432,7 @@ def _render_rich_event(console, event) -> bool:
         if isinstance(content, dict) and content.get("summary"):
             # Teaching session summary widget.
             from pitagora.teaching.ui import show_session_summary
+
             show_session_summary(
                 content["topic"],
                 content["comprehension"],
@@ -430,6 +444,7 @@ def _render_rich_event(console, event) -> bool:
         elif isinstance(content, dict) and "sub_concepts" in content:
             # Topic overview widget for /explore.
             from pitagora.teaching.ui import show_topic_overview
+
             show_topic_overview(
                 content["topic"],
                 content["sub_concepts"],
@@ -446,9 +461,11 @@ def _render_rich_event(console, event) -> bool:
         console.print(f"[red]{event.content}[/red]")
     elif event.kind == "comprehension":
         from pitagora.teaching.ui import show_comprehension_gauge
+
         show_comprehension_gauge(float(event.content), console)
     elif event.kind == "subconcepts":
         from pitagora.teaching.ui import show_subconcept_progress
+
         show_subconcept_progress(
             event.content,
             event.metadata["current_index"],
@@ -456,6 +473,7 @@ def _render_rich_event(console, event) -> bool:
         )
     elif event.kind == "controls":
         from pitagora.teaching.ui import show_controls
+
         show_controls(console)
     elif event.kind == "status" and not event.metadata.get("busy"):
         console.print(f"[dim]{event.content}[/dim]")
@@ -477,9 +495,7 @@ def _dispatch_rich_events(console, controller, user_input: str) -> bool:
                 status_ctx.__exit__(None, None, None)
                 status_ctx = None
             if event.kind == "status" and event.metadata.get("busy"):
-                status_ctx = console.status(
-                    f"[bold cyan]{event.content}[/bold cyan]"
-                )
+                status_ctx = console.status(f"[bold cyan]{event.content}[/bold cyan]")
                 status_ctx.__enter__()
                 continue
             if _render_rich_event(console, event):
@@ -494,7 +510,7 @@ def _dispatch_rich_events(console, controller, user_input: str) -> bool:
 def launch_chat(
     mode: str = "study",
     topic: str = "general",
-    system_prompt: Optional[str] = None,
+    system_prompt: str | None = None,
     *,
     controller=None,
     input_reader=None,
@@ -520,12 +536,16 @@ def launch_chat(
 
     if controller is None:
         from pitagora.chat_controller import ChatController
+
         controller = ChatController(
-            mode=mode, topic=topic, system_prompt=system_prompt,
+            mode=mode,
+            topic=topic,
+            system_prompt=system_prompt,
         )
 
     if input_reader is None:
         from pitagora.cli.repl_input import pitagora_prompt
+
         input_reader = pitagora_prompt
 
     # Startup: prefer controller-provided startup events (welcome banner +
@@ -537,6 +557,7 @@ def launch_chat(
             _render_rich_event(console, event)
     else:
         from pitagora.cli.rich_ui import show_welcome
+
         show_welcome(
             mode=controller.mode,
             topic=controller.topic,

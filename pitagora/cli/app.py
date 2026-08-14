@@ -1,21 +1,24 @@
 """Pitagora CLI — the main entry point."""
-import os
+
 import logging
+import os
 import sys
+
 import typer
+
 from pitagora.cli.commands import (
-    study,
-    explore,
-    reason,
-    verify,
-    visualize,
     concept,
-    memory,
-    kb,
     config,
+    data,
+    explore,
+    kb,
+    memory,
+    reason,
     skills,
     strategy,
-    data,
+    study,
+    verify,
+    visualize,
 )
 
 log = logging.getLogger(__name__)
@@ -23,12 +26,7 @@ log = logging.getLogger(__name__)
 
 def _is_interactive() -> bool:
     """Return whether both standard input and output are terminals."""
-    return bool(
-        sys.stdin
-        and sys.stdout
-        and sys.stdin.isatty()
-        and sys.stdout.isatty()
-    )
+    return bool(sys.stdin and sys.stdout and sys.stdin.isatty() and sys.stdout.isatty())
 
 
 def _load_simple_launcher():
@@ -50,9 +48,7 @@ def _select_chat_launcher(simple: bool):
     try:
         return _load_tui_launcher()
     except ModuleNotFoundError as exc:
-        if exc.name != "textual" and not (
-            exc.name and exc.name.startswith("textual.")
-        ):
+        if exc.name != "textual" and not (exc.name and exc.name.startswith("textual.")):
             raise
         typer.echo(
             "Textual is not installed; install it with "
@@ -75,7 +71,7 @@ except ImportError as e:
     doctor = None
 
 try:
-    from pitagora.cli.commands import profile, session, onboard, ingest, setup
+    from pitagora.cli.commands import ingest, onboard, profile, session, setup
 except ImportError as e:
     log.warning("Failed to import %s: %s", "profile, session, onboard, ingest, setup", e)
     profile = session = onboard = ingest = setup = None
@@ -110,13 +106,17 @@ if ingest:
 
 # Onboarding command
 if onboard:
+
     @app.command("onboard")
     def onboard_cmd(
         skip: bool = typer.Option(False, "--skip", help="Skip interactive assessment"),
-        level: str = typer.Option(None, "--level", help="Set level: beginner/intermediate/advanced"),
+        level: str = typer.Option(
+            None, "--level", help="Set level: beginner/intermediate/advanced"
+        ),
     ):
         """First-run onboarding with level assessment."""
         onboard.run_onboarding(skip=skip, level_override=level)
+
 
 # Core commands
 app.command("study")(study.study)
@@ -134,8 +134,8 @@ def research_cmd(
 ):
     """Research a topic using web-acquired knowledge with full citations."""
     from rich.console import Console
-    from rich.panel import Panel
     from rich.markdown import Markdown
+
     from pitagora.knowledge.acquisition import KnowledgeAcquisition
     from pitagora.knowledge.base import KnowledgeBase
 
@@ -168,13 +168,17 @@ def research_cmd(
 @app.command("explain")
 def explain_cmd(
     topic: str = typer.Argument(..., help="Topic to explain"),
-    level: str = typer.Option("intermediate", help="Level: child, beginner, intermediate, advanced, expert"),
-    side_by_side: bool = typer.Option(False, "--side-by-side", "-s", help="Technical + intuition side by side"),
+    level: str = typer.Option(
+        "intermediate", help="Level: child, beginner, intermediate, advanced, expert"
+    ),
+    side_by_side: bool = typer.Option(
+        False, "--side-by-side", "-s", help="Technical + intuition side by side"
+    ),
 ):
     """Explain a complex topic at your level using the Feynman technique."""
-    import asyncio
     from rich.console import Console
     from rich.markdown import Markdown
+
     from pitagora.chat import chat_completion, load_provider_config
 
     console = Console()
@@ -205,6 +209,7 @@ def debate_cmd(
     """Run a structured debate between Prover and Reviewer agents."""
     from rich.console import Console
     from rich.markdown import Markdown
+
     from pitagora.chat import chat_completion, load_provider_config
 
     console = Console()
@@ -232,14 +237,18 @@ def debate_cmd(
         console.print(f"[bold]Round {round_num}[/bold]")
 
         # Prover
-        prover_msgs.append({"role": "user", "content": f"Present your argument (round {round_num})."})
+        prover_msgs.append(
+            {"role": "user", "content": f"Present your argument (round {round_num})."}
+        )
         with console.status("[cyan]Prover thinking...[/cyan]"):
             prover_resp = chat_completion(prover_msgs, config=config)
         prover_msgs.append({"role": "assistant", "content": prover_resp})
         console.print(f"[green]Prover:[/green] {prover_resp[:500]}...\n")
 
         # Reviewer responds
-        reviewer_msgs.append({"role": "user", "content": f"Counter the prover's argument: {prover_resp}"})
+        reviewer_msgs.append(
+            {"role": "user", "content": f"Counter the prover's argument: {prover_resp}"}
+        )
         with console.status("[cyan]Reviewer thinking...[/cyan]"):
             reviewer_resp = chat_completion(reviewer_msgs, config=config)
         reviewer_msgs.append({"role": "assistant", "content": reviewer_resp})
@@ -254,8 +263,8 @@ def debate_cmd(
     )
     with console.status("[cyan]Synthesizing...[/cyan]"):
         verdict = chat_completion([{"role": "user", "content": synthesis_prompt}], config=config)
-    
-    console.print(f"\n[bold]Verdict:[/bold]\n")
+
+    console.print("\n[bold]Verdict:[/bold]\n")
     console.print(Markdown(verdict))
 
 
@@ -296,10 +305,12 @@ def main_callback(
     # contexts (CI, pipes), fall back to a one-line hint + defaults so the
     # command never blocks on a prompt.
     from pitagora.core.constants import CONFIG_PATH
+
     if not CONFIG_PATH.exists():
         if sys.stdin and sys.stdin.isatty():
             try:
                 from pitagora.cli.commands.setup import run_setup
+
                 typer.echo("First run detected — launching setup wizard.\n")
                 run_setup()
             except Exception as e:

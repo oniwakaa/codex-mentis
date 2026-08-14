@@ -22,15 +22,17 @@ Pitagora is not just another AI chatbot wrapper. It's a **multi-agent reasoning 
 ## 🚀 Installation
 
 ```bash
-# Install from PyPI
+# Core CLI and Rich fallback
 pip install pitagora
 
-# With all features (embeddings, MCP, web scraping)
-pip install pitagora[all]
+# Full-screen Textual chat
+pip install 'pitagora[tui]'
 
-# Or with pipx for isolated install
-pipx install pitagora
+# All optional features
+pip install 'pitagora[all]'
 ```
+
+`pitagora` launches the TUI in a terminal, while `pitagora --simple` and `pitagora chat --simple` launch the Rich REPL.
 
 ### Quick Start
 
@@ -41,10 +43,9 @@ pitagora
 # Or use the short alias
 cm
 
-# Simple readline mode (no TUI)
+# Simple readline mode (Rich fallback)
 pitagora --simple
-
-# Direct commands
+pitagora chat --simple
 pitagora study "Lagrangian mechanics"
 pitagora explore "What happens if gravity was 2x?"
 pitagora derive "Euler-Lagrange equation from principle of least action"

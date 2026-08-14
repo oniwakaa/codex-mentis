@@ -1,4 +1,4 @@
-from rich.console import Console, Group
+from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
@@ -48,6 +48,7 @@ def test_compact_teaching_builders_return_renderables():
     assert isinstance(gauge, Text)
     assert isinstance(progress, Text)
     assert isinstance(controls, Text)
+
 
 from pitagora.cli.tui_widgets import InputHistory, split_math
 

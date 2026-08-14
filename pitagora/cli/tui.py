@@ -1,26 +1,27 @@
+from typing import Any
 
-from typing import Optional, Dict, Any
-
-from rich.text import Text
+from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
-from textual.widgets import Static, OptionList
-from textual import work
+from textual.widgets import Markdown, OptionList, Static
+
 from pitagora.chat_controller import ChatEvent
-from pitagora.cli.tui_widgets import split_math, EquationWidget
-from pitagora.teaching.ui import build_comprehension_gauge, build_subconcept_progress, build_controls
-from textual.widgets import Markdown
-
-
 from pitagora.cli.repl_input import COMMAND_TREE
 from pitagora.cli.tui_widgets import (
     ChatTextArea,
+    CommandPopup,
     ContextSidebar,
     Conversation,
+    EquationWidget,
     QuitScreen,
     SidebarScreen,
-    CommandPopup,
+    split_math,
+)
+from pitagora.teaching.ui import (
+    build_comprehension_gauge,
+    build_controls,
+    build_subconcept_progress,
 )
 
 
@@ -144,13 +145,13 @@ class PitagoraApp(App):
         with Horizontal(id="main"):
             yield Conversation(id="conversation")
             yield ContextSidebar(id="sidebar")
-            
+
         with Static(id="input-container"):
             yield CommandPopup(id="command-popup")
             with Horizontal(id="input-area"):
                 yield Static("△ pitagora>", id="prompt")
                 yield ChatTextArea(id="composer")
-                
+
         yield Static(
             "Ctrl+B sidebar  Ctrl+X compact  / commands",
             id="footer",
@@ -158,7 +159,7 @@ class PitagoraApp(App):
 
     def on_mount(self) -> None:
         conversation = self.query_one("#conversation", Conversation)
-        
+
         banner_text = (
             "[bold #ffd700]    △[/]\n"
             "[bold #ffd700]   △ △[/]\n"
@@ -168,26 +169,34 @@ class PitagoraApp(App):
             "[bold #ffd700]PITAGORA[/]"
         )
         from rich.panel import Panel
+
         from pitagora.journeys.store import list_journeys
-        
+
         journeys = list_journeys()
         active_count = len([j for j in journeys if j.get("status") == "active"])
-        
-        welcome_text = f"{banner_text}\n\nThink. Prove. Understand.\n\nActive Journeys: {active_count}"
-        
-        conversation.mount(Static(Panel(welcome_text, title="Welcome to Pitagora", border_style="gold1"), id="welcome-panel"))
-        
+
+        welcome_text = (
+            f"{banner_text}\n\nThink. Prove. Understand.\n\nActive Journeys: {active_count}"
+        )
+
+        conversation.mount(
+            Static(
+                Panel(welcome_text, title="Welcome to Pitagora", border_style="gold1"),
+                id="welcome-panel",
+            )
+        )
+
         due_reviews = self.controller.context.get("due_reviews")
         if due_reviews:
             self.due_reviews = due_reviews
             conversation.mount(Static(f"Due Reviews: {self.due_reviews}", id="due-reviews-panel"))
-            
+
         self.query_one("#composer").focus()
         self.set_interval(1, self._refresh_elapsed)
-        
+
         sidebar = self.query_one("#sidebar", ContextSidebar)
         sidebar.update_context(self.controller.context)
-        
+
         self.query_one("#command-popup").display = False
 
     def on_resize(self, event) -> None:
@@ -203,7 +212,7 @@ class PitagoraApp(App):
     def action_toggle_sidebar(self) -> None:
         if self.has_class("compact"):
             return
-            
+
         sidebar = self.query_one("#sidebar", ContextSidebar)
         if self.size.width >= 100:
             sidebar.display = not sidebar.display
@@ -227,13 +236,12 @@ class PitagoraApp(App):
             if self._turn_worker and self._turn_worker.is_running:
                 self._turn_worker.cancel()
             self.exit()
-            
+
     def action_clear_visible(self) -> None:
         conversation = self.query_one("#conversation")
         conversation.remove_children()
         conversation.mount(Static("[dim]Conversation cleared visually.[/dim]"))
         self.query_one("#composer").focus()
-
 
     @work(thread=True, exclusive=True, group="chat-turn")
     def run_turn(self, text: str) -> None:
@@ -281,7 +289,13 @@ class PitagoraApp(App):
         elif event.kind == "comprehension":
             conversation.mount(Static(build_comprehension_gauge(event.content)))
         elif event.kind == "subconcepts":
-            conversation.mount(Static(build_subconcept_progress(event.content, event.metadata["current_index"], compact=True)))
+            conversation.mount(
+                Static(
+                    build_subconcept_progress(
+                        event.content, event.metadata["current_index"], compact=True
+                    )
+                )
+            )
         elif event.kind == "controls":
             conversation.mount(Static(build_controls()))
         elif event.kind == "state_changed":
@@ -297,12 +311,12 @@ class PitagoraApp(App):
         minutes = elapsed // 60
         seconds = elapsed % 60
         from textual.css.query import NoMatches
+
         try:
             header_context = self.query_one("#header-context", Static)
             header_context.update(f"{minutes:02d}:{seconds:02d}")
         except NoMatches:
             return
-        
 
     def on_text_area_changed(self, event: ChatTextArea.Changed) -> None:
         composer = self.query_one("#composer")
@@ -312,14 +326,14 @@ class PitagoraApp(App):
             if text.startswith("/") and " " not in text:
                 text_lower = text.lower()
                 popup.clear_options()
-                
+
                 # Add only matching commands
                 has_matches = False
                 for cmd in COMMAND_TREE:
                     if cmd.startswith(text_lower):
                         popup.add_option(cmd)
                         has_matches = True
-                        
+
                 if has_matches:
                     popup.display = True
                     popup.highlighted = 0
@@ -328,8 +342,9 @@ class PitagoraApp(App):
             else:
                 popup.display = False
 
-                
-    def on_chat_text_area_autocomplete_navigate(self, event: ChatTextArea.AutocompleteNavigate) -> None:
+    def on_chat_text_area_autocomplete_navigate(
+        self, event: ChatTextArea.AutocompleteNavigate
+    ) -> None:
         popup = self.query_one("#command-popup")
         if popup.display:
             if event.direction == "up":
@@ -337,7 +352,9 @@ class PitagoraApp(App):
             elif event.direction == "down":
                 popup.action_cursor_down()
 
-    def on_chat_text_area_autocomplete_requested(self, event: ChatTextArea.AutocompleteRequested) -> None:
+    def on_chat_text_area_autocomplete_requested(
+        self, event: ChatTextArea.AutocompleteRequested
+    ) -> None:
         popup = self.query_one("#command-popup")
         if not event.accept:
             popup.display = False
@@ -346,42 +363,53 @@ class PitagoraApp(App):
             composer = self.query_one("#composer")
             option = popup.get_option_at_index(popup.highlighted)
             composer.text = str(option.prompt)
-            composer.move_cursor((composer.document.line_count - 1, len(composer.document.get_line(composer.document.line_count - 1))))
+            composer.move_cursor(
+                (
+                    composer.document.line_count - 1,
+                    len(composer.document.get_line(composer.document.line_count - 1)),
+                )
+            )
             popup.display = False
-            
+
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         popup = self.query_one("#command-popup")
         if event.option_list == popup:
             composer = self.query_one("#composer")
             composer.text = str(event.option.prompt)
-            composer.move_cursor((composer.document.line_count - 1, len(composer.document.get_line(composer.document.line_count - 1))))
+            composer.move_cursor(
+                (
+                    composer.document.line_count - 1,
+                    len(composer.document.get_line(composer.document.line_count - 1)),
+                )
+            )
             popup.display = False
             composer.focus()
-            
+
     def on_chat_text_area_submitted(self, event: ChatTextArea.Submitted) -> None:
         if self._turn_worker and self._turn_worker.is_running:
             return
 
         popup = self.query_one("#command-popup")
         popup.display = False
-        
+
         composer = self.query_one("#composer")
         composer.input_history.add(event.text)
         composer.text = ""
         composer.read_only = True
-        
+
         footer = self.query_one("#footer", Static)
         footer.update("[cyan]Processing...[/cyan]")
-        
+
         self._turn_worker = self.run_turn(event.text)
 
 
 def launch_tui(
     mode: str = "study",
     topic: str = "general",
-    system_prompt: Optional[str] = None,
+    system_prompt: str | None = None,
 ) -> None:
     from pitagora.chat_controller import ChatController
+
     controller = ChatController(
         mode=mode,
         topic=topic,

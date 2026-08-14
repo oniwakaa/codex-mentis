@@ -11,12 +11,14 @@ This module delegates to the helpers already living in :mod:`pitagora.chat`
 so the existing runtime behaviour is preserved when callers do not inject
 their own dependencies.
 """
+
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Iterator, Optional
+from typing import Any
 
 from pitagora import chat as chat_runtime
 from pitagora.teaching.analyzer import ResponseAnalyzer
@@ -78,17 +80,17 @@ class ChatController:
         self,
         mode: str = "study",
         topic: str = "general",
-        system_prompt: Optional[str] = None,
-        config: Optional[dict[str, Any]] = None,
-        completion: Optional[Callable[..., str]] = None,
-        rag_lookup: Optional[Callable[[str], str]] = None,
-        concept_lookup: Optional[Callable[[str], str]] = None,
-        verify_math: Optional[Callable[[str], Optional[str]]] = None,
-        save_memory: Optional[Callable[..., None]] = None,
-        record_study: Optional[Callable[..., None]] = None,
-        due_reviews: Optional[Callable[[], Optional[str]]] = None,
-        user_context: Optional[str] = None,
-        feedback_loop: Optional[tuple[Any, Any, Any]] = None,
+        system_prompt: str | None = None,
+        config: dict[str, Any] | None = None,
+        completion: Callable[..., str] | None = None,
+        rag_lookup: Callable[[str], str] | None = None,
+        concept_lookup: Callable[[str], str] | None = None,
+        verify_math: Callable[[str], str | None] | None = None,
+        save_memory: Callable[..., None] | None = None,
+        record_study: Callable[..., None] | None = None,
+        due_reviews: Callable[[], str | None] | None = None,
+        user_context: str | None = None,
+        feedback_loop: tuple[Any, Any, Any] | None = None,
     ) -> None:
         self.mode = mode
         self.topic = topic
@@ -108,19 +110,11 @@ class ChatController:
         self.teaching_journey = None
         self.last_freeform = {"topic": topic, "strategy": "socratic"}
         self.system_prompt = system_prompt or self._default_system_prompt()
-        context_text = (
-            chat_runtime._get_user_context()
-            if user_context is None
-            else user_context
-        )
+        context_text = chat_runtime._get_user_context() if user_context is None else user_context
         if context_text:
             self.system_prompt += f"\n\n{context_text}"
         self.messages = [{"role": "system", "content": self.system_prompt}]
-        loop = (
-            chat_runtime._build_feedback_loop()
-            if feedback_loop is None
-            else feedback_loop
-        )
+        loop = chat_runtime._build_feedback_loop() if feedback_loop is None else feedback_loop
         (
             self.feedback_improver,
             self.feedback_skill_evo,
@@ -150,9 +144,7 @@ class ChatController:
             "elapsed_seconds": int((datetime.now() - self.started_at).total_seconds()),
             "teaching": session is not None,
             "comprehension": session.comprehension_score if session else 0.0,
-            "sub_concepts": (
-                [item.to_dict() for item in session.sub_concepts] if session else []
-            ),
+            "sub_concepts": ([item.to_dict() for item in session.sub_concepts] if session else []),
             "journey": getattr(self.teaching_journey, "topic", None),
             "journey_progress": (
                 (session.current_index + 1) / len(session.sub_concepts)
@@ -186,9 +178,7 @@ class ChatController:
         concept_context = self.concept_lookup(self.topic)
         contexts = [value for value in (rag_context, concept_context) if value]
         enriched = (
-            "\n\n".join(contexts) + f"\n\nUser question: {user_input}"
-            if contexts
-            else user_input
+            "\n\n".join(contexts) + f"\n\nUser question: {user_input}" if contexts else user_input
         )
         self.messages.append({"role": "user", "content": enriched})
         yield ChatEvent("status", "Thinking...", {"busy": True})
@@ -259,12 +249,14 @@ class ChatController:
 
     def _cmd_save(self, argument: str) -> Iterator[ChatEvent]:
         from pitagora.sessions import save_session
+
         sid = save_session(self.messages, topic=self.topic, mode=self.mode)
         yield ChatEvent("status", f"✓ Session saved: {sid}")
         yield ChatEvent("state_changed", metadata={"context": self.context})
 
     def _cmd_sessions(self, argument: str) -> Iterator[ChatEvent]:
         from pitagora.sessions import list_sessions
+
         sessions = list_sessions()
         if not sessions:
             yield ChatEvent("status", "No saved sessions.")
@@ -276,7 +268,8 @@ class ChatController:
         yield ChatEvent("markdown", "\n".join(lines))
 
     def _cmd_resume(self, argument: str) -> Iterator[ChatEvent]:
-        from pitagora.sessions import load_session, list_sessions
+        from pitagora.sessions import list_sessions, load_session
+
         if argument:
             sid = argument
         else:
@@ -286,9 +279,7 @@ class ChatController:
             loaded = load_session(sid)
             if loaded:
                 self.messages = loaded
-                yield ChatEvent(
-                    "status", f"✓ Resumed session {sid} ({len(loaded)} messages)"
-                )
+                yield ChatEvent("status", f"✓ Resumed session {sid} ({len(loaded)} messages)")
             else:
                 yield ChatEvent("error", f"Session not found: {sid}")
         else:
@@ -302,10 +293,12 @@ class ChatController:
             yield ChatEvent("status", "Usage: /latex <expr>")
             return
         from pitagora.latex_render import render_equation_box
+
         yield ChatEvent("renderable", render_equation_box(argument))
 
     def _cmd_help(self, argument: str) -> Iterator[ChatEvent]:
         from rich.panel import Panel
+
         yield ChatEvent(
             "renderable",
             Panel(
@@ -378,6 +371,7 @@ class ChatController:
             return
         yield ChatEvent("status", "Verifying...", {"busy": True})
         from pitagora.math_engine.sandbox import SymPySandbox
+
         sandbox = SymPySandbox()
         result = sandbox.evaluate(argument)
         if result.verified:
@@ -394,6 +388,7 @@ class ChatController:
             return
         yield ChatEvent("status", "Researching...", {"busy": True})
         from pitagora.knowledge.acquisition import KnowledgeAcquisition
+
         acquirer = KnowledgeAcquisition()
         result = acquirer.research_topic(argument, depth="shallow")
         findings = result.get("findings", [])
@@ -420,9 +415,9 @@ class ChatController:
 
     def _cmd_progress(self, argument: str) -> Iterator[ChatEvent]:
         try:
+            from pitagora.cli.commands.onboard import load_profile
             from pitagora.concepts.graph import ConceptGraph
             from pitagora.memory.user_graph import UserGraph
-            from pitagora.cli.commands.onboard import load_profile
 
             profile = load_profile()
             cg = ConceptGraph()
@@ -431,9 +426,7 @@ class ChatController:
 
             lines = ["📊 Progress Dashboard\n"]
             if profile:
-                levels = ", ".join(
-                    f"{k}: {v}" for k, v in profile.get("levels", {}).items()
-                )
+                levels = ", ".join(f"{k}: {v}" for k, v in profile.get("levels", {}).items())
                 if levels:
                     lines.append(f"Level: {levels}")
             lines.append(f"Concepts in graph: {len(cg.graph)}")
@@ -455,15 +448,16 @@ class ChatController:
             yield ChatEvent("status", "Usage: /ingest <path>")
             return
         from pathlib import Path
+
         target = Path(argument).expanduser()
         if not target.exists():
             yield ChatEvent("error", f"Path not found: {target}")
             return
         yield ChatEvent("status", "Ingesting...", {"busy": True})
-        from pitagora.knowledge.base import KnowledgeBase
-        from pitagora.knowledge.ingester import DocumentIngester
-        from pitagora.knowledge.chunker import SmartChunker
         from pitagora.core.constants import SUPPORTED_FORMATS
+        from pitagora.knowledge.base import KnowledgeBase
+        from pitagora.knowledge.chunker import SmartChunker
+        from pitagora.knowledge.ingester import DocumentIngester
 
         kb = KnowledgeBase()
         ingester = DocumentIngester()
@@ -488,6 +482,7 @@ class ChatController:
     def _cmd_journeys(self, argument: str) -> Iterator[ChatEvent]:
         try:
             from pitagora.journeys.store import list_journeys
+
             journeys = list_journeys()
             if not journeys:
                 yield ChatEvent("status", "No journeys yet. Use /explore <topic>.")
@@ -507,9 +502,12 @@ class ChatController:
     def _cmd_dashboard(self, argument: str) -> Iterator[ChatEvent]:
         try:
             from io import StringIO
+
             from rich.console import Console
+
             from pitagora.journeys.store import list_journeys
             from pitagora.teaching.ui import show_journey_map
+
             journeys = list_journeys()
             if not journeys:
                 yield ChatEvent("status", "No journeys yet. Use /explore <topic>.")
@@ -526,22 +524,27 @@ class ChatController:
 
     def _cmd_workflow(self, argument: str) -> Iterator[ChatEvent]:
         import asyncio as _asyncio
-        from pitagora.agents.providers.base import ProviderConfig
-        from pitagora.agents.providers import get_provider
-        from pitagora.agents.tutor import TutorAgent
-        from pitagora.agents.researcher import ResearchAgent
-        from pitagora.agents.prover import ProverAgent
-        from pitagora.agents.reviewer import ReviewerAgent
-        from pitagora.agents.visualizer import VisualizerAgent
-        from pitagora.agents.explainer import ExplainerAgent
-        from pitagora.agents.self_improver import SelfImproverAgent
+
         from pitagora.agents.data_analyst import DataAnalystAgent
+        from pitagora.agents.explainer import ExplainerAgent
+        from pitagora.agents.prover import ProverAgent
+        from pitagora.agents.providers import get_provider
+        from pitagora.agents.providers.base import ProviderConfig
+        from pitagora.agents.researcher import ResearchAgent
+        from pitagora.agents.reviewer import ReviewerAgent
+        from pitagora.agents.self_improver import SelfImproverAgent
+        from pitagora.agents.tutor import TutorAgent
+        from pitagora.agents.visualizer import VisualizerAgent
         from pitagora.agents.workflows import WorkflowEngine
         from pitagora.core.constants import DEFAULT_API_KEY, DEFAULT_BASE_URL
 
         AVAILABLE_WORKFLOWS = (
-            "teach", "derive_and_prove", "concept_mastery",
-            "debate", "deep_research", "philosophical_reasoning",
+            "teach",
+            "derive_and_prove",
+            "concept_mastery",
+            "debate",
+            "deep_research",
+            "philosophical_reasoning",
         )
         parts = argument.split(" ", 1)
         wf_name = parts[0] if parts else ""
@@ -600,7 +603,9 @@ class ChatController:
         yield ChatEvent("status", "Designing learning path...", {"busy": True})
         subs = chat_runtime._generate_sub_concepts(topic, self.config, self.model)
         session = TeachingSession(
-            topic=topic, sub_concepts=subs, user_level="intermediate",
+            topic=topic,
+            sub_concepts=subs,
+            user_level="intermediate",
         )
         chat_runtime._seed_session_style(session, self.feedback_improver)
         session.transition(TeachingState.exploring)
@@ -611,6 +616,7 @@ class ChatController:
         # Auto-create or resume a journey (mirrors chat.py wiring).
         try:
             from pitagora.journeys.store import get_or_create_journey
+
             journey = get_or_create_journey(topic, subs)
             journey.session_state = session.to_dict()
             self.teaching_journey = journey
@@ -630,10 +636,8 @@ class ChatController:
     def _resume_journey(self) -> Iterator[ChatEvent]:
         try:
             from pitagora.journeys.store import list_journeys, load_journey
-            journeys = [
-                j for j in list_journeys()
-                if j.get("status") in ("active", "paused")
-            ]
+
+            journeys = [j for j in list_journeys() if j.get("status") in ("active", "paused")]
             if not journeys:
                 yield ChatEvent(
                     "status",
@@ -652,7 +656,8 @@ class ChatController:
                 f"({session.interaction_count} interactions)",
             )
             yield ChatEvent(
-                "comprehension", session.comprehension_score,
+                "comprehension",
+                session.comprehension_score,
             )
             yield ChatEvent("controls")
             yield ChatEvent("state_changed", metadata={"context": self.context})
@@ -672,17 +677,23 @@ class ChatController:
         sc_name = sc.name if sc else session.topic
 
         result = analyzer.classify(
-            user_input, session.topic, sc_name,
-            config=self.config, model=self.model,
+            user_input,
+            session.topic,
+            sc_name,
+            config=self.config,
+            model=self.model,
         )
         session.apply_classification(
-            result.label, result.delta, style=session.current_style,
+            result.label,
+            result.delta,
+            style=session.current_style,
         )
 
         # WS1: feed the cross-session feedback loop with a real quality signal.
         if self.feedback_improver is not None:
             try:
                 from pitagora.agents.self_improver import quality_from_classification
+
                 self.feedback_improver.record_interaction(
                     topic=session.topic,
                     level=session.user_level,
@@ -701,7 +712,8 @@ class ChatController:
         ):
             try:
                 matched = self.feedback_skills_engine.match_skills(
-                    session.topic, user_input,
+                    session.topic,
+                    user_input,
                 )
                 if matched:
                     self.feedback_skill_evo.record_use(
@@ -739,7 +751,9 @@ class ChatController:
         yield ChatEvent("status", "Teaching...", {"busy": True})
         try:
             response = self.completion(
-                self.messages, model=self.model, config=self.config,
+                self.messages,
+                model=self.model,
+                config=self.config,
             )
         except Exception:
             # Roll back the teaching prompt so retries leave the conversation
@@ -762,13 +776,12 @@ class ChatController:
         if self.teaching_journey is not None:
             try:
                 from pitagora.journeys.store import save_journey
+
                 self.teaching_journey.session_state = session.to_dict()
                 self.teaching_journey.comprehension_history.append(
                     session.comprehension_score,
                 )
-                self.teaching_journey.sub_concepts = [
-                    sc.to_dict() for sc in session.sub_concepts
-                ]
+                self.teaching_journey.sub_concepts = [sc.to_dict() for sc in session.sub_concepts]
                 self.teaching_journey.interaction_count = session.interaction_count
                 save_journey(self.teaching_journey)
             except Exception:
@@ -783,14 +796,14 @@ class ChatController:
             if self.teaching_journey is not None:
                 try:
                     from pitagora.journeys.store import save_journey
+
                     self.teaching_journey.session_state = session.to_dict()
                     save_journey(self.teaching_journey)
                 except Exception:
                     pass
             yield ChatEvent(
                 "status",
-                "Teaching paused. Resumable with /explore --continue. "
-                "Back to free-form chat.",
+                "Teaching paused. Resumable with /explore --continue. " "Back to free-form chat.",
             )
             self.teaching_session = None
             self.teaching_analyzer = None
@@ -800,12 +813,12 @@ class ChatController:
         yield from self._run_teaching_turn_events(text)
 
         # If the session completed, drop back to free-form chat.
-        if self.teaching_session is not None and \
-                self.teaching_session.state == TeachingState.completed:
+        if (
+            self.teaching_session is not None
+            and self.teaching_session.state == TeachingState.completed
+        ):
             session = self.teaching_session
-            mastered = [
-                sc.name for sc in session.sub_concepts if sc.mastery >= 0.8
-            ]
+            mastered = [sc.name for sc in session.sub_concepts if sc.mastery >= 0.8]
             yield ChatEvent(
                 "renderable",
                 {

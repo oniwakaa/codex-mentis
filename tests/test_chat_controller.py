@@ -4,6 +4,7 @@ The controller is a headless state machine: it depends on injected callables
 for completion, RAG, memory, etc., and emits ChatEvent objects. These tests
 cover the free-form study turn path and the controller's neutral contract.
 """
+
 from pitagora.chat_controller import ChatController, ChatEvent
 
 
@@ -39,9 +40,7 @@ def test_freeform_turn_emits_user_status_markdown_state_changed():
     ]
     assert events[0].content == "What is a limit?"
     assert events[2].content == "answer"
-    assert controller.messages[-2]["content"].endswith(
-        "User question: What is a limit?"
-    )
+    assert controller.messages[-2]["content"].endswith("User question: What is a limit?")
     assert controller.messages[-1] == {"role": "assistant", "content": "answer"}
 
 
@@ -160,9 +159,7 @@ def test_clear_resets_messages_but_keeps_system_prompt():
 
     events = list(controller.handle_input("/clear"))
 
-    assert controller.messages == [
-        {"role": "system", "content": controller.system_prompt}
-    ]
+    assert controller.messages == [{"role": "system", "content": controller.system_prompt}]
     assert events[-1].kind == "state_changed"
 
 
@@ -180,9 +177,9 @@ def test_unknown_command_is_visible():
 
 # ─── Teaching mode tests (Task 5) ───
 
+from pitagora.journeys.model import LearningJourney
 from pitagora.teaching.analyzer import ResponseClassification
 from pitagora.teaching.session import TeachingSession, TeachingState
-from pitagora.journeys.model import LearningJourney
 
 
 class CorrectAnalyzer:
@@ -209,9 +206,7 @@ def test_explore_starts_teaching_and_emits_inline_widgets(monkeypatch):
         "pitagora.journeys.store.get_or_create_journey",
         lambda topic, subs: LearningJourney(
             topic=topic,
-            sub_concepts=[
-                {"name": n, "mastery": 0.0, "visited": False} for n in subs
-            ],
+            sub_concepts=[{"name": n, "mastery": 0.0, "visited": False} for n in subs],
         ),
     )
 
@@ -233,9 +228,7 @@ def test_pause_shortcut_saves_and_leaves_teaching(monkeypatch):
     controller.teaching_session.transition(TeachingState.exploring)
     controller.teaching_journey = LearningJourney(
         topic="limits",
-        sub_concepts=[
-            {"name": "Definition", "mastery": 0.0, "visited": False}
-        ],
+        sub_concepts=[{"name": "Definition", "mastery": 0.0, "visited": False}],
     )
     saved = []
     monkeypatch.setattr(

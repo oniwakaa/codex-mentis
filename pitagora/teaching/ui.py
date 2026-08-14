@@ -3,9 +3,10 @@
 All functions print to a passed-in console (default: module-level Console).
 Kept dependency-light: only rich, no new packages.
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
@@ -27,7 +28,8 @@ CONTROLS_LINE = (
 def build_controls() -> Text:
     return Text.from_markup(CONTROLS_LINE)
 
-def show_controls(con: Optional[Console] = None) -> None:
+
+def show_controls(con: Console | None = None) -> None:
     (con or console).print(build_controls())
 
 
@@ -48,17 +50,18 @@ def build_comprehension_gauge(score: float) -> Text:
         f" {score * 100:5.1f}% comprehension",
     )
 
-def show_comprehension_gauge(score: float, con: Optional[Console] = None) -> None:
+
+def show_comprehension_gauge(score: float, con: Console | None = None) -> None:
     """Render comprehension as a colored progress bar."""
     (con or console).print(build_comprehension_gauge(score))
 
 
 def build_subconcept_progress(
-    sub_concepts: List[Dict[str, Any]],
+    sub_concepts: list[dict[str, Any]],
     current_index: int,
     compact: bool = False,
 ):
-    lines: List[str] = []
+    lines: list[str] = []
     parts = []
     for i, sc in enumerate(sub_concepts):
         marker = "▸ " if i == current_index else ("" if compact else "  ")
@@ -76,7 +79,7 @@ def build_subconcept_progress(
                 parts.append((f"{marker}{name} ({mastery*100:.0f}%)", color))
             else:
                 lines.append(f"{marker}[{color}]{name}[/{color}] ({mastery*100:.0f}%)")
-    
+
     if compact:
         t = Text()
         for i, (text, style) in enumerate(parts):
@@ -87,10 +90,11 @@ def build_subconcept_progress(
     else:
         return Panel("\\n".join(lines), title="Sub-concepts", border_style="blue")
 
+
 def show_subconcept_progress(
-    sub_concepts: List[Dict[str, Any]],
+    sub_concepts: list[dict[str, Any]],
     current_index: int,
-    con: Optional[Console] = None,
+    con: Console | None = None,
 ) -> None:
     """Render sub-concept list with mastery colors and a current marker."""
     (con or console).print(build_subconcept_progress(sub_concepts, current_index))
@@ -98,10 +102,10 @@ def show_subconcept_progress(
 
 def show_topic_overview(
     topic: str,
-    sub_concepts: List[str],
+    sub_concepts: list[str],
     level: str = "intermediate",
-    prerequisites: Optional[List[str]] = None,
-    con: Optional[Console] = None,
+    prerequisites: list[str] | None = None,
+    con: Console | None = None,
 ) -> None:
     con = con or console
     body = [f"[bold]Topic:[/bold] {topic}", f"[bold]Level:[/bold] {level}"]
@@ -118,8 +122,8 @@ def show_session_summary(
     comprehension: float,
     interaction_count: int,
     best_style: str,
-    mastered: List[str],
-    con: Optional[Console] = None,
+    mastered: list[str],
+    con: Console | None = None,
 ) -> None:
     con = con or console
     rows = [
@@ -139,8 +143,8 @@ def show_session_summary(
 
 def show_journey_map(
     topic: str,
-    sub_concepts: List[Dict[str, Any]],
-    con: Optional[Console] = None,
+    sub_concepts: list[dict[str, Any]],
+    con: Console | None = None,
 ) -> None:
     """Render a concept tree with mastery colors."""
     con = con or console

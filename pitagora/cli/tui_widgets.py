@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 from rich.progress import ProgressBar
 from rich.table import Table
@@ -11,7 +11,7 @@ from textual.widgets import Button, Static, TextArea
 
 
 class ContextSidebar(Static):
-    def update_context(self, context: Dict[str, Any]) -> None:
+    def update_context(self, context: dict[str, Any]) -> None:
         table = Table.grid(expand=True)
         table.add_column()
         table.add_column(justify="right")
@@ -19,24 +19,24 @@ class ContextSidebar(Static):
         table.add_row("Topic", context.get("topic", ""))
         table.add_row("Model", context.get("model", ""))
         table.add_row("Messages", str(context.get("message_count", 0)))
-        
+
         progress = context.get("progress", 0.0)
         progress_bar = ProgressBar(total=100, completed=int(progress * 100))
-        
+
         table.add_row("Progress", progress_bar)
-        
+
         self.update(table)
 
 
 class SidebarScreen(ModalScreen):
-    def __init__(self, context: Dict[str, Any]):
+    def __init__(self, context: dict[str, Any]):
         super().__init__()
         self.context = context
 
     def compose(self) -> ComposeResult:
         sidebar = ContextSidebar(id="modal-sidebar")
         yield sidebar
-        
+
     def on_mount(self) -> None:
         sidebar = self.query_one(ContextSidebar)
         sidebar.update_context(self.context)
@@ -66,11 +66,11 @@ class Conversation(VerticalScroll):
             if isinstance(child, Static):
                 # Check for textual's RichVisual which wraps Rich renderables
                 renderable = getattr(child, "renderable", child.render())
-                
+
                 # If it's a RichVisual, unwrap the actual renderable
                 if hasattr(renderable, "_renderable"):
                     renderable = renderable._renderable
-                
+
                 if hasattr(renderable, "plain"):
                     text += renderable.plain + "\n"
                 elif isinstance(renderable, str):
@@ -78,6 +78,7 @@ class Conversation(VerticalScroll):
                 else:
                     # Catch Panels and other rich renderables that might not have plain directly
                     from rich.console import Console
+
                     console = Console()
                     with console.capture() as capture:
                         console.print(renderable)
@@ -85,21 +86,22 @@ class Conversation(VerticalScroll):
         return text
 
 
-
 import re
-from typing import List, Tuple
-from pitagora.latex_render import latex_to_unicode
-from textual.message import Message
+
 from textual import events
+from textual.message import Message
 from textual.widgets import OptionList
+
 from pitagora.cli.repl_input import COMMAND_TREE
+from pitagora.latex_render import latex_to_unicode
+
 
 class InputHistory:
     def __init__(self, limit: int = 100):
         self.limit = limit
         self.items: list[str] = []
         self.cursor = 0
-        
+
     def add(self, text: str) -> None:
         text = text.strip()
         if not text:
@@ -108,12 +110,12 @@ class InputHistory:
             pass
         else:
             self.items.append(text)
-            
+
         if len(self.items) > self.limit:
             self.items.pop(0)
-            
+
         self.cursor = len(self.items)
-        
+
     def previous(self) -> str:
         if not self.items:
             return ""
@@ -121,7 +123,7 @@ class InputHistory:
             self.cursor -= 1
             return self.items[self.cursor]
         return self.items[0] if self.items else ""
-        
+
     def next(self) -> str:
         if not self.items:
             return ""
@@ -132,14 +134,13 @@ class InputHistory:
         return ""
 
 
-def split_math(text: str) -> List[Tuple[str, str, int]]:
+def split_math(text: str) -> list[tuple[str, str, int]]:
     parts = []
     eq_num = 1
-    
+
     # regex to find non-overlapping $$...$$ blocks
-    import re
     pattern = re.compile(r"\$\$(.*?)\$\$", re.DOTALL)
-    
+
     last_end = 0
     for match in pattern.finditer(text):
         start, end = match.span()
@@ -149,32 +150,31 @@ def split_math(text: str) -> List[Tuple[str, str, int]]:
             # Replace inline math $...$ first before parsing with latex_to_unicode
             md_text = re.sub(r"\$([^$]+)\$", lambda m: latex_to_unicode(m.group(1)), md_text)
             parts.append(("markdown", md_text, 0))
-            
+
         # equation part
         eq_text = match.group(1).strip()
         parts.append(("equation", eq_text, eq_num))
         eq_num += 1
-        
+
         last_end = end
-        
+
     if last_end < len(text):
         md_text = text[last_end:]
         # Replace inline math $...$ first before parsing with latex_to_unicode
         md_text = re.sub(r"\$([^$]+)\$", lambda m: latex_to_unicode(m.group(1)), md_text)
         parts.append(("markdown", md_text, 0))
-        
-    return [p for p in parts if p[1]] if parts else []
 
+    return [p for p in parts if p[1]] if parts else []
 
 
 class EquationWidget(Static):
     def __init__(self, equation: str, *args, **kwargs):
         from rich.panel import Panel
-        from rich.text import Text
+
         super().__init__(*args, **kwargs)
         self.equation = equation
         self.panel = Panel(Text(equation, justify="center", style="cyan"), border_style="cyan")
-        
+
     def render(self):
         return self.panel
 
@@ -192,19 +192,19 @@ class ChatTextArea(TextArea):
         Binding("ctrl+b", "app.toggle_sidebar", "Sidebar", show=False),
         Binding("ctrl+l", "app.clear_visible", "Clear", show=False),
     ]
-    
+
     class Submitted(Message):
         def __init__(self, text_area, text: str) -> None:
             self.text_area = text_area
             self.text = text
             super().__init__()
-            
+
     class AutocompleteRequested(Message):
         def __init__(self, text_area, accept: bool = False) -> None:
             self.text_area = text_area
             self.accept = accept
             super().__init__()
-            
+
     class AutocompleteNavigate(Message):
         def __init__(self, text_area, direction: str) -> None:
             self.text_area = text_area
@@ -219,6 +219,7 @@ class ChatTextArea(TextArea):
 
         if event.key == "escape":
             from textual.css.query import NoMatches
+
             popup = None
             try:
                 popup = self.app.query_one("#command-popup")
@@ -243,14 +244,14 @@ class ChatTextArea(TextArea):
             self.post_message(self.AutocompleteRequested(self, accept=True))
             event.prevent_default()
             return
-            
+
         teaching = False
         try:
             if hasattr(self.app, "controller") and hasattr(self.app.controller, "context"):
                 teaching = self.app.controller.context.get("teaching", False)
         except Exception:
             pass
-            
+
         if teaching and not self.text:
             if event.character in {"n", "e", "d", "s", "?", "v", "q", "p"}:
                 self.post_message(self.Submitted(self, event.character))
@@ -259,30 +260,40 @@ class ChatTextArea(TextArea):
 
         if event.key in {"up", "down"}:
             from textual.css.query import NoMatches
+
             popup = None
             try:
                 popup = self.app.query_one("#command-popup")
             except NoMatches:
                 pass
-                
+
             if popup and popup.display:
                 self.post_message(self.AutocompleteNavigate(self, event.key))
                 event.prevent_default()
                 return
-                
+
             cursor_row, _ = self.cursor_location
             doc_lines = self.document.line_count
-            
+
             if event.key == "up" and cursor_row == 0:
                 self.text = self.input_history.previous()
-                self.move_cursor((self.document.line_count - 1, len(self.document.get_line(self.document.line_count - 1))))
+                self.move_cursor(
+                    (
+                        self.document.line_count - 1,
+                        len(self.document.get_line(self.document.line_count - 1)),
+                    )
+                )
                 event.prevent_default()
                 return
             elif event.key == "down" and cursor_row == doc_lines - 1:
                 self.text = self.input_history.next()
-                self.move_cursor((self.document.line_count - 1, len(self.document.get_line(self.document.line_count - 1))))
+                self.move_cursor(
+                    (
+                        self.document.line_count - 1,
+                        len(self.document.get_line(self.document.line_count - 1)),
+                    )
+                )
                 event.prevent_default()
                 return
 
         await super()._on_key(event)
-

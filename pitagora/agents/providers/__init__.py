@@ -1,11 +1,9 @@
-"""Provider system — OpenAI-compatible provider with fallback chains.
+"""OpenAI-compatible provider factory and fallback chain."""
 
-All providers (OpenAI, Anthropic via proxy, Gemini via CLIProxy, Ollama, local)
-are handled through the OpenAI-compatible protocol. CLIProxy routes to the
-correct backend automatically.
-"""
 import logging
-from typing import Dict, Any, List, Optional
+from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
+from typing import Any
+
 from pitagora.agents.providers.base import BaseProvider, ProviderConfig
 from pitagora.agents.providers.openai import OpenAIProvider
 
@@ -13,91 +11,180 @@ logger = logging.getLogger(__name__)
 
 
 class FallbackProvider(BaseProvider):
-    """Try multiple providers in sequence, falling back on failure."""
+    """Try providers in order and account for the successful provider."""
 
-    def __init__(self, providers: List[BaseProvider]):
+    def __init__(self, providers: Sequence[BaseProvider]):
         if not providers:
             raise ValueError("FallbackProvider requires at least one provider.")
         super().__init__(providers[0].config)
-        self.providers = providers
+        self.providers = list(providers)
 
-    def complete(self, messages, tools=None, temperature=0.7, response_format=None):
-        last_err = None
-        for p in self.providers:
-            try:
-                return p.complete(messages, tools, temperature, response_format)
-            except Exception as e:
-                logger.warning(f"{p.__class__.__name__} failed: {e}")
-                last_err = e
-        raise RuntimeError(f"All providers failed. Last: {last_err}")
+    def _record_result(self, result: dict[str, Any], provider: BaseProvider) -> None:
+        usage = result.get("usage")
+        if not isinstance(usage, Mapping):
+            return
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        completion_tokens = usage.get("completion_tokens", 0)
+        total_tokens = usage.get("total_tokens", prompt_tokens + completion_tokens)
+        if all(
+            isinstance(value, int) and not isinstance(value, bool) and value >= 0
+            for value in (prompt_tokens, completion_tokens, total_tokens)
+        ):
+            self._record_usage(
+                {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": total_tokens,
+                },
+                config=provider.config,
+            )
 
-    def stream(self, messages):
-        for p in self.providers:
+    def complete(
+        self,
+        messages: list[dict[str, str]],
+        tools: list[dict[str, Any]] | None = None,
+        temperature: float = 0.7,
+        response_format: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        last_error: Exception | None = None
+        for provider in self.providers:
             try:
-                return p.stream(messages)
-            except Exception as e:
-                logger.warning(f"{p.__class__.__name__} stream failed: {e}")
-        raise RuntimeError("All providers failed to stream")
+                result = provider.complete(messages, tools, temperature, response_format)
+            except Exception as error:  # noqa: BLE001 - fallback must handle provider failures
+                logger.warning("%s failed: %s", provider.__class__.__name__, error)
+                last_error = error
+                continue
+            self._record_result(result, provider)
+            return result
+        raise RuntimeError(f"All providers failed. Last: {last_error}") from last_error
 
-    def embed(self, texts):
-        for p in self.providers:
+    def stream(self, messages: list[dict[str, str]]) -> Iterator[str]:
+        last_error: Exception | None = None
+        for provider in self.providers:
+            yielded = False
             try:
-                return p.embed(texts)
-            except Exception as e:
-                logger.warning(f"{p.__class__.__name__} embed failed: {e}")
-        raise RuntimeError("All providers failed to embed")
+                for chunk in provider.stream(messages):
+                    yielded = True
+                    yield chunk
+                return
+            except Exception as error:  # noqa: BLE001 - fallback must handle provider failures
+                if yielded:
+                    raise
+                logger.warning("%s stream failed: %s", provider.__class__.__name__, error)
+                last_error = error
+        raise RuntimeError(f"All providers failed to stream. Last: {last_error}") from last_error
 
-    async def acomplete(self, messages, tools=None, temperature=0.7, response_format=None):
-        last_err = None
-        for p in self.providers:
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        last_error: Exception | None = None
+        for provider in self.providers:
             try:
-                return await p.acomplete(messages, tools, temperature, response_format)
-            except Exception as e:
-                logger.warning(f"{p.__class__.__name__} acomplete failed: {e}")
-                last_err = e
-        raise RuntimeError(f"All providers failed. Last: {last_err}")
+                return provider.embed(texts)
+            except Exception as error:  # noqa: BLE001 - fallback must handle provider failures
+                logger.warning("%s embed failed: %s", provider.__class__.__name__, error)
+                last_error = error
+        raise RuntimeError(f"All providers failed to embed. Last: {last_error}") from last_error
 
-    async def astream(self, messages):
-        for p in self.providers:
+    async def acomplete(
+        self,
+        messages: list[dict[str, str]],
+        tools: list[dict[str, Any]] | None = None,
+        temperature: float = 0.7,
+        response_format: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        last_error: Exception | None = None
+        for provider in self.providers:
             try:
-                return p.astream(messages)
-            except Exception as e:
-                logger.warning(f"{p.__class__.__name__} astream failed: {e}")
-        raise RuntimeError("All providers failed to astream")
+                result = await provider.acomplete(
+                    messages,
+                    tools,
+                    temperature,
+                    response_format,
+                )
+            except Exception as error:  # noqa: BLE001 - fallback must handle provider failures
+                logger.warning("%s acomplete failed: %s", provider.__class__.__name__, error)
+                last_error = error
+                continue
+            self._record_result(result, provider)
+            return result
+        raise RuntimeError(f"All providers failed. Last: {last_error}") from last_error
 
-    async def aembed(self, texts):
-        for p in self.providers:
+    async def astream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
+        last_error: Exception | None = None
+        for provider in self.providers:
+            yielded = False
             try:
-                return await p.aembed(texts)
-            except Exception as e:
-                logger.warning(f"{p.__class__.__name__} aembed failed: {e}")
-        raise RuntimeError("All providers failed to aembed")
+                async for chunk in provider.astream(messages):
+                    yielded = True
+                    yield chunk
+                return
+            except Exception as error:  # noqa: BLE001 - fallback must handle provider failures
+                if yielded:
+                    raise
+                logger.warning("%s astream failed: %s", provider.__class__.__name__, error)
+                last_error = error
+        raise RuntimeError(f"All providers failed to astream. Last: {last_error}") from last_error
+
+    async def aembed(self, texts: list[str]) -> list[list[float]]:
+        last_error: Exception | None = None
+        for provider in self.providers:
+            try:
+                return await provider.aembed(texts)
+            except Exception as error:  # noqa: BLE001 - fallback must handle provider failures
+                logger.warning("%s aembed failed: %s", provider.__class__.__name__, error)
+                last_error = error
+        raise RuntimeError(f"All providers failed to aembed. Last: {last_error}") from last_error
 
 
 def create_provider(config: ProviderConfig) -> BaseProvider:
-    """Create a provider. Everything goes through OpenAI-compatible protocol.
-
-    CLIProxy, Ollama, vLLM, and direct OpenAI all speak the same API.
-    For Anthropic/Gemini, use CLIProxy to translate.
-    """
-    # Check for fallback chain
+    """Create an OpenAI-compatible provider, optionally with fallbacks."""
     fallback_chain = config.extra_params.get("fallback_chain")
-    if fallback_chain and isinstance(fallback_chain, list):
-        providers = []
-        for p_name in fallback_chain:
-            p_config_dict = config.extra_params.get(f"config_{p_name}", {})
-            sub_config = ProviderConfig(
-                api_key=p_config_dict.get("api_key", config.api_key),
-                model=p_config_dict.get("model", config.model),
-                base_url=p_config_dict.get("base_url", config.base_url),
-                max_tokens=p_config_dict.get("max_tokens", config.max_tokens),
+    if isinstance(fallback_chain, list) and fallback_chain:
+        providers: list[BaseProvider] = []
+        for provider_name in fallback_chain:
+            provider_config = config.extra_params.get(f"config_{provider_name}", {})
+            if not isinstance(provider_config, dict):
+                raise ValueError(f"config_{provider_name} must be an object")
+            providers.append(
+                OpenAIProvider(
+                    ProviderConfig(
+                        api_key=provider_config.get("api_key", config.api_key),
+                        model=provider_config.get("model", config.model),
+                        base_url=provider_config.get("base_url", config.base_url),
+                        max_tokens=provider_config.get("max_tokens", config.max_tokens),
+                        timeout=provider_config.get("timeout", config.timeout),
+                        connect_timeout=provider_config.get(
+                            "connect_timeout",
+                            config.connect_timeout,
+                        ),
+                        read_timeout=provider_config.get("read_timeout", config.read_timeout),
+                        write_timeout=provider_config.get("write_timeout", config.write_timeout),
+                        pool_timeout=provider_config.get("pool_timeout", config.pool_timeout),
+                        max_retries=provider_config.get("max_retries", config.max_retries),
+                        initial_backoff=provider_config.get(
+                            "initial_backoff",
+                            config.initial_backoff,
+                        ),
+                        backoff_factor=provider_config.get(
+                            "backoff_factor",
+                            config.backoff_factor,
+                        ),
+                        prompt_token_cost=provider_config.get(
+                            "prompt_token_cost",
+                            config.prompt_token_cost,
+                        ),
+                        completion_token_cost=provider_config.get(
+                            "completion_token_cost",
+                            config.completion_token_cost,
+                        ),
+                        extra_params=provider_config.get("extra_params", {}),
+                    )
+                )
             )
-            providers.append(OpenAIProvider(sub_config))
         return FallbackProvider(providers)
-
     return OpenAIProvider(config)
 
 
 def get_provider(provider_name: str, config: ProviderConfig) -> BaseProvider:
-    """Create provider by name. All route through OpenAI-compatible."""
+    """Create a provider by name; all names use the compatible protocol."""
+    del provider_name
     return OpenAIProvider(config)

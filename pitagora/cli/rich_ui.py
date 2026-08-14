@@ -37,15 +37,17 @@ def show_welcome(
     """Print the banner plus a welcome panel with mode/model/topic/commands."""
     con = con or console
     show_pitagora_banner(con)
-    con.print(Panel(
-        f"[bold cyan]Pitagora[/bold cyan] — {mode.title()} mode\n"
-        f"Model: [dim]{model}[/dim] | Topic: [dim]{topic}[/dim]\n\n"
-        f"Commands: [cyan]/mode[/cyan] [cyan]/topic[/cyan] [cyan]/model[/cyan] "
-        f"[cyan]/explore[/cyan] [cyan]/verify[/cyan] [cyan]/research[/cyan] "
-        f"[cyan]/clear[/cyan] [cyan]/quit[/cyan]",
-        title="🧠 Pitagora",
-        border_style="blue",
-    ))
+    con.print(
+        Panel(
+            f"[bold cyan]Pitagora[/bold cyan] — {mode.title()} mode\n"
+            f"Model: [dim]{model}[/dim] | Topic: [dim]{topic}[/dim]\n\n"
+            f"Commands: [cyan]/mode[/cyan] [cyan]/topic[/cyan] [cyan]/model[/cyan] "
+            f"[cyan]/explore[/cyan] [cyan]/verify[/cyan] [cyan]/research[/cyan] "
+            f"[cyan]/clear[/cyan] [cyan]/quit[/cyan]",
+            title="🧠 Pitagora",
+            border_style="blue",
+        )
+    )
 
 
 def print_markdown(content: str) -> None:
@@ -53,10 +55,12 @@ def print_markdown(content: str) -> None:
     md = Markdown(content, code_theme="nord")
     console.print(md)
 
+
 def print_panel(content: str, title: str, style: str = "blue") -> None:
     """Prints a styled container panel."""
     panel = Panel(content, title=title, border_style=style, expand=False)
     console.print(panel)
+
 
 def get_confidence_indicator(score: float) -> Text:
     """Creates a color-coded confidence level Rich Text representation."""
@@ -71,20 +75,24 @@ def get_confidence_indicator(score: float) -> Text:
         emoji = "❌"
     return Text(f"{emoji} Agent Confidence: {score * 100:.1f}%", style=style)
 
+
 def print_confidence(score: float) -> None:
     """Print the confidence score to the terminal."""
     console.print(get_confidence_indicator(score))
+
 
 def print_math(latex_str: str, return_str: bool = False):
     """Renders math expression in terminal, translating LaTeX symbols and exponents to Unicode.
 
     When return_str=True, return the rendered string instead of printing it.
     """
+
     def _render(latex_str: str) -> str:
         # Try SymPy pretty-printing first; fall back to Unicode substitution.
         try:
             from sympy import pretty
             from sympy.parsing.latex import parse_latex
+
             expr = parse_latex(latex_str)
             return pretty(expr)
         except Exception:
@@ -100,21 +108,51 @@ def print_math(latex_str: str, return_str: bool = False):
 def _unicode_substitute(latex_str: str) -> str:
     # High quality fallback substitution logic mapping to superscript/subscript unicode chars
     superscript_map = {
-        "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
-        "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹",
-        "+": "⁺", "-": "⁻", "=": "⁼", "(": "⁽", ")": "⁾",
-        "n": "ⁿ", "x": "ˣ", "y": "ʸ", "i": "ⁱ"
+        "0": "⁰",
+        "1": "¹",
+        "2": "²",
+        "3": "³",
+        "4": "⁴",
+        "5": "⁵",
+        "6": "⁶",
+        "7": "⁷",
+        "8": "⁸",
+        "9": "⁹",
+        "+": "⁺",
+        "-": "⁻",
+        "=": "⁼",
+        "(": "⁽",
+        ")": "⁾",
+        "n": "ⁿ",
+        "x": "ˣ",
+        "y": "ʸ",
+        "i": "ⁱ",
     }
     subscript_map = {
-        "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄",
-        "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉",
-        "+": "₊", "-": "₋", "=": "₌", "(": "₍", ")": "₎",
-        "i": "ᵢ", "j": "ⱼ", "k": "ₖ", "x": "ₓ", "y": "ᵧ"
+        "0": "₀",
+        "1": "₁",
+        "2": "₂",
+        "3": "₃",
+        "4": "₄",
+        "5": "₅",
+        "6": "₆",
+        "7": "₇",
+        "8": "₈",
+        "9": "₉",
+        "+": "₊",
+        "-": "₋",
+        "=": "₌",
+        "(": "₍",
+        ")": "₎",
+        "i": "ᵢ",
+        "j": "ⱼ",
+        "k": "ₖ",
+        "x": "ₓ",
+        "y": "ᵧ",
     }
 
     clean = (
-        latex_str
-        .replace(r"\int", "∫")
+        latex_str.replace(r"\int", "∫")
         .replace(r"\sum", "∑")
         .replace(r"\alpha", "α")
         .replace(r"\beta", "β")
@@ -140,16 +178,20 @@ def _unicode_substitute(latex_str: str) -> str:
     )
 
     import re
+
     def replace_super(match):
         val = match.group(1)
         return "".join(superscript_map.get(c, c) for c in val)
+
     clean = re.sub(r"\^\{?([0-9a-zA-Z\+\-\=]+)\}?", replace_super, clean)
 
     def replace_sub(match):
         val = match.group(1)
         return "".join(subscript_map.get(c, c) for c in val)
+
     clean = re.sub(r"\_\{?([0-9a-zA-Z\+\-\=]+)\}?", replace_sub, clean)
     return clean
+
 
 def animated_progress(steps: list[str], duration_per_step: float = 0.6) -> None:
     """Displays animated progress bar loading indicator for multi-step derivations."""
@@ -158,19 +200,30 @@ def animated_progress(steps: list[str], duration_per_step: float = 0.6) -> None:
         TextColumn("[cyan]{task.description}"),
         BarColumn(bar_width=30),
         TaskProgressColumn(),
-        console=console
+        console=console,
     ) as progress:
         task = progress.add_task("[bold]Verifying calculus...", total=len(steps))
         for idx, step in enumerate(steps, 1):
             time.sleep(duration_per_step)
             progress.advance(task)
-            progress.update(task, description=f"[green]Step {idx}/{len(steps)} verified: {step[:35]}...")
+            progress.update(
+                task, description=f"[green]Step {idx}/{len(steps)} verified: {step[:35]}..."
+            )
+
 
 def print_split_reasoning(derivation: str, intuition: str) -> None:
     """Renders technical derivation and physical intuition in side-by-side panels."""
-    left_panel = Panel(Markdown(derivation, code_theme="nord"), title="[bold yellow]Derivation & Proof[/bold yellow]", border_style="yellow")
-    right_panel = Panel(Markdown(intuition, code_theme="nord"), title="[bold cyan]Conceptual Intuition[/bold cyan]", border_style="cyan")
-    
+    left_panel = Panel(
+        Markdown(derivation, code_theme="nord"),
+        title="[bold yellow]Derivation & Proof[/bold yellow]",
+        border_style="yellow",
+    )
+    right_panel = Panel(
+        Markdown(intuition, code_theme="nord"),
+        title="[bold cyan]Conceptual Intuition[/bold cyan]",
+        border_style="cyan",
+    )
+
     # 2-column layout grid
     grid = Table.grid(expand=True)
     grid.add_column(ratio=1)
@@ -178,42 +231,45 @@ def print_split_reasoning(derivation: str, intuition: str) -> None:
     grid.add_row(left_panel, right_panel)
     console.print(grid)
 
+
 def build_plot(
-    x: list[float], 
-    y: list[float], 
-    title: str, 
-    xlabel: str, 
-    ylabel: str, 
-    plot_type: str = "function", 
-    x_range: tuple[float, float] | None = None
+    x: list[float],
+    y: list[float],
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    plot_type: str = "function",
+    x_range: tuple[float, float] | None = None,
 ) -> Panel:
     import plotext as plt
+
     plt.clf()
     plt.theme("dark")
-    
+
     if plot_type == "scatter":
         plt.scatter(x, y)
     else:
         plt.plot(x, y)
-        
+
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    
+
     if x_range:
         plt.xlim(x_range[0], x_range[1])
-        
+
     ansi = plt.build()
     return Panel(Text.from_ansi(ansi), title=title, expand=False)
 
+
 def print_plot(
-    x: list[float], 
-    y: list[float], 
-    title: str, 
-    xlabel: str, 
-    ylabel: str, 
-    plot_type: str = "function", 
-    x_range: tuple[float, float] | None = None
+    x: list[float],
+    y: list[float],
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    plot_type: str = "function",
+    x_range: tuple[float, float] | None = None,
 ) -> None:
     """Renders a terminal plot using plotext."""
     try:
@@ -223,6 +279,7 @@ def print_plot(
         console.print(f"[bold]Plot: {title}[/bold]")
         console.print(f"X range: {min(x)} to {max(x)}")
         console.print(f"Y range: {min(y)} to {max(y)}")
+
 
 def print_concept_map(
     concept_id: str,
@@ -281,10 +338,11 @@ def build_equation_block(
         line = f"[bold yellow]({i})[/bold yellow]  {rendered}"
         ann = eq.get("annotation")
         if ann:
-            line += f"\n      [dim italic]{ann}[/dim italic]"
+            line += f"\\n      [dim italic]{ann}[/dim italic]"
         lines.append(line)
-    content = "\n\n".join(lines)
+    content = "\\n\\n".join(lines)
     return Panel(content, title=title, border_style=style, expand=False)
+
 
 def print_equation_block(
     equations: list[dict[str, str]],
@@ -331,8 +389,11 @@ def print_mastery_dashboard(
             color = "red"
         status = "Mastered" if pct >= 80 else "In progress" if pct > 0 else "Not started"
         table.add_row(
-            domain, str(total), str(mastered),
-            f"[{color}]{bar}[/{color}] {pct:5.1f}%", status,
+            domain,
+            str(total),
+            str(mastered),
+            f"[{color}]{bar}[/{color}] {pct:5.1f}%",
+            status,
         )
 
     console.print(table)
@@ -345,21 +406,31 @@ def print_mastery_dashboard(
                 f"({j.get('status', '?')}) — {j.get('interaction_count', 0)} interactions"
             )
 
+
 def build_table(headers: list[str], rows: list[list[Any]], title: str | None = None) -> Table:
-    table = Table(title=title, show_header=True, header_style="bold magenta", expand=True, row_styles=["none", "dim"])
+    table = Table(
+        title=title,
+        show_header=True,
+        header_style="bold magenta",
+        expand=True,
+        row_styles=["none", "dim"],
+    )
     for header in headers:
         table.add_column(header)
     for row in rows:
         table.add_row(*[str(item) for item in row])
     return table
 
+
 def print_table(headers: list[str], rows: list[list[Any]], title: str | None = None) -> None:
     """Prints tabular data nicely formatted."""
     console.print(build_table(headers, rows, title))
 
+
 def create_spinner(text: str):
     """Creates a loading spinner context manager."""
     return console.status(text, spinner="dots")
+
 
 def format_proof(steps: list[str], title: str = "Proof Derivation") -> None:
     """Formats a step-by-step mathematical proof."""

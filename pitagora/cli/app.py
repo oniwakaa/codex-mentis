@@ -1,6 +1,8 @@
 """Pitagora CLI — the main entry point."""
+
 import logging
 import os
+import sys
 
 import typer
 
@@ -20,6 +22,40 @@ from pitagora.cli.commands import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def _is_interactive() -> bool:
+    """Return whether both standard input and output are terminals."""
+    return bool(sys.stdin and sys.stdout and sys.stdin.isatty() and sys.stdout.isatty())
+
+
+def _load_simple_launcher():
+    from pitagora.chat import launch_chat
+
+    return launch_chat
+
+
+def _load_tui_launcher():
+    from pitagora.cli.tui import launch_tui
+
+    return launch_tui
+
+
+def _select_chat_launcher(simple: bool):
+    if simple or not _is_interactive():
+        return _load_simple_launcher()
+
+    try:
+        return _load_tui_launcher()
+    except ModuleNotFoundError as exc:
+        if exc.name != "textual" and not (exc.name and exc.name.startswith("textual.")):
+            raise
+        typer.echo(
+            "Textual is not installed; install it with "
+            "`pip install pitagora[tui]`. Falling back to simple chat."
+        )
+        return _load_simple_launcher()
+
 
 # Lazy imports for optional command groups
 try:
@@ -70,13 +106,17 @@ if ingest:
 
 # Onboarding command
 if onboard:
+
     @app.command("onboard")
     def onboard_cmd(
         skip: bool = typer.Option(False, "--skip", help="Skip interactive assessment"),
-        level: str = typer.Option(None, "--level", help="Set level: beginner/intermediate/advanced"),
+        level: str = typer.Option(
+            None, "--level", help="Set level: beginner/intermediate/advanced"
+        ),
     ):
         """First-run onboarding with level assessment."""
         onboard.run_onboarding(skip=skip, level_override=level)
+
 
 # Core commands
 app.command("study")(study.study)
@@ -128,8 +168,12 @@ def research_cmd(
 @app.command("explain")
 def explain_cmd(
     topic: str = typer.Argument(..., help="Topic to explain"),
-    level: str = typer.Option("intermediate", help="Level: child, beginner, intermediate, advanced, expert"),
-    side_by_side: bool = typer.Option(False, "--side-by-side", "-s", help="Technical + intuition side by side"),
+    level: str = typer.Option(
+        "intermediate", help="Level: child, beginner, intermediate, advanced, expert"
+    ),
+    side_by_side: bool = typer.Option(
+        False, "--side-by-side", "-s", help="Technical + intuition side by side"
+    ),
 ):
     """Explain a complex topic at your level using the Feynman technique."""
     from rich.console import Console
@@ -193,14 +237,18 @@ def debate_cmd(
         console.print(f"[bold]Round {round_num}[/bold]")
 
         # Prover
-        prover_msgs.append({"role": "user", "content": f"Present your argument (round {round_num})."})
+        prover_msgs.append(
+            {"role": "user", "content": f"Present your argument (round {round_num})."}
+        )
         with console.status("[cyan]Prover thinking...[/cyan]"):
             prover_resp = chat_completion(prover_msgs, config=config)
         prover_msgs.append({"role": "assistant", "content": prover_resp})
         console.print(f"[green]Prover:[/green] {prover_resp[:500]}...\n")
 
         # Reviewer responds
-        reviewer_msgs.append({"role": "user", "content": f"Counter the prover's argument: {prover_resp}"})
+        reviewer_msgs.append(
+            {"role": "user", "content": f"Counter the prover's argument: {prover_resp}"}
+        )
         with console.status("[cyan]Reviewer thinking...[/cyan]"):
             reviewer_resp = chat_completion(reviewer_msgs, config=config)
         reviewer_msgs.append({"role": "assistant", "content": reviewer_resp})
@@ -215,37 +263,40 @@ def debate_cmd(
     )
     with console.status("[cyan]Synthesizing...[/cyan]"):
         verdict = chat_completion([{"role": "user", "content": synthesis_prompt}], config=config)
-    
+
     console.print("\n[bold]Verdict:[/bold]\n")
     console.print(Markdown(verdict))
 
 
 @app.command("chat")
 def chat_cmd(
+    ctx: typer.Context,
     mode: str = typer.Option("study", help="Mode: study/explore/reason/verify"),
     topic: str = typer.Option("general", help="Initial topic"),
     model: str = typer.Option(None, help="Override model"),
-    simple: bool = typer.Option(False, "--simple", help="Launch the simple Rich REPL instead of the Textual TUI"),
+    simple: bool = typer.Option(False, "--simple", help="Use the simple chat interface"),
 ):
     """Launch the interactive chat REPL — the main experience."""
-    from pitagora.chat import launch_chat
-
     if model:
         os.environ["PITAGORA_MODEL"] = model
 
-    launch_chat(mode=mode, topic=topic, simple=simple)
+    launcher = _select_chat_launcher(simple or bool(ctx.obj and ctx.obj.get("simple")))
+    launcher(mode=mode, topic=topic)
 
 
 @app.callback(invoke_without_command=True)
 def main_callback(
     ctx: typer.Context,
     model: str = typer.Option(None, "--model", "-m", help="Override model"),
-    simple: bool = typer.Option(False, "--simple", help="Launch the simple Rich REPL instead of the Textual TUI"),
+    simple: bool = typer.Option(False, "--simple", help="Use the simple chat interface"),
 ):
     """Pitagora — AI-powered math & physics learning.
 
     Running without a command launches the interactive chat.
     """
+    ctx.ensure_object(dict)
+    ctx.obj["simple"] = simple
+
     if ctx.invoked_subcommand is not None:
         return
 
@@ -253,14 +304,13 @@ def main_callback(
     # config exists AND stdin is a TTY (interactive use). In non-interactive
     # contexts (CI, pipes), fall back to a one-line hint + defaults so the
     # command never blocks on a prompt.
-    import sys
-
-    from pitagora.chat import launch_chat
     from pitagora.core.constants import CONFIG_PATH
+
     if not CONFIG_PATH.exists():
         if sys.stdin and sys.stdin.isatty():
             try:
                 from pitagora.cli.commands.setup import run_setup
+
                 typer.echo("First run detected — launching setup wizard.\n")
                 run_setup()
             except Exception as e:
@@ -275,7 +325,8 @@ def main_callback(
     if model:
         os.environ["PITAGORA_MODEL"] = model
 
-    launch_chat(simple=simple)
+    launcher = _select_chat_launcher(simple)
+    launcher()
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 All functions print to a passed-in console (default: module-level Console).
 Kept dependency-light: only rich, no new packages.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -17,15 +18,16 @@ console = Console()
 
 # Controls shown after each agent message in teaching mode.
 CONTROLS_LINE = (
-    "[cyan][n][/cyan] next  [cyan][e][/cyan] explain differently  "
-    "[cyan][d][/cyan] go deeper  [cyan][s][/cyan] skip  [cyan][?][/cyan] confused  "
-    "[cyan][v][/cyan] visualize  [cyan][q][/cyan] quiz  [cyan][p][/cyan] pause  "
+    "[cyan]\\[n][/cyan] next  [cyan]\\[e][/cyan] explain differently  "
+    "[cyan]\\[d][/cyan] go deeper  [cyan]\\[s][/cyan] skip  [cyan]\\[?][/cyan] confused  "
+    "[cyan]\\[v][/cyan] visualize  [cyan]\\[q][/cyan] quiz  [cyan]\\[p][/cyan] pause  "
     "[cyan]/help[/cyan]"
 )
 
 
 def build_controls() -> Text:
     return Text.from_markup(CONTROLS_LINE)
+
 
 def show_controls(con: Console | None = None) -> None:
     (con or console).print(build_controls())
@@ -42,11 +44,15 @@ def _score_color(score: float) -> str:
 def build_comprehension_gauge(score: float) -> Text:
     color = _score_color(score)
     bar_width = 20
-    filled = round(score * bar_width)
+    filled = int(round(score * bar_width))
     return Text.assemble(
         ("█" * filled + "░" * (bar_width - filled), color),
         f" {score * 100:5.1f}% comprehension",
     )
+
+def show_comprehension_gauge(score: float, con: Console | None = None) -> None:
+    """Render comprehension as a colored progress bar."""
+    (con or console).print(build_comprehension_gauge(score))
 
 def show_comprehension_gauge(score: float, con: Console | None = None) -> None:
     """Render comprehension as a colored progress bar."""
@@ -76,7 +82,7 @@ def build_subconcept_progress(
                 parts.append((f"{marker}{name} ({mastery*100:.0f}%)", color))
             else:
                 lines.append(f"{marker}[{color}]{name}[/{color}] ({mastery*100:.0f}%)")
-    
+
     if compact:
         t = Text()
         for i, (text, style) in enumerate(parts):
@@ -85,7 +91,8 @@ def build_subconcept_progress(
             t.append(text, style=style)
         return t
     else:
-        return Panel("\n".join(lines), title="Sub-concepts", border_style="blue")
+        return Panel("\\n".join(lines), title="Sub-concepts", border_style="blue")
+
 
 def show_subconcept_progress(
     sub_concepts: list[dict[str, Any]],

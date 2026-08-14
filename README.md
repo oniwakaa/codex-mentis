@@ -43,10 +43,9 @@ pitagora
 # Or use the short alias
 cm
 
-# Simple readline mode (no TUI)
+# Simple readline mode (Rich fallback)
 pitagora --simple
-
-# Direct commands
+pitagora chat --simple
 pitagora study "Lagrangian mechanics"
 pitagora explore "What happens if gravity was 2x?"
 pitagora derive "Euler-Lagrange equation from principle of least action"

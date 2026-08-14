@@ -1,8 +1,9 @@
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
-from pitagora.agents.base import BaseAgent, AgentResponse
+from pitagora.agents.base import AgentResponse, BaseAgent
 from pitagora.agents.providers.base import BaseProvider
 
 logger = logging.getLogger(__name__)
@@ -23,31 +24,41 @@ Topic: "entropy" at intermediate level:
 </example>
 """
 
+
 class DifficultyAssessment(BaseModel):
     concept: str = Field(description="The concept being assessed")
-    estimated_difficulty: str = Field(description="Rating from: trivial, easy, moderate, challenging, extreme")
-    prerequisites: List[str] = Field(description="Prerequisite topics needed to grasp this concept")
-    key_cognitive_obstacles: List[str] = Field(description="List of common misconceptions or mental blocks")
+    estimated_difficulty: str = Field(
+        description="Rating from: trivial, easy, moderate, challenging, extreme"
+    )
+    prerequisites: list[str] = Field(description="Prerequisite topics needed to grasp this concept")
+    key_cognitive_obstacles: list[str] = Field(
+        description="List of common misconceptions or mental blocks"
+    )
+
 
 class Analogy(BaseModel):
     concept: str = Field(description="The concept to describe")
     analogy_name: str = Field(description="Catchy name for the analogy")
     scenario: str = Field(description="The real-world scenario or metaphor used")
-    mapping: Dict[str, str] = Field(description="Map concept elements to analogy elements")
-    limitations: List[str] = Field(description="Where the analogy breaks down or doesn't match the math/physics")
+    mapping: dict[str, str] = Field(description="Map concept elements to analogy elements")
+    limitations: list[str] = Field(
+        description="Where the analogy breaks down or doesn't match the math/physics"
+    )
+
 
 class DecomposedConcept(BaseModel):
     concept: str = Field(description="The main topic")
-    sub_concepts: List[str] = Field(description="Ordered list of sub-components or building blocks")
-    milestones: List[str] = Field(description="Checkpoints indicating progress toward mastery")
+    sub_concepts: list[str] = Field(description="Ordered list of sub-components or building blocks")
+    milestones: list[str] = Field(description="Checkpoints indicating progress toward mastery")
+
 
 class ExplainerAgent(BaseAgent):
-    def __init__(self, provider: BaseProvider, concept_graph: Optional[Any] = None):
+    def __init__(self, provider: BaseProvider, concept_graph: Any | None = None):
         super().__init__(
             name="Explainer",
             role="Feynman Pedagogy & Concept Simplifier",
             provider=provider,
-            system_prompt=EXPLAINER_SYSTEM_PROMPT
+            system_prompt=EXPLAINER_SYSTEM_PROMPT,
         )
         self.concept_graph = concept_graph
 
@@ -62,13 +73,13 @@ class ExplainerAgent(BaseAgent):
                     "properties": {
                         "concept": {
                             "type": "string",
-                            "description": "The mathematical or physical concept to assess."
+                            "description": "The mathematical or physical concept to assess.",
                         }
                     },
-                    "required": ["concept"]
-                }
+                    "required": ["concept"],
+                },
             },
-            self.tool_difficulty_assessor
+            self.tool_difficulty_assessor,
         )
 
         # Register analogy_generator
@@ -82,18 +93,18 @@ class ExplainerAgent(BaseAgent):
                     "properties": {
                         "concept": {
                             "type": "string",
-                            "description": "The abstract concept needing an analogy."
+                            "description": "The abstract concept needing an analogy.",
                         },
                         "domain": {
                             "type": "string",
                             "description": "The source domain of the analogy (e.g., cooking, traffic, oceans, sports).",
-                            "default": "everyday life"
-                        }
+                            "default": "everyday life",
+                        },
                     },
-                    "required": ["concept"]
-                }
+                    "required": ["concept"],
+                },
             },
-            self.tool_analogy_generator
+            self.tool_analogy_generator,
         )
 
         # Register concept_decomposer
@@ -107,13 +118,13 @@ class ExplainerAgent(BaseAgent):
                     "properties": {
                         "concept": {
                             "type": "string",
-                            "description": "The target concept to break down."
+                            "description": "The target concept to break down.",
                         }
                     },
-                    "required": ["concept"]
-                }
+                    "required": ["concept"],
+                },
             },
-            self.tool_concept_decomposer
+            self.tool_concept_decomposer,
         )
 
     async def tool_difficulty_assessor(self, concept: str) -> str:
@@ -132,7 +143,7 @@ class ExplainerAgent(BaseAgent):
         prompt = f"Perform a difficulty assessment for the concept: '{concept}'."
         if prereqs:
             prompt += f" Known structural prerequisites from curriculum graph: {prereqs}"
-            
+
         try:
             assessment = await self.athink_structured(prompt, DifficultyAssessment)
             return assessment.model_dump_json(indent=2)
@@ -143,7 +154,7 @@ class ExplainerAgent(BaseAgent):
                 concept=concept,
                 estimated_difficulty="moderate",
                 prerequisites=prereqs or [f"Basic {concept} fundamentals"],
-                key_cognitive_obstacles=["Abstraction level", "Mathematical notation"]
+                key_cognitive_obstacles=["Abstraction level", "Mathematical notation"],
             )
             return fallback.model_dump_json(indent=2)
 
@@ -162,7 +173,7 @@ class ExplainerAgent(BaseAgent):
                 analogy_name=f"The {concept} Metaphor",
                 scenario=f"A workflow representing how {concept} functions.",
                 mapping={"source": "target"},
-                limitations=["Oversimplification"]
+                limitations=["Oversimplification"],
             )
             return fallback.model_dump_json(indent=2)
 
@@ -178,8 +189,15 @@ class ExplainerAgent(BaseAgent):
             logger.error(f"Error in tool_concept_decomposer: {e}")
             fallback = DecomposedConcept(
                 concept=concept,
-                sub_concepts=[f"Introduction to {concept}", f"Core mechanics of {concept}", f"Advanced {concept}"],
-                milestones=[f"Understand {concept} basic definition", f"Apply {concept} to problems"]
+                sub_concepts=[
+                    f"Introduction to {concept}",
+                    f"Core mechanics of {concept}",
+                    f"Advanced {concept}",
+                ],
+                milestones=[
+                    f"Understand {concept} basic definition",
+                    f"Apply {concept} to problems",
+                ],
             )
             return fallback.model_dump_json(indent=2)
 

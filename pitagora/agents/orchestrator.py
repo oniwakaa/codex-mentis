@@ -2,26 +2,29 @@ import asyncio
 import logging
 import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional, Callable
+from typing import Any
 
-from pitagora.agents.base import BaseAgent, AgentResponse
+from pitagora.agents.base import AgentResponse, BaseAgent
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class OrchestratorResponse:
     content: str
-    agent_responses: List[AgentResponse] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    agent_responses: list[AgentResponse] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
 
 class Orchestrator:
     def __init__(
         self,
-        agents: Dict[str, BaseAgent],
-        memory: Optional[Any] = None,
-        concept_graph: Optional[Any] = None,
-        self_improver: Optional[Any] = None,
+        agents: dict[str, BaseAgent],
+        memory: Any | None = None,
+        concept_graph: Any | None = None,
+        self_improver: Any | None = None,
     ):
         """
         Orchestrates Pitagora tasks by routing requests to specialized agents
@@ -35,8 +38,8 @@ class Orchestrator:
         self.memory = memory
         self.concept_graph = concept_graph
         self.self_improver = self_improver
-        self.sessions: Dict[str, Dict[str, Any]] = {}
-        self.workflow_registry: Dict[str, Callable] = {}
+        self.sessions: dict[str, dict[str, Any]] = {}
+        self.workflow_registry: dict[str, Callable] = {}
 
         self._register_default_workflows()
 
@@ -52,40 +55,53 @@ class Orchestrator:
         self.register_workflow("prover_reviewer_debate", self._run_debate_workflow)
         self.register_workflow("derive_verify_plot", self._run_derive_verify_plot_workflow)
 
-    def get_session(self, session_id: str) -> Dict[str, Any]:
+    def get_session(self, session_id: str) -> dict[str, Any]:
         """
         Retrieves or initializes a session state.
         """
         if session_id not in self.sessions:
-            self.sessions[session_id] = {
-                "history": [],
-                "metadata": {}
-            }
+            self.sessions[session_id] = {"history": [], "metadata": {}}
         return self.sessions[session_id]
 
-    async def classify_intent(self, user_input: str) -> Dict[str, Any]:
+    async def classify_intent(self, user_input: str) -> dict[str, Any]:
         """
         Classify user intent into one of our workflows or single-agent routes.
         Returns a dict: {"route_type": "workflow" | "agent", "name": str}
         """
         input_lower = user_input.lower()
-        
+
         # Rule-based fast checks
-        if "debate" in input_lower or ("vs" in input_lower and ("prover" in input_lower or "reviewer" in input_lower)):
+        if "debate" in input_lower or (
+            "vs" in input_lower and ("prover" in input_lower or "reviewer" in input_lower)
+        ):
             return {"route_type": "workflow", "name": "prover_reviewer_debate"}
-        if "pipeline" in input_lower or ("research" in input_lower and "prove" in input_lower and "visualize" in input_lower):
+        if "pipeline" in input_lower or (
+            "research" in input_lower and "prove" in input_lower and "visualize" in input_lower
+        ):
             return {"route_type": "workflow", "name": "research_prove_review_visualize"}
-        if "parallel" in input_lower or ("tutor" in input_lower and "prover" in input_lower and "simultaneous" in input_lower):
+        if "parallel" in input_lower or (
+            "tutor" in input_lower and "prover" in input_lower and "simultaneous" in input_lower
+        ):
             return {"route_type": "workflow", "name": "parallel_tutor_prover"}
         if "multi" in input_lower or "derive_verify_plot" in input_lower:
             return {"route_type": "workflow", "name": "derive_verify_plot"}
 
         # Single agent triggers
-        if "explain" in input_lower or "feynman" in input_lower or "analogy" in input_lower or "simple" in input_lower:
+        if (
+            "explain" in input_lower
+            or "feynman" in input_lower
+            or "analogy" in input_lower
+            or "simple" in input_lower
+        ):
             return {"route_type": "agent", "name": "explainer"}
         if "study" in input_lower or "teach" in input_lower or "socratic" in input_lower:
             return {"route_type": "agent", "name": "tutor"}
-        if "prove" in input_lower or "derive" in input_lower or "formula" in input_lower or "math" in input_lower:
+        if (
+            "prove" in input_lower
+            or "derive" in input_lower
+            or "formula" in input_lower
+            or "math" in input_lower
+        ):
             return {"route_type": "agent", "name": "prover"}
         if "verify" in input_lower or "review" in input_lower or "critique" in input_lower:
             return {"route_type": "agent", "name": "reviewer"}
@@ -95,11 +111,23 @@ class Orchestrator:
             return {"route_type": "agent", "name": "researcher"}
         if "self_improve" in input_lower or "optimize prompt" in input_lower:
             return {"route_type": "agent", "name": "self_improver"}
-        if "dataset" in input_lower or "dataframe" in input_lower or "csv" in input_lower or "regression" in input_lower or "correlation" in input_lower:
+        if (
+            "dataset" in input_lower
+            or "dataframe" in input_lower
+            or "csv" in input_lower
+            or "regression" in input_lower
+            or "correlation" in input_lower
+        ):
             return {"route_type": "agent", "name": "data_analyst"}
 
         # Dynamic classifier utilizing LLM if possible
-        agent = self.agents.get("researcher") or self.agents.get("tutor") or list(self.agents.values())[0] if self.agents else None
+        agent = (
+            self.agents.get("researcher")
+            or self.agents.get("tutor")
+            or list(self.agents.values())[0]
+            if self.agents
+            else None
+        )
         if agent:
             prompt = (
                 f"Classify the intent of the following user request into one of these exact options:\n"
@@ -117,28 +145,29 @@ class Orchestrator:
                 f"- 'researcher' (knowledge lookup, web search)\n"
                 f"- 'self_improver' (prompt optimization, A/B strategy outcomes)\n"
                 f"- 'data_analyst' (dataset profiling, statistical analysis, plots)\n\n"
-                f"User request: \"{user_input}\"\n\n"
-                f"Return a JSON response conforming strictly to: {{\"route_type\": \"workflow\" or \"agent\", \"name\": \"option_name\"}}"
+                f'User request: "{user_input}"\n\n'
+                f'Return a JSON response conforming strictly to: {{"route_type": "workflow" or "agent", "name": "option_name"}}'
             )
             try:
                 from pydantic import BaseModel
+
                 class IntentClassification(BaseModel):
                     route_type: str
                     name: str
-                
+
                 result = await agent.athink_structured(prompt, IntentClassification)
                 return {"route_type": result.route_type, "name": result.name}
             except Exception:
                 pass
-                
+
         return {"route_type": "agent", "name": "researcher"}
 
     def process(
         self,
         user_input: str,
         mode: str = "explore",
-        context: Optional[str] = None,
-        session_id: Optional[str] = None
+        context: str | None = None,
+        session_id: str | None = None,
     ) -> OrchestratorResponse:
         """
         Synchronous wrapper for aprocess. Python 3.12-safe: avoids the
@@ -152,15 +181,16 @@ class Orchestrator:
             return asyncio.run(self.aprocess(user_input, mode, context, session_id))
         # We're already inside a running loop — nest_asyncio lets us re-enter.
         import nest_asyncio
+
         nest_asyncio.apply()
         return loop.run_until_complete(self.aprocess(user_input, mode, context, session_id))
 
     async def aprocess(
-        self, 
-        user_input: str, 
-        mode: str = "explore", 
-        context: Optional[str] = None,
-        session_id: Optional[str] = None
+        self,
+        user_input: str,
+        mode: str = "explore",
+        context: str | None = None,
+        session_id: str | None = None,
     ) -> OrchestratorResponse:
         """
         Route user input based on the classified intent and execute workflows asynchronously.
@@ -181,7 +211,7 @@ class Orchestrator:
         # Check if mode specifies manual routing override
         route_type = None
         route_name = None
-        
+
         mode_clean = mode.lower().strip()
         if mode_clean in self.workflow_registry:
             route_type = "workflow"
@@ -216,7 +246,7 @@ class Orchestrator:
         elif mode_clean in ("data", "data_analyst", "analyze"):
             route_type = "agent"
             route_name = "data_analyst"
-            
+
         if not route_type or mode_clean == "explore":
             # Classify intent dynamically
             intent = await self.classify_intent(user_input)
@@ -242,12 +272,11 @@ class Orchestrator:
 
             if not agent:
                 return OrchestratorResponse(
-                    content="Error: No active agents registered in the system.",
-                    agent_responses=[]
+                    content="Error: No active agents registered in the system.", agent_responses=[]
                 )
 
             agent_response = None
-            
+
             # Execute specific agent methods if applicable, otherwise fallback to think
             if agent_key == "tutor" and hasattr(agent, "explain_concept"):
                 # WS1: when a self_improver is wired in, pick a strategy from the
@@ -277,7 +306,8 @@ class Orchestrator:
                     # fallback for the standalone orchestrate() path.
                     try:
                         quality = await self.self_improver.rate_explanation(
-                            topic=user_input, level=level,
+                            topic=user_input,
+                            level=level,
                             strategy=strategy or "socratic",
                             explanation=agent_response.content,
                         )
@@ -305,7 +335,9 @@ class Orchestrator:
                             domain = d
                             break
                     # Extract the concept from the user input (strip the analogy request phrase)
-                    concept = re.sub(r"^(give me an |an )?analogy for\s+", "", user_input, flags=re.IGNORECASE)
+                    concept = re.sub(
+                        r"^(give me an |an )?analogy for\s+", "", user_input, flags=re.IGNORECASE
+                    )
                     concept = re.sub(r"\s+using\s+.*$", "", concept).strip() or user_input
                     res_str = await agent.tool_analogy_generator(concept, domain=domain)
                     agent_response = AgentResponse(content=res_str, metadata={"analogy": True})
@@ -317,7 +349,9 @@ class Orchestrator:
                 agent_response = await agent.review(user_input)
             elif agent_key == "visualizer" and hasattr(agent, "plot_expression"):
                 # Try to extract expression
-                expr_match = re.search(r"plot\s+([a-zA-Z0-9\s\+\-\*\/\(\)\^]+)", user_input, re.IGNORECASE)
+                expr_match = re.search(
+                    r"plot\s+([a-zA-Z0-9\s\+\-\*\/\(\)\^]+)", user_input, re.IGNORECASE
+                )
                 if expr_match:
                     expr = expr_match.group(1).strip()
                     res_str = await asyncio.to_thread(agent.plot_expression, expr)
@@ -330,7 +364,7 @@ class Orchestrator:
             response = OrchestratorResponse(
                 content=agent_response.content,
                 agent_responses=[agent_response],
-                metadata={"routed_agent": agent_key}
+                metadata={"routed_agent": agent_key},
             )
 
         # Log assistant response to memory / session
@@ -346,44 +380,48 @@ class Orchestrator:
 
         return response
 
-    async def _run_parallel_tutor_prover(self, user_input: str, context: Optional[str]) -> OrchestratorResponse:
+    async def _run_parallel_tutor_prover(
+        self, user_input: str, context: str | None
+    ) -> OrchestratorResponse:
         """
         Runs Tutor and Prover agents simultaneously and merges their output into a side-by-side conceptual vs formal display.
         """
         tutor = self.agents.get("tutor")
         prover = self.agents.get("prover")
-        
+
         if not tutor or not prover:
             return OrchestratorResponse(
                 content="Error: Both Tutor and Prover agents must be active to run parallel reasoning.",
-                agent_responses=[]
+                agent_responses=[],
             )
 
         # Query concurrently
         tutor_task = tutor.athink(
             f"Provide Socratic guiding principles and physical intuition for: '{user_input}'",
-            context
+            context,
         )
         prover_task = prover.athink(
             f"Provide a rigorous mathematical proof or algebraic derivation for: '{user_input}'",
-            context
+            context,
         )
-        
+
         tutor_resp, prover_resp = await asyncio.gather(tutor_task, prover_task)
-        
+
         # Merge response side-by-side or cleanly separated
         merged_content = (
             f"### Conceptual & Intuitive Breakdown (Tutor)\n{tutor_resp.content}\n\n"
             f"### Rigorous Mathematical Derivation (Prover)\n{prover_resp.content}"
         )
-        
+
         return OrchestratorResponse(
             content=merged_content,
             agent_responses=[tutor_resp, prover_resp],
-            metadata={"workflow": "parallel_tutor_prover"}
+            metadata={"workflow": "parallel_tutor_prover"},
         )
 
-    async def _run_pipeline_workflow(self, user_input: str, context: Optional[str]) -> OrchestratorResponse:
+    async def _run_pipeline_workflow(
+        self, user_input: str, context: str | None
+    ) -> OrchestratorResponse:
         """
         Executes a Research -> Prove -> Review -> Visualize pipeline sequentially.
         """
@@ -391,14 +429,16 @@ class Orchestrator:
         prover = self.agents.get("prover")
         reviewer = self.agents.get("reviewer")
         visualizer = self.agents.get("visualizer")
-        
+
         agent_responses = []
         pipeline_log = []
 
         # Step 1: Research
         research_content = "No researcher active."
         if researcher:
-            res_resp = await researcher.athink(f"Synthesize relevant equations and academic context for: '{user_input}'", context)
+            res_resp = await researcher.athink(
+                f"Synthesize relevant equations and academic context for: '{user_input}'", context
+            )
             agent_responses.append(res_resp)
             research_content = res_resp.content
             pipeline_log.append("### 1. Research Background & Equations\n" + research_content)
@@ -434,19 +474,25 @@ class Orchestrator:
             equations = re.findall(r"\$\$(.*?)\$\$", prove_content)
             if not equations:
                 equations = re.findall(r"\$(.*?)\$", prove_content)
-                
+
             plot_expr = None
             for eq in equations:
                 if "=" in eq and "x" in eq:
                     parts = eq.split("=")
-                    clean_rhs = parts[1].replace("\\sin", "sin").replace("\\cos", "cos").replace("\\exp", "exp").strip()
+                    clean_rhs = (
+                        parts[1]
+                        .replace("\\sin", "sin")
+                        .replace("\\cos", "cos")
+                        .replace("\\exp", "exp")
+                        .strip()
+                    )
                     plot_expr = clean_rhs
                     break
-            
+
             if not plot_expr:
                 # Default
                 plot_expr = "x**2"
-                
+
             try:
                 # Call visualizer plotter
                 plot_content = visualizer.plot_expression(plot_expr)
@@ -460,28 +506,32 @@ class Orchestrator:
         return OrchestratorResponse(
             content=final_content,
             agent_responses=agent_responses,
-            metadata={"workflow": "research_prove_review_visualize"}
+            metadata={"workflow": "research_prove_review_visualize"},
         )
 
-    async def _run_debate_workflow(self, user_input: str, context: Optional[str]) -> OrchestratorResponse:
+    async def _run_debate_workflow(
+        self, user_input: str, context: str | None
+    ) -> OrchestratorResponse:
         """
         Executes an iterative debate between the Prover (creates/revises proof) and Reviewer (critiques proof).
         Loops up to 3 rounds or until Reviewer approves.
         """
         prover = self.agents.get("prover")
         reviewer = self.agents.get("reviewer")
-        
+
         if not prover or not reviewer:
             return OrchestratorResponse(
                 content="Error: Both Prover and Reviewer agents are required for debate workflow.",
-                agent_responses=[]
+                agent_responses=[],
             )
 
         agent_responses = []
         debate_history = []
 
         # Round 1: Generate initial proof
-        current_proof = await prover.athink(f"Propose a proof/derivation for: '{user_input}'", context)
+        current_proof = await prover.athink(
+            f"Propose a proof/derivation for: '{user_input}'", context
+        )
         agent_responses.append(current_proof)
         debate_history.append(f"#### Round 1: Prover's Initial Derivation\n{current_proof.content}")
 
@@ -493,39 +543,47 @@ class Orchestrator:
             critique = await reviewer.athink(
                 f"Critically audit this math/physics proof. Check for signs, steps, dimensions, and notation errors. "
                 f"If correct, state 'NO ERRORS DETECTED'. Proof:\n\n{current_proof.content}",
-                context
+                context,
             )
             agent_responses.append(critique)
-            debate_history.append(f"#### Round {round_idx}: Reviewer's Audit/Critique\n{critique.content}")
-            
+            debate_history.append(
+                f"#### Round {round_idx}: Reviewer's Audit/Critique\n{critique.content}"
+            )
+
             # Check exit condition
             if "no errors detected" in critique.content.lower():
-                debate_history.append(f"**Verification complete.** Reviewer signed off on the proof in Round {round_idx}.")
+                debate_history.append(
+                    f"**Verification complete.** Reviewer signed off on the proof in Round {round_idx}."
+                )
                 break
-                
+
             # Prover revises
             if round_idx < max_rounds:
                 revised_proof = await prover.athink(
                     f"Revise your derivation based on this critique:\n\n{critique.content}\n\n"
                     f"Address each point and output the complete revised mathematical proof.",
-                    context
+                    context,
                 )
                 agent_responses.append(revised_proof)
                 current_proof = revised_proof
-                debate_history.append(f"#### Round {round_idx+1}: Prover's Revised Derivation\n{current_proof.content}")
+                debate_history.append(
+                    f"#### Round {round_idx+1}: Prover's Revised Derivation\n{current_proof.content}"
+                )
 
         final_content = (
-            f"### Multi-Agent Debate Workflow (Prover vs Reviewer)\n\n" +
-            "\n\n---\n\n".join(debate_history)
+            "### Multi-Agent Debate Workflow (Prover vs Reviewer)\n\n"
+            + "\n\n---\n\n".join(debate_history)
         )
-        
+
         return OrchestratorResponse(
             content=final_content,
             agent_responses=agent_responses,
-            metadata={"workflow": "prover_reviewer_debate", "rounds": rounds_completed}
+            metadata={"workflow": "prover_reviewer_debate", "rounds": rounds_completed},
         )
 
-    async def _run_derive_verify_plot_workflow(self, user_input: str, context: Optional[str]) -> OrchestratorResponse:
+    async def _run_derive_verify_plot_workflow(
+        self, user_input: str, context: str | None
+    ) -> OrchestratorResponse:
         """
         Runs derive -> verify -> plot pipeline.
         1. Prover derives the equation/proof.
@@ -533,20 +591,24 @@ class Orchestrator:
         3. Visualizer plots the resulting function.
         """
         agent_responses = []
-        
+
         # Step 1: Derive
         prover = self.agents.get("prover")
         if not prover:
-            return OrchestratorResponse(content="Error: Prover agent missing for multi-step workflow.", agent_responses=[])
-            
+            return OrchestratorResponse(
+                content="Error: Prover agent missing for multi-step workflow.", agent_responses=[]
+            )
+
         prover_resp = await prover.athink(user_input, context)
         agent_responses.append(prover_resp)
-        
+
         # Step 2: Verify
         reviewer = self.agents.get("reviewer")
         review_text = "Reviewer agent not available."
         if reviewer:
-            reviewer_resp = await reviewer.athink(f"Review the correctness of the following math:\n\n{prover_resp.content}", context)
+            reviewer_resp = await reviewer.athink(
+                f"Review the correctness of the following math:\n\n{prover_resp.content}", context
+            )
             agent_responses.append(reviewer_resp)
             review_text = reviewer_resp.content
 
@@ -557,21 +619,29 @@ class Orchestrator:
             equations = re.findall(r"\$\$(.*?)\$\$", prover_resp.content)
             if not equations:
                 equations = re.findall(r"\$(.*?)\$", prover_resp.content)
-                
+
             plot_expr = None
             for eq in equations:
                 if "=" in eq and "x" in eq:
                     parts = eq.split("=")
-                    clean_rhs = parts[1].replace("\\sin", "sin").replace("\\cos", "cos").replace("\\exp", "exp").strip()
+                    clean_rhs = (
+                        parts[1]
+                        .replace("\\sin", "sin")
+                        .replace("\\cos", "cos")
+                        .replace("\\exp", "exp")
+                        .strip()
+                    )
                     plot_expr = clean_rhs
                     break
-                    
+
             if not plot_expr:
                 plot_expr = "x**2"
-                
+
             try:
                 plot_text = visualizer.plot_expression(plot_expr)
-                agent_responses.append(AgentResponse(content=plot_text, metadata={"plotted_expr": plot_expr}))
+                agent_responses.append(
+                    AgentResponse(content=plot_text, metadata={"plotted_expr": plot_expr})
+                )
             except Exception:
                 pass
 
@@ -584,25 +654,32 @@ class Orchestrator:
         return OrchestratorResponse(
             content=summary_content,
             agent_responses=agent_responses,
-            metadata={"workflow": "derive_verify_plot"}
+            metadata={"workflow": "derive_verify_plot"},
         )
+
 
 def orchestrate(query: str, mode: str, topic: str, context: str = "") -> str:
     """
     Stand-alone orchestrate function for REPL compatibility.
     Runs the agent reasoning chain in a synchronous wrapper.
     """
-    from pitagora.agents.providers import ProviderConfig, get_provider
-    from pitagora.agents.tutor import TutorAgent
-    from pitagora.agents.researcher import ResearchAgent
-    from pitagora.agents.prover import ProverAgent
-    from pitagora.agents.reviewer import ReviewerAgent
-    from pitagora.agents.visualizer import VisualizerAgent
-    from pitagora.agents.explainer import ExplainerAgent
-    from pitagora.agents.self_improver import SelfImproverAgent
     from pitagora.agents.data_analyst import DataAnalystAgent
-    
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("PITAGORA_API_KEY") or "mock"
+    from pitagora.agents.explainer import ExplainerAgent
+    from pitagora.agents.prover import ProverAgent
+    from pitagora.agents.providers import ProviderConfig, get_provider
+    from pitagora.agents.researcher import ResearchAgent
+    from pitagora.agents.reviewer import ReviewerAgent
+    from pitagora.agents.self_improver import SelfImproverAgent
+    from pitagora.agents.tutor import TutorAgent
+    from pitagora.agents.visualizer import VisualizerAgent
+
+    api_key = (
+        os.getenv("GEMINI_API_KEY")
+        or os.getenv("OPENAI_API_KEY")
+        or os.getenv("ANTHROPIC_API_KEY")
+        or os.getenv("PITAGORA_API_KEY")
+        or "mock"
+    )
 
     # Resolve provider config from pitagora config or defaults
     default_provider_name = "gemini"
@@ -611,10 +688,11 @@ def orchestrate(query: str, mode: str, topic: str, context: str = "") -> str:
 
     try:
         from pitagora.core.config import load_config
+
         config_obj = load_config()
         default_provider_name = config_obj.providers.default
         # Read nested provider config if available
-        prov_config = config_obj.providers.config if hasattr(config_obj.providers, 'config') else {}
+        prov_config = config_obj.providers.config if hasattr(config_obj.providers, "config") else {}
         if prov_config:
             default_model = prov_config.get("default_model", default_model)
             base_url = prov_config.get("base_url", base_url)
@@ -625,14 +703,11 @@ def orchestrate(query: str, mode: str, topic: str, context: str = "") -> str:
         pass
 
     config = ProviderConfig(
-        api_key=api_key,
-        model=default_model,
-        base_url=base_url,
-        max_tokens=4096
+        api_key=api_key, model=default_model, base_url=base_url, max_tokens=4096
     )
-    
+
     prov = get_provider(default_provider_name, config)
-    
+
     agents = {
         "tutor": TutorAgent(prov),
         "researcher": ResearchAgent(prov),
@@ -641,14 +716,12 @@ def orchestrate(query: str, mode: str, topic: str, context: str = "") -> str:
         "visualizer": VisualizerAgent(prov),
         "explainer": ExplainerAgent(prov),
         "self_improver": SelfImproverAgent(prov),
-        "data_analyst": DataAnalystAgent(prov)
+        "data_analyst": DataAnalystAgent(prov),
     }
-    
+
     orchestrator = Orchestrator(agents=agents)
-    
+
     resp = orchestrator.process(
-        user_input=query,
-        mode=mode,
-        context=f"Topic: {topic}\n{context}".strip()
+        user_input=query, mode=mode, context=f"Topic: {topic}\n{context}".strip()
     )
     return resp.content

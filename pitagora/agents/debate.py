@@ -1,19 +1,28 @@
 import asyncio
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
-from pitagora.agents.base import BaseAgent, AgentResponse
+from pitagora.agents.base import BaseAgent
 from pitagora.agents.providers.base import BaseProvider
 
 logger = logging.getLogger(__name__)
 
+
 class DebateSynthesis(BaseModel):
     verdict: str = Field(description="The verdict of the debate: 'FOR', 'AGAINST', or 'UNDECIDED'")
     confidence: float = Field(description="Confidence in the verdict from 0.0 to 1.0")
-    strongest_arguments_pro: List[str] = Field(description="The strongest arguments presented by the PRO side (Prover)")
-    strongest_arguments_con: List[str] = Field(description="The strongest arguments presented by the CON side (Reviewer)")
-    synthesis_summary: str = Field(description="A comprehensive analysis and summary of the debate, reconciling both sides")
+    strongest_arguments_pro: list[str] = Field(
+        description="The strongest arguments presented by the PRO side (Prover)"
+    )
+    strongest_arguments_con: list[str] = Field(
+        description="The strongest arguments presented by the CON side (Reviewer)"
+    )
+    synthesis_summary: str = Field(
+        description="A comprehensive analysis and summary of the debate, reconciling both sides"
+    )
+
 
 DEBATE_SYSTEM_PROMPT = """<role>Debate facilitator and synthesizer for Pitagora. Moderate formal debates between two opposing math/science positions.</role>
 
@@ -25,27 +34,28 @@ DEBATE_SYSTEM_PROMPT = """<role>Debate facilitator and synthesizer for Pitagora.
 </instructions>
 """
 
+
 class DebateAgent(BaseAgent):
     def __init__(self, provider: BaseProvider):
         super().__init__(
             name="DebateAgent",
             role="Structured Debate Facilitator and Synthesizer",
             provider=provider,
-            system_prompt=DEBATE_SYSTEM_PROMPT
+            system_prompt=DEBATE_SYSTEM_PROMPT,
         )
 
     async def run_debate(
-        self, 
-        statement: str, 
-        prover: BaseAgent, 
+        self,
+        statement: str,
+        prover: BaseAgent,
         reviewer: BaseAgent,
-        synthesizer: Optional[BaseAgent] = None
-    ) -> Dict[str, Any]:
+        synthesizer: BaseAgent | None = None,
+    ) -> dict[str, Any]:
         """
         Manages a structured formal debate on a statement between the Prover (FOR) and Reviewer (AGAINST).
         """
         synth_agent = synthesizer or self
-        transcript: List[Dict[str, str]] = []
+        transcript: list[dict[str, str]] = []
 
         logger.info(f"Starting structured debate on statement: '{statement}'")
 
@@ -67,8 +77,20 @@ class DebateAgent(BaseAgent):
         con_opening_task = reviewer.athink(con_opening_prompt)
         pro_opening, con_opening = await asyncio.gather(pro_opening_task, con_opening_task)
 
-        transcript.append({"round": "1. Opening Statements", "agent": "Prover (FOR)", "content": pro_opening.content})
-        transcript.append({"round": "1. Opening Statements", "agent": "Reviewer (AGAINST)", "content": con_opening.content})
+        transcript.append(
+            {
+                "round": "1. Opening Statements",
+                "agent": "Prover (FOR)",
+                "content": pro_opening.content,
+            }
+        )
+        transcript.append(
+            {
+                "round": "1. Opening Statements",
+                "agent": "Reviewer (AGAINST)",
+                "content": con_opening.content,
+            }
+        )
 
         # =====================================================================
         # Round 2: Cross-examination
@@ -81,7 +103,13 @@ class DebateAgent(BaseAgent):
             f"Prover's Opening:\n{pro_opening.content}"
         )
         con_cross = await reviewer.athink(con_cross_prompt)
-        transcript.append({"round": "2. Cross-examination", "agent": "Reviewer (AGAINST) to Prover", "content": con_cross.content})
+        transcript.append(
+            {
+                "round": "2. Cross-examination",
+                "agent": "Reviewer (AGAINST) to Prover",
+                "content": con_cross.content,
+            }
+        )
 
         # Prover answers Reviewer's cross-examination
         pro_response_prompt = (
@@ -90,7 +118,13 @@ class DebateAgent(BaseAgent):
             f"Reviewer's Critique:\n{con_cross.content}"
         )
         pro_response = await prover.athink(pro_response_prompt)
-        transcript.append({"round": "2. Cross-examination", "agent": "Prover (FOR) response", "content": pro_response.content})
+        transcript.append(
+            {
+                "round": "2. Cross-examination",
+                "agent": "Prover (FOR) response",
+                "content": pro_response.content,
+            }
+        )
 
         # Prover questions Reviewer's opening
         pro_cross_prompt = (
@@ -99,7 +133,13 @@ class DebateAgent(BaseAgent):
             f"Reviewer's Opening:\n{con_opening.content}"
         )
         pro_cross = await prover.athink(pro_cross_prompt)
-        transcript.append({"round": "2. Cross-examination", "agent": "Prover (FOR) to Reviewer", "content": pro_cross.content})
+        transcript.append(
+            {
+                "round": "2. Cross-examination",
+                "agent": "Prover (FOR) to Reviewer",
+                "content": pro_cross.content,
+            }
+        )
 
         # Reviewer answers Prover's cross-examination
         con_response_prompt = (
@@ -108,7 +148,13 @@ class DebateAgent(BaseAgent):
             f"Prover's Critique:\n{pro_cross.content}"
         )
         con_response = await reviewer.athink(con_response_prompt)
-        transcript.append({"round": "2. Cross-examination", "agent": "Reviewer (AGAINST) response", "content": con_response.content})
+        transcript.append(
+            {
+                "round": "2. Cross-examination",
+                "agent": "Reviewer (AGAINST) response",
+                "content": con_response.content,
+            }
+        )
 
         # =====================================================================
         # Round 3: Rebuttal
@@ -129,8 +175,12 @@ class DebateAgent(BaseAgent):
         con_rebuttal_task = reviewer.athink(con_rebuttal_prompt)
         pro_rebuttal, con_rebuttal = await asyncio.gather(pro_rebuttal_task, con_rebuttal_task)
 
-        transcript.append({"round": "3. Rebuttal", "agent": "Prover (FOR)", "content": pro_rebuttal.content})
-        transcript.append({"round": "3. Rebuttal", "agent": "Reviewer (AGAINST)", "content": con_rebuttal.content})
+        transcript.append(
+            {"round": "3. Rebuttal", "agent": "Prover (FOR)", "content": pro_rebuttal.content}
+        )
+        transcript.append(
+            {"round": "3. Rebuttal", "agent": "Reviewer (AGAINST)", "content": con_rebuttal.content}
+        )
 
         # =====================================================================
         # Round 4: Closing statements
@@ -149,14 +199,26 @@ class DebateAgent(BaseAgent):
         con_closing_task = reviewer.athink(con_closing_prompt)
         pro_closing, con_closing = await asyncio.gather(pro_closing_task, con_closing_task)
 
-        transcript.append({"round": "4. Closing Statements", "agent": "Prover (FOR)", "content": pro_closing.content})
-        transcript.append({"round": "4. Closing Statements", "agent": "Reviewer (AGAINST)", "content": con_closing.content})
+        transcript.append(
+            {
+                "round": "4. Closing Statements",
+                "agent": "Prover (FOR)",
+                "content": pro_closing.content,
+            }
+        )
+        transcript.append(
+            {
+                "round": "4. Closing Statements",
+                "agent": "Reviewer (AGAINST)",
+                "content": con_closing.content,
+            }
+        )
 
         # =====================================================================
         # Round 5: Synthesis
         # =====================================================================
         logger.info("Debate Round 5: Synthesis and Verdict")
-        
+
         # Build raw transcript text for the synthesizer
         raw_transcript_str = ""
         for item in transcript:
@@ -171,7 +233,9 @@ class DebateAgent(BaseAgent):
         )
 
         try:
-            synthesis: DebateSynthesis = await synth_agent.athink_structured(synthesis_prompt, DebateSynthesis)
+            synthesis: DebateSynthesis = await synth_agent.athink_structured(
+                synthesis_prompt, DebateSynthesis
+            )
         except (ValueError, Exception) as e:
             logger.warning(f"Debate synthesis failed: {e}")
             synthesis = DebateSynthesis(
@@ -189,5 +253,5 @@ class DebateAgent(BaseAgent):
             "confidence": synthesis.confidence,
             "strongest_arguments_pro": synthesis.strongest_arguments_pro,
             "strongest_arguments_con": synthesis.strongest_arguments_con,
-            "synthesis_summary": synthesis.synthesis_summary
+            "synthesis_summary": synthesis.synthesis_summary,
         }

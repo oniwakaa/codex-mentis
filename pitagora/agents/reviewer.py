@@ -1,7 +1,8 @@
 import json
 import re
-from typing import Dict, Any, List, Optional
-from pitagora.agents.base import BaseAgent, AgentResponse
+from typing import Any
+
+from pitagora.agents.base import AgentResponse, BaseAgent
 from pitagora.agents.providers.base import BaseProvider
 
 REVIEWER_SYSTEM_PROMPT = """<role>Adversarial reviewer for Pitagora. Verify claims, inspect proofs, hunt for errors and counterexamples.</role>
@@ -27,15 +28,16 @@ Critique: Equality at $x=1$; derivative $1/x - 1 \\le 0$ for $x \\ge 1$ and $\\g
 </example>
 """
 
+
 class ReviewerAgent(BaseAgent):
     def __init__(self, provider: BaseProvider):
         super().__init__(
             name="Reviewer",
             role="Adversarial Mathematical Reviewer",
             provider=provider,
-            system_prompt=REVIEWER_SYSTEM_PROMPT
+            system_prompt=REVIEWER_SYSTEM_PROMPT,
         )
-        
+
         # Register the SymPy evaluation tool
         self.register_tool(
             "sympy_evaluate",
@@ -47,35 +49,38 @@ class ReviewerAgent(BaseAgent):
                     "properties": {
                         "code": {
                             "type": "string",
-                            "description": "Python code using SymPy/NumPy. Expose variables and print the result of checks."
+                            "description": "Python code using SymPy/NumPy. Expose variables and print the result of checks.",
                         }
                     },
-                    "required": ["code"]
-                }
+                    "required": ["code"],
+                },
             },
-            self.tool_sympy_evaluate
+            self.tool_sympy_evaluate,
         )
 
     def tool_sympy_evaluate(self, code: str) -> str:
         """Executes code in the project's SymPy sandbox to evaluate mathematical claims."""
         from pitagora.math_engine.sandbox import SymPySandbox
+
         sandbox = SymPySandbox()
         res = sandbox.execute(code)
         return json.dumps(res)
 
-    def _parse_verdict(self, content: str) -> Dict[str, Any]:
+    def _parse_verdict(self, content: str) -> dict[str, Any]:
         """
         Parse the verdict, confidence and critique from the agent's text response.
         """
         verdict = "INCONCLUSIVE"
         confidence = 0.5
         critique = "No review critique generated."
-        
+
         # Look for Verdict: CONFIRMED/REFUTED/INCONCLUSIVE
-        verdict_match = re.search(r"Verdict:\s*(CONFIRMED|REFUTED|INCONCLUSIVE)", content, re.IGNORECASE)
+        verdict_match = re.search(
+            r"Verdict:\s*(CONFIRMED|REFUTED|INCONCLUSIVE)", content, re.IGNORECASE
+        )
         if verdict_match:
             verdict = verdict_match.group(1).upper()
-            
+
         # Look for Confidence: 0.x
         conf_match = re.search(r"Confidence:\s*(0\.\d+|1\.0|1)", content, re.IGNORECASE)
         if conf_match:
@@ -83,17 +88,13 @@ class ReviewerAgent(BaseAgent):
                 confidence = float(conf_match.group(1))
             except ValueError:
                 pass
-                
+
         # Look for Critique: text
         critique_match = re.search(r"Critique:\s*(.*)", content, re.DOTALL | re.IGNORECASE)
         if critique_match:
             critique = critique_match.group(1).strip()
-            
-        return {
-            "verdict": verdict,
-            "confidence": confidence,
-            "critique": critique
-        }
+
+        return {"verdict": verdict, "confidence": confidence, "critique": critique}
 
     def review(self, claim: str) -> AgentResponse:
         """
@@ -106,18 +107,18 @@ class ReviewerAgent(BaseAgent):
             f"If appropriate, write test code and run it via 'sympy_evaluate' to search for counterexamples. "
             f"Conclude with your Verdict, Confidence, and Critique."
         )
-        
+
         messages = [
             {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ]
-        
+
         # Perform up to 2 tool execution steps if the agent requests tests
         for _ in range(2):
             response = self.provider.complete(messages, tools=self.tools)
             content = response.get("content", "")
             tool_calls = response.get("tool_calls", [])
-            
+
             if not tool_calls:
                 parsed = self._parse_verdict(content)
                 return AgentResponse(
@@ -128,21 +129,21 @@ class ReviewerAgent(BaseAgent):
                         "agent_name": self.name,
                         "agent_role": self.role,
                         "verdict": parsed["verdict"],
-                        "critique": parsed["critique"]
-                    }
+                        "critique": parsed["critique"],
+                    },
                 )
-                
+
             messages.append({"role": "assistant", "content": content})
-            
+
             tool_results = []
             for tc in tool_calls:
                 name = tc["name"]
                 args = tc["arguments"]
                 res = self.with_tool(name, args)
                 tool_results.append(f"Tool {name} returned:\n{res}")
-                
+
             messages.append({"role": "user", "content": "\n\n".join(tool_results)})
-            
+
         response = self.provider.complete(messages)
         content = response.get("content", "")
         parsed = self._parse_verdict(content)
@@ -154,11 +155,11 @@ class ReviewerAgent(BaseAgent):
                 "agent_name": self.name,
                 "agent_role": self.role,
                 "verdict": parsed["verdict"],
-                "critique": parsed["critique"]
-            }
+                "critique": parsed["critique"],
+            },
         )
 
-    def review_proof(self, steps: List[str]) -> AgentResponse:
+    def review_proof(self, steps: list[str]) -> AgentResponse:
         """
         Adversarially review a step-by-step proof.
         """
@@ -169,7 +170,7 @@ class ReviewerAgent(BaseAgent):
             f"Point out the first step that contains an error, if any. Explain the error. "
             f"Test individual step equations using 'sympy_evaluate' if needed. Conclude with Verdict, Confidence, and Critique."
         )
-        
+
         # We can just call review with this structured prompt
         return self.review(prompt)
 

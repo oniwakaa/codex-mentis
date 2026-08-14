@@ -1,11 +1,12 @@
 import json
 import logging
-import sqlite3
 import random
-from typing import Dict, Any, List, Optional
+import sqlite3
+from typing import Any
+
 from pydantic import BaseModel, Field
 
-from pitagora.agents.base import BaseAgent, AgentResponse
+from pitagora.agents.base import BaseAgent
 from pitagora.agents.providers.base import BaseProvider
 
 logger = logging.getLogger(__name__)
@@ -25,16 +26,19 @@ Strategy "socratic" underperforms (avg 2.4 over 12 uses):
 </example>
 """
 
+
 class EvolvedPrompt(BaseModel):
     strategy_name: str = Field(description="The strategy that was evolved")
     new_prompt_template: str = Field(description="The full revised system prompt template")
-    explanation_of_changes: str = Field(description="Why the prompt was updated and how it addresses the failure logs")
+    explanation_of_changes: str = Field(
+        description="Why the prompt was updated and how it addresses the failure logs"
+    )
 
 
 # Map a teaching classification label to a 1-5 response-quality score.
 # Used by the chat REPL to feed the feedback loop with a real signal
 # derived from the ResponseAnalyzer's classification of the learner's reply.
-CLASSIFICATION_QUALITY: Dict[str, int] = {
+CLASSIFICATION_QUALITY: dict[str, int] = {
     "correct": 5,
     "deeper": 5,
     "partial": 3,
@@ -42,6 +46,7 @@ CLASSIFICATION_QUALITY: Dict[str, int] = {
     "skip": 2,
     "confused": 1,
     "off_topic": 1,
+    "different_style": 3,
 }
 
 
@@ -49,23 +54,28 @@ def quality_from_classification(label: str) -> int:
     """Convert a teaching classification label to a 1-5 quality score."""
     return CLASSIFICATION_QUALITY.get(str(label).lower(), 3)
 
+
 class GeneratedSkill(BaseModel):
     skill_name: str = Field(description="A clean identifier for the new skill (kebab-case)")
     description: str = Field(description="Purpose and target area of the skill")
-    instructions: List[str] = Field(description="Step-by-step procedural guidelines for this skill")
+    instructions: list[str] = Field(description="Step-by-step procedural guidelines for this skill")
     example_input: str = Field(description="An example input scenario")
-    example_output: str = Field(description="An example successful response showing the pattern in action")
+    example_output: str = Field(
+        description="An example successful response showing the pattern in action"
+    )
+
 
 class SelfImproverAgent(BaseAgent):
     def __init__(self, provider: BaseProvider, db_path: str = ""):
         if not db_path:
             from pitagora.core.constants import DB_DIR
+
             db_path = str(DB_DIR / "self_improver.db")
         super().__init__(
             name="SelfImprover",
             role="Prompts & Strategy Evolution Optimizer",
             provider=provider,
-            system_prompt=SELF_IMPROVER_SYSTEM_PROMPT
+            system_prompt=SELF_IMPROVER_SYSTEM_PROMPT,
         )
         self.db_path = db_path
         self._init_db()
@@ -81,25 +91,25 @@ class SelfImproverAgent(BaseAgent):
                     "properties": {
                         "prompt_id": {
                             "type": "string",
-                            "description": "Identifier for the specific prompt version used."
+                            "description": "Identifier for the specific prompt version used.",
                         },
                         "strategy_name": {
                             "type": "string",
-                            "description": "The type of strategy used (e.g., Socratic, Feynman, Analogies)."
+                            "description": "The type of strategy used (e.g., Socratic, Feynman, Analogies).",
                         },
                         "success": {
                             "type": "boolean",
-                            "description": "Whether the explanation successfully led to user understanding or correct answer."
+                            "description": "Whether the explanation successfully led to user understanding or correct answer.",
                         },
                         "feedback": {
                             "type": "string",
-                            "description": "Qualitative user feedback or error logs."
-                        }
+                            "description": "Qualitative user feedback or error logs.",
+                        },
                     },
-                    "required": ["prompt_id", "strategy_name", "success"]
-                }
+                    "required": ["prompt_id", "strategy_name", "success"],
+                },
             },
-            self.tool_track_outcome
+            self.tool_track_outcome,
         )
 
         # Register get_best_prompt
@@ -113,13 +123,13 @@ class SelfImproverAgent(BaseAgent):
                     "properties": {
                         "strategy_name": {
                             "type": "string",
-                            "description": "Name of the target strategy."
+                            "description": "Name of the target strategy.",
                         }
                     },
-                    "required": ["strategy_name"]
-                }
+                    "required": ["strategy_name"],
+                },
             },
-            self.tool_get_best_prompt
+            self.tool_get_best_prompt,
         )
 
         # Register evolve_strategy
@@ -133,17 +143,17 @@ class SelfImproverAgent(BaseAgent):
                     "properties": {
                         "strategy_name": {
                             "type": "string",
-                            "description": "Name of the strategy to evolve."
+                            "description": "Name of the strategy to evolve.",
                         },
                         "current_prompt": {
                             "type": "string",
-                            "description": "The current system prompt template of the strategy."
-                        }
+                            "description": "The current system prompt template of the strategy.",
+                        },
                     },
-                    "required": ["strategy_name", "current_prompt"]
-                }
+                    "required": ["strategy_name", "current_prompt"],
+                },
             },
-            self.tool_evolve_strategy
+            self.tool_evolve_strategy,
         )
 
         # Register generate_skill
@@ -157,23 +167,23 @@ class SelfImproverAgent(BaseAgent):
                     "properties": {
                         "pattern_name": {
                             "type": "string",
-                            "description": "A clear name for the pattern (e.g., visual-calculus, socratic-physics)."
+                            "description": "A clear name for the pattern (e.g., visual-calculus, socratic-physics).",
                         },
                         "successful_patterns_summary": {
                             "type": "string",
-                            "description": "A summary of successful inputs/outputs that exhibit this pattern."
-                        }
+                            "description": "A summary of successful inputs/outputs that exhibit this pattern.",
+                        },
                     },
-                    "required": ["pattern_name", "successful_patterns_summary"]
-                }
+                    "required": ["pattern_name", "successful_patterns_summary"],
+                },
             },
-            self.tool_generate_skill
+            self.tool_generate_skill,
         )
 
     def _init_db(self) -> None:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         # 1. Strategy Performance (Thompson Sampling parameters alpha, beta)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS strategy_performance (
@@ -182,7 +192,7 @@ class SelfImproverAgent(BaseAgent):
                 beta REAL DEFAULT 1.0
             )
         """)
-        
+
         # 2. Prompts Performance
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS prompt_performance (
@@ -193,7 +203,7 @@ class SelfImproverAgent(BaseAgent):
                 failures INTEGER DEFAULT 0
             )
         """)
-        
+
         # 3. Outcomes log
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS outcomes (
@@ -205,7 +215,7 @@ class SelfImproverAgent(BaseAgent):
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # 4. Evolved Skills
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS evolved_skills (
@@ -238,8 +248,7 @@ class SelfImproverAgent(BaseAgent):
             "ON strategy_metrics(topic, level)"
         )
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_metrics_strategy "
-            "ON strategy_metrics(strategy_used)"
+            "CREATE INDEX IF NOT EXISTS idx_metrics_strategy " "ON strategy_metrics(strategy_used)"
         )
 
         # 6. Prompt variants (WS1) — evolved prompts with lineage
@@ -261,27 +270,26 @@ class SelfImproverAgent(BaseAgent):
         for strategy in default_strategies:
             cursor.execute(
                 "INSERT OR IGNORE INTO strategy_performance (strategy_name, alpha, beta) VALUES (?, 1.0, 1.0)",
-                (strategy,)
+                (strategy,),
             )
 
         conn.commit()
         conn.close()
 
-    def select_strategy(self, strategies: List[str]) -> str:
+    def select_strategy(self, strategies: list[str]) -> str:
         """
         Uses Thompson Sampling to select the best explanation strategy.
         Samples from Beta(alpha, beta) for each strategy and chooses the max.
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         selected_strategy = None
         max_sample = -1.0
-        
+
         for strategy in strategies:
             cursor.execute(
-                "SELECT alpha, beta FROM strategy_performance WHERE strategy_name = ?",
-                (strategy,)
+                "SELECT alpha, beta FROM strategy_performance WHERE strategy_name = ?", (strategy,)
             )
             row = cursor.fetchone()
             if row:
@@ -291,22 +299,24 @@ class SelfImproverAgent(BaseAgent):
                 # Insert dynamic strategy if missing
                 cursor.execute(
                     "INSERT OR IGNORE INTO strategy_performance (strategy_name, alpha, beta) VALUES (?, 1.0, 1.0)",
-                    (strategy,)
+                    (strategy,),
                 )
                 conn.commit()
-                
+
             # Thompson sample
             sample = random.betavariate(alpha, beta)
             if sample > max_sample:
                 max_sample = sample
                 selected_strategy = strategy
-                
+
         conn.close()
-        
+
         # Fallback to random if something goes wrong
         return selected_strategy or random.choice(strategies)
 
-    async def tool_track_outcome(self, prompt_id: str, strategy_name: str, success: bool, feedback: str = "") -> str:
+    async def tool_track_outcome(
+        self, prompt_id: str, strategy_name: str, success: bool, feedback: str = ""
+    ) -> str:
         """
         Tracks a user interaction outcome, updating both strategy Beta parameters and prompt metrics.
         """
@@ -316,40 +326,40 @@ class SelfImproverAgent(BaseAgent):
             # 1. Log outcome
             cursor.execute(
                 "INSERT INTO outcomes (prompt_id, strategy_name, success, feedback) VALUES (?, ?, ?, ?)",
-                (prompt_id, strategy_name, 1 if success else 0, feedback)
+                (prompt_id, strategy_name, 1 if success else 0, feedback),
             )
-            
+
             # 2. Update strategy performance (Thompson Sampling parameters)
             cursor.execute(
                 "SELECT alpha, beta FROM strategy_performance WHERE strategy_name = ?",
-                (strategy_name,)
+                (strategy_name,),
             )
             row = cursor.fetchone()
             if not row:
                 cursor.execute(
                     "INSERT INTO strategy_performance (strategy_name, alpha, beta) VALUES (?, 1.0, 1.0)",
-                    (strategy_name,)
+                    (strategy_name,),
                 )
                 alpha, beta = 1.0, 1.0
             else:
                 alpha, beta = row[0], row[1]
-                
+
             if success:
                 # Add reward
                 alpha += 1.0
             else:
                 # Add penalty
                 beta += 1.0
-                
+
             cursor.execute(
                 "UPDATE strategy_performance SET alpha = ?, beta = ? WHERE strategy_name = ?",
-                (alpha, beta, strategy_name)
+                (alpha, beta, strategy_name),
             )
-            
+
             # 3. Update prompt statistics
             cursor.execute(
                 "SELECT successes, failures FROM prompt_performance WHERE prompt_id = ?",
-                (prompt_id,)
+                (prompt_id,),
             )
             p_row = cursor.fetchone()
             if p_row:
@@ -360,22 +370,30 @@ class SelfImproverAgent(BaseAgent):
                     p_failures += 1
                 cursor.execute(
                     "UPDATE prompt_performance SET successes = ?, failures = ? WHERE prompt_id = ?",
-                    (p_successes, p_failures, prompt_id)
+                    (p_successes, p_failures, prompt_id),
                 )
             else:
                 # Create a placeholder entry for prompt text, to be populated later or kept empty
                 cursor.execute(
                     "INSERT INTO prompt_performance (prompt_id, prompt_text, strategy_name, successes, failures) VALUES (?, ?, ?, ?, ?)",
-                    (prompt_id, "Unknown prompt template", strategy_name, 1 if success else 0, 0 if success else 1)
+                    (
+                        prompt_id,
+                        "Unknown prompt template",
+                        strategy_name,
+                        1 if success else 0,
+                        0 if success else 1,
+                    ),
                 )
-                
+
             conn.commit()
-            return json.dumps({
-                "status": "success",
-                "updated_strategy": strategy_name,
-                "new_alpha": alpha,
-                "new_beta": beta
-            })
+            return json.dumps(
+                {
+                    "status": "success",
+                    "updated_strategy": strategy_name,
+                    "new_alpha": alpha,
+                    "new_beta": beta,
+                }
+            )
         except Exception as e:
             logger.error(f"Error tracking outcome: {e}")
             return json.dumps({"status": "error", "message": str(e)})
@@ -389,47 +407,53 @@ class SelfImproverAgent(BaseAgent):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT prompt_id, prompt_text, (successes * 1.0 / (successes + failures + 1)) as score
                 FROM prompt_performance
                 WHERE strategy_name = ?
                 ORDER BY score DESC, (successes + failures) DESC
                 LIMIT 1
-            """, (strategy_name,))
+            """,
+                (strategy_name,),
+            )
             row = cursor.fetchone()
             if row:
-                return json.dumps({
-                    "prompt_id": row[0],
-                    "prompt_text": row[1],
-                    "estimated_score": row[2]
-                })
+                return json.dumps(
+                    {"prompt_id": row[0], "prompt_text": row[1], "estimated_score": row[2]}
+                )
             else:
-                return json.dumps({
-                    "prompt_id": f"{strategy_name}_default",
-                    "prompt_text": "Use default agent system prompt.",
-                    "estimated_score": 0.5
-                })
+                return json.dumps(
+                    {
+                        "prompt_id": f"{strategy_name}_default",
+                        "prompt_text": "Use default agent system prompt.",
+                        "estimated_score": 0.5,
+                    }
+                )
         finally:
             conn.close()
 
     async def tool_evolve_strategy(self, strategy_name: str, current_prompt: str) -> str:
         """
-        Examines recent feedback logs for the strategy, particularly failures, 
+        Examines recent feedback logs for the strategy, particularly failures,
         and instructs the model to evolve the system prompt to avoid these issues.
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         # Retrieve recent failure logs
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT feedback FROM outcomes
             WHERE strategy_name = ? AND success = 0
             ORDER BY timestamp DESC
             LIMIT 5
-        """, (strategy_name,))
+        """,
+            (strategy_name,),
+        )
         failures = [row[0] for row in cursor.fetchall() if row[0]]
         conn.close()
-        
+
         prompt = (
             f"Evolve the system prompt for explanation strategy: '{strategy_name}'.\n\n"
             f"Current Prompt Template:\n"
@@ -442,10 +466,10 @@ class SelfImproverAgent(BaseAgent):
             prompt += "\nIncorporate defensive constraints and refined guidelines to prevent these failures."
         else:
             prompt += "No failures recorded yet. Please optimize the prompt for maximum pedagogical clarity, engagement, and logical depth."
-            
+
         try:
             evolved = await self.athink_structured(prompt, EvolvedPrompt)
-            
+
             # Save the new evolved prompt template in database
             conn = sqlite3.connect(self.db_path)
             try:
@@ -453,7 +477,7 @@ class SelfImproverAgent(BaseAgent):
                 new_prompt_id = f"{strategy_name}_v{random.randint(1000, 9999)}"
                 cursor.execute(
                     "INSERT INTO prompt_performance (prompt_id, prompt_text, strategy_name) VALUES (?, ?, ?)",
-                    (new_prompt_id, evolved.new_prompt_template, strategy_name)
+                    (new_prompt_id, evolved.new_prompt_template, strategy_name),
                 )
                 conn.commit()
             finally:
@@ -475,21 +499,24 @@ class SelfImproverAgent(BaseAgent):
         )
         try:
             skill = await self.athink_structured(prompt, GeneratedSkill)
-            
+
             # Store in database
             conn = sqlite3.connect(self.db_path)
             try:
                 cursor = conn.cursor()
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT OR REPLACE INTO evolved_skills (skill_name, description, instructions, example_input, example_output)
                     VALUES (?, ?, ?, ?, ?)
-                """, (
-                    skill.skill_name,
-                    skill.description,
-                    json.dumps(skill.instructions),
-                    skill.example_input,
-                    skill.example_output
-                ))
+                """,
+                    (
+                        skill.skill_name,
+                        skill.description,
+                        json.dumps(skill.instructions),
+                        skill.example_input,
+                        skill.example_output,
+                    ),
+                )
                 conn.commit()
             finally:
                 conn.close()
@@ -509,9 +536,9 @@ class SelfImproverAgent(BaseAgent):
         level: str,
         strategy_used: str,
         response_quality: int,
-        time_to_understanding: Optional[float] = None,
-        hints_needed: Optional[int] = None,
-        success: Optional[bool] = None,
+        time_to_understanding: float | None = None,
+        hints_needed: int | None = None,
+        success: bool | None = None,
         feedback: str = "",
     ) -> int:
         """Record a single teaching interaction with pedagogical metrics.
@@ -530,8 +557,16 @@ class SelfImproverAgent(BaseAgent):
                    (topic, level, strategy_used, response_quality,
                     time_to_understanding, hints_needed, success, feedback)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (topic, level, strategy_used, response_quality,
-                 time_to_understanding, hints_needed, 1 if success else 0, feedback),
+                (
+                    topic,
+                    level,
+                    strategy_used,
+                    response_quality,
+                    time_to_understanding,
+                    hints_needed,
+                    1 if success else 0,
+                    feedback,
+                ),
             )
             conn.commit()
             return cur.lastrowid
@@ -540,10 +575,10 @@ class SelfImproverAgent(BaseAgent):
 
     def strategy_report(
         self,
-        topic: Optional[str] = None,
-        level: Optional[str] = None,
-        last_n: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        topic: str | None = None,
+        level: str | None = None,
+        last_n: int | None = None,
+    ) -> list[dict[str, Any]]:
         """Aggregate metrics per strategy (optionally filtered by topic/level).
 
         Computes avg_quality, avg_hints_needed, success_rate, and use count.
@@ -552,7 +587,7 @@ class SelfImproverAgent(BaseAgent):
         try:
             cur = conn.cursor()
             where = []
-            params: List[Any] = []
+            params: list[Any] = []
             if topic:
                 where.append("topic = ?")
                 params.append(topic)
@@ -579,7 +614,7 @@ class SelfImproverAgent(BaseAgent):
                 params,
             )
             cols = [d[0] for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+            return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
         finally:
             conn.close()
 
@@ -610,8 +645,8 @@ class SelfImproverAgent(BaseAgent):
         return random.choices(strategies, weights=weights, k=1)[0]
 
     async def suggest_prompt_revision(
-        self, strategy_name: str, metrics: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, strategy_name: str, metrics: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """When a strategy underperforms (avg < 3.0 over ≥10 uses), use the LLM
         to rewrite the prompt and store the variant with lineage + delta."""
         if metrics is None:
@@ -656,10 +691,14 @@ class SelfImproverAgent(BaseAgent):
         else:
             conn = sqlite3.connect(self.db_path)
             try:
-                row = conn.cursor().execute(
-                    "SELECT id FROM prompt_variants WHERE strategy_name=? ORDER BY id DESC LIMIT 1",
-                    (strategy_name,),
-                ).fetchone()
+                row = (
+                    conn.cursor()
+                    .execute(
+                        "SELECT id FROM prompt_variants WHERE strategy_name=? ORDER BY id DESC LIMIT 1",
+                        (strategy_name,),
+                    )
+                    .fetchone()
+                )
                 parent_id = row[0] if row else None
             finally:
                 conn.close()
@@ -689,7 +728,7 @@ class SelfImproverAgent(BaseAgent):
             "explanation": evolved.explanation_of_changes,
         }
 
-    def digest(self) -> Dict[str, Any]:
+    def digest(self) -> dict[str, Any]:
         """Weekly-style digest: top/bottom strategies, trending topics, focus areas."""
         report = self.strategy_report()
         if not report:
@@ -702,13 +741,11 @@ class SelfImproverAgent(BaseAgent):
         conn = sqlite3.connect(self.db_path)
         try:
             cur = conn.cursor()
-            cur.execute(
-                """SELECT topic, COUNT(*) AS uses
+            cur.execute("""SELECT topic, COUNT(*) AS uses
                    FROM strategy_metrics
                    GROUP BY topic
                    ORDER BY uses DESC
-                   LIMIT 5"""
-            )
+                   LIMIT 5""")
             trending = [{"topic": r[0], "uses": r[1]} for r in cur.fetchall()]
         finally:
             conn.close()

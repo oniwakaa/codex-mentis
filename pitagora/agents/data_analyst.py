@@ -1,12 +1,13 @@
 """Data analyst agent — profile datasets, run statistical analyses, explain findings."""
+
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-from pitagora.agents.base import BaseAgent, AgentResponse
+from pitagora.agents.base import AgentResponse, BaseAgent
 from pitagora.agents.providers.base import BaseProvider
 
 DATA_ANALYST_PROMPT = """<role>Data analyst in Pitagora. Explore datasets, run statistical analyses, and explain findings clearly.</role>
@@ -29,11 +30,17 @@ DATA_ANALYST_PROMPT = """<role>Data analyst in Pitagora. Explore datasets, run s
 </tools>
 """
 
+
 class AnalysisRequest(BaseModel):
     """Structured request describing which analysis to run."""
-    analysis_type: str = Field(description="ttest | mann_whitney | anova | chi_squared | linear_regression")
-    columns: List[str] = Field(description="Columns involved in the analysis")
-    params: Dict[str, Any] = Field(default_factory=dict, description="Extra parameters (e.g. group column)")
+
+    analysis_type: str = Field(
+        description="ttest | mann_whitney | anova | chi_squared | linear_regression"
+    )
+    columns: list[str] = Field(description="Columns involved in the analysis")
+    params: dict[str, Any] = Field(
+        default_factory=dict, description="Extra parameters (e.g. group column)"
+    )
 
 
 class DataAnalystAgent(BaseAgent):
@@ -45,7 +52,7 @@ class DataAnalystAgent(BaseAgent):
             system_prompt=DATA_ANALYST_PROMPT,
         )
         # In-session dataset registry: name → DataFrame
-        self._datasets: Dict[str, Any] = {}
+        self._datasets: dict[str, Any] = {}
 
         self.register_tool(
             "load_data",
@@ -56,7 +63,10 @@ class DataAnalystAgent(BaseAgent):
                     "type": "object",
                     "properties": {
                         "path_or_url": {"type": "string", "description": "File path or URL"},
-                        "name": {"type": "string", "description": "Optional handle to reference the dataset later"},
+                        "name": {
+                            "type": "string",
+                            "description": "Optional handle to reference the dataset later",
+                        },
                     },
                     "required": ["path_or_url"],
                 },
@@ -71,7 +81,10 @@ class DataAnalystAgent(BaseAgent):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string", "description": "Dataset handle (default: 'default')"},
+                        "name": {
+                            "type": "string",
+                            "description": "Dataset handle (default: 'default')",
+                        },
                     },
                 },
             },
@@ -86,7 +99,10 @@ class DataAnalystAgent(BaseAgent):
                     "type": "object",
                     "properties": {
                         "name": {"type": "string", "description": "Dataset handle"},
-                        "analysis_type": {"type": "string", "description": "ttest | mann_whitney | anova | chi_squared | linear_regression"},
+                        "analysis_type": {
+                            "type": "string",
+                            "description": "ttest | mann_whitney | anova | chi_squared | linear_regression",
+                        },
                         "columns": {"type": "array", "items": {"type": "string"}},
                         "params": {"type": "object"},
                     },
@@ -104,10 +120,16 @@ class DataAnalystAgent(BaseAgent):
                     "type": "object",
                     "properties": {
                         "name": {"type": "string", "description": "Dataset handle"},
-                        "plot_type": {"type": "string", "description": "line | scatter | hist | bar"},
+                        "plot_type": {
+                            "type": "string",
+                            "description": "line | scatter | hist | bar",
+                        },
                         "x": {"type": "string"},
                         "y": {"type": "string"},
-                        "save_path": {"type": "string", "description": "Optional path to save a PNG"},
+                        "save_path": {
+                            "type": "string",
+                            "description": "Optional path to save a PNG",
+                        },
                     },
                     "required": ["plot_type"],
                 },
@@ -121,22 +143,26 @@ class DataAnalystAgent(BaseAgent):
         return self._datasets[name or "default" or list(self._datasets)[0]]
 
     async def tool_load_data(self, path_or_url: str, name: str = "default") -> str:
-        from pitagora.data_analysis.loader import load_data, LoaderError
+        from pitagora.data_analysis.loader import LoaderError, load_data
+
         try:
             df = load_data(path_or_url)
         except LoaderError as e:
             return json.dumps({"status": "error", "message": str(e)})
         self._datasets[name] = df
-        return json.dumps({
-            "status": "ok",
-            "name": name,
-            "rows": int(df.shape[0]),
-            "cols": int(df.shape[1]),
-            "columns": list(df.columns),
-        })
+        return json.dumps(
+            {
+                "status": "ok",
+                "name": name,
+                "rows": int(df.shape[0]),
+                "cols": int(df.shape[1]),
+                "columns": list(df.columns),
+            }
+        )
 
     async def tool_profile_data(self, name: str = "default") -> str:
         from pitagora.data_analysis.profiler import profile_data
+
         try:
             df = self._df(name)
         except KeyError as e:
@@ -145,10 +171,14 @@ class DataAnalystAgent(BaseAgent):
         return prof.model_dump_json(indent=2)
 
     async def tool_run_analysis(
-        self, analysis_type: str, columns: List[str], name: str = "default",
-        params: Optional[Dict[str, Any]] = None,
+        self,
+        analysis_type: str,
+        columns: list[str],
+        name: str = "default",
+        params: dict[str, Any] | None = None,
     ) -> str:
         from pitagora.data_analysis import analyzer
+
         params = params or {}
         try:
             df = self._df(name)
@@ -158,16 +188,21 @@ class DataAnalystAgent(BaseAgent):
         at = (analysis_type or "").lower()
         try:
             if at == "ttest":
-                res = analyzer.run_ttest(df[columns[0]], df[columns[1]],
-                                         equal_var=bool(params.get("equal_var", True)))
+                res = analyzer.run_ttest(
+                    df[columns[0]], df[columns[1]], equal_var=bool(params.get("equal_var", True))
+                )
             elif at == "mann_whitney":
                 res = analyzer.run_mann_whitney(df[columns[0]], df[columns[1]])
             elif at == "anova":
                 res = analyzer.run_anova(*[df[c] for c in columns])
             elif at == "chi_squared":
-                tbl = df.pivot_table(index=columns[0], columns=columns[1],
-                                      values=params.get("values", columns[0]),
-                                      aggfunc="size", fill_value=0)
+                tbl = df.pivot_table(
+                    index=columns[0],
+                    columns=columns[1],
+                    values=params.get("values", columns[0]),
+                    aggfunc="size",
+                    fill_value=0,
+                )
                 res = analyzer.run_chi_squared(tbl)
             elif at == "linear_regression":
                 res = analyzer.linear_regression(df, columns[0], columns[1:])
@@ -178,16 +213,22 @@ class DataAnalystAgent(BaseAgent):
         return res.model_dump_json(indent=2)
 
     async def tool_create_plot(
-        self, plot_type: str, x: str = "", y: str = "", name: str = "default",
+        self,
+        plot_type: str,
+        x: str = "",
+        y: str = "",
+        name: str = "default",
         save_path: str = "",
     ) -> str:
         from pitagora.data_analysis.visualizer import create_plot
+
         try:
             df = self._df(name)
         except KeyError as e:
             return json.dumps({"status": "error", "message": str(e)})
-        out = create_plot(df, plot_type=plot_type, x=x or None, y=y or None,
-                          save_path=save_path or None)
+        out = create_plot(
+            df, plot_type=plot_type, x=x or None, y=y or None, save_path=save_path or None
+        )
         return json.dumps({"status": "ok", "plot": out})
 
     async def analyze(self, question: str, path_or_url: str = "") -> AgentResponse:

@@ -1,5 +1,4 @@
-from typing import Optional, Dict, Any
-from pitagora.agents.base import BaseAgent, AgentResponse
+from pitagora.agents.base import AgentResponse, BaseAgent
 from pitagora.agents.providers.base import BaseProvider
 
 TUTOR_SYSTEM_PROMPT = """<role>Socratic tutor for mathematics and physics in Pitagora.</role>
@@ -18,13 +17,14 @@ Tutor: "Interesting — you're applying the power rule. But what's special about
 </example>
 """
 
+
 class TutorAgent(BaseAgent):
     def __init__(self, provider: BaseProvider):
         super().__init__(
             name="Tutor",
             role="Socratic Mathematics and Physics Instructor",
             provider=provider,
-            system_prompt=TUTOR_SYSTEM_PROMPT
+            system_prompt=TUTOR_SYSTEM_PROMPT,
         )
 
     def explain_concept(self, topic: str, level: str = "beginner") -> AgentResponse:
@@ -44,7 +44,7 @@ class TutorAgent(BaseAgent):
         """
         prompt = (
             f"We are discussing: '{topic}'.\n"
-            f"The student responded with: \"{student_response}\".\n"
+            f'The student responded with: "{student_response}".\n'
             f"Acknowledge what is correct or interesting, identify any misconceptions without showing the answer, "
             f"and ask a Socratic guiding question to help them correct or refine their thinking."
         )

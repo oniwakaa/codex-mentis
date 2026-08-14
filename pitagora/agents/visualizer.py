@@ -1,9 +1,9 @@
-import sys
-import re
 import os
+import re
+import sys
 from io import StringIO
-from typing import Dict, Any, List, Optional, Tuple
-from pitagora.agents.base import BaseAgent, AgentResponse
+
+from pitagora.agents.base import BaseAgent
 from pitagora.agents.providers.base import BaseProvider
 
 VISUALIZER_SYSTEM_PROMPT = """<role>Visualizer for Pitagora. Represent math and physics information visually.</role>
@@ -24,22 +24,23 @@ Calculus
 </example>
 """
 
+
 class VisualizerAgent(BaseAgent):
     def __init__(self, provider: BaseProvider):
         super().__init__(
             name="Visualizer",
             role="Mathematical Visualization Specialist",
             provider=provider,
-            system_prompt=VISUALIZER_SYSTEM_PROMPT
+            system_prompt=VISUALIZER_SYSTEM_PROMPT,
         )
 
     def plot_expression(
-        self, 
-        expr: str, 
-        x_range: Tuple[float, float] = (-10.0, 10.0), 
+        self,
+        expr: str,
+        x_range: tuple[float, float] = (-10.0, 10.0),
         plot_type: str = "line",
         points: int = 100,
-        save_path: Optional[str] = None
+        save_path: str | None = None,
     ) -> str:
         """
         Plots a SymPy-compatible expression over the given x_range.
@@ -57,7 +58,8 @@ class VisualizerAgent(BaseAgent):
         try:
             import sympy
             from sympy.parsing.sympy_parser import parse_expr
-            x_sym = sympy.Symbol('x')
+
+            x_sym = sympy.Symbol("x")
             parsed_expr = parse_expr(expr)
 
             for i in range(points):
@@ -79,18 +81,19 @@ class VisualizerAgent(BaseAgent):
         terminal_plot = ""
         try:
             import plotext as plt
+
             plt.clear_data()
             plt.clear_terminal()
-            
+
             if plot_type == "scatter":
                 plt.scatter(x_vals, y_vals)
             else:
                 plt.plot(x_vals, y_vals)
-                
+
             plt.title(f"Plot of y = {expr}")
             plt.xlabel("x")
             plt.ylabel("y")
-            
+
             # Capture output of show() which prints to terminal
             old_stdout = sys.stdout
             captured = sys.stdout = StringIO()
@@ -105,6 +108,7 @@ class VisualizerAgent(BaseAgent):
         if save_path:
             try:
                 import matplotlib.pyplot as plt_mp
+
                 plt_mp.figure(figsize=(8, 5))
                 plt_mp.plot(x_vals, y_vals, label=f"y = {expr}")
                 plt_mp.title(f"Plot of {expr}")
@@ -112,20 +116,24 @@ class VisualizerAgent(BaseAgent):
                 plt_mp.ylabel("y")
                 plt_mp.grid(True)
                 plt_mp.legend()
-                
+
                 # Create parent directories if they do not exist
                 os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
                 plt_mp.savefig(save_path)
                 plt_mp.close()
                 terminal_plot += f"\nSaved high-resolution plot to {save_path}"
             except ImportError:
-                terminal_plot += "\n[Warning: matplotlib not installed. High-res image could not be saved.]"
+                terminal_plot += (
+                    "\n[Warning: matplotlib not installed. High-res image could not be saved.]"
+                )
             except Exception as e:
                 terminal_plot += f"\n[Warning: Failed to save plot: {str(e)}]"
 
         return terminal_plot
 
-    def create_concept_map(self, topic: str, connections: Optional[List[Tuple[str, str]]] = None) -> str:
+    def create_concept_map(
+        self, topic: str, connections: list[tuple[str, str]] | None = None
+    ) -> str:
         """
         Generates an ASCII representation of a concept map.
         """
@@ -141,13 +149,13 @@ class VisualizerAgent(BaseAgent):
                 match = re.search(r"([\w\s\-]+)\s*->\s*([\w\s\-]+)", line)
                 if match:
                     connections.append((match.group(1).strip(), match.group(2).strip()))
-                    
+
         if not connections:
             # Fallback
             return f"Concept: {topic}\n └─ (No connections discovered)"
 
         # Build adjacency list
-        adj: Dict[str, List[str]] = {}
+        adj: dict[str, list[str]] = {}
         all_nodes = set()
         has_parents = set()
         for p, child in connections:
@@ -155,17 +163,17 @@ class VisualizerAgent(BaseAgent):
             all_nodes.add(p)
             all_nodes.add(child)
             has_parents.add(child)
-            
+
         roots = all_nodes - has_parents
         if not roots:
             roots = {connections[0][0]} if connections else {topic}
 
         output_lines = []
-        
+
         def render_node(node: str, prefix: str = "", is_last: bool = True):
             connector = "└── " if is_last else "├── "
             output_lines.append(f"{prefix}{connector}{node}")
-            
+
             children = adj.get(node, [])
             new_prefix = prefix + ("    " if is_last else "│   ")
             for i, child in enumerate(children):

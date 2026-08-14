@@ -1,7 +1,7 @@
 import json
-import re
-from typing import Dict, Any, List, Optional, Tuple
-from pitagora.agents.base import BaseAgent, AgentResponse
+from typing import Any
+
+from pitagora.agents.base import AgentResponse, BaseAgent
 from pitagora.agents.providers.base import BaseProvider
 
 PROVER_SYSTEM_PROMPT = """<role>Prover for Pitagora. Perform rigorous mathematical proofs and derivations.</role>
@@ -21,15 +21,16 @@ Step 2: $= 1^2/2 - 0^2/2 = 1/2$. ✓ (verified via sympy)
 </example>
 """
 
+
 class ProverAgent(BaseAgent):
     def __init__(self, provider: BaseProvider):
         super().__init__(
             name="Prover",
             role="Mathematical Proof and Derivation Expert",
             provider=provider,
-            system_prompt=PROVER_SYSTEM_PROMPT
+            system_prompt=PROVER_SYSTEM_PROMPT,
         )
-        
+
         # Register the SymPy execution tool
         self.register_tool(
             "sympy_verify",
@@ -41,18 +42,19 @@ class ProverAgent(BaseAgent):
                     "properties": {
                         "code": {
                             "type": "string",
-                            "description": "Python code using SymPy. SymPy is imported as 'sympy'. Predefined symbols: x, y, z, t. Call print() to return outputs."
+                            "description": "Python code using SymPy. SymPy is imported as 'sympy'. Predefined symbols: x, y, z, t. Call print() to return outputs.",
                         }
                     },
-                    "required": ["code"]
-                }
+                    "required": ["code"],
+                },
             },
-            self.tool_sympy_verify
+            self.tool_sympy_verify,
         )
 
     def tool_sympy_verify(self, code: str) -> str:
         """Executes code in the project's SymPy sandbox."""
         from pitagora.math_engine.sandbox import SymPySandbox
+
         sandbox = SymPySandbox()
         res = sandbox.execute(code)
         return json.dumps(res)
@@ -68,7 +70,7 @@ class ProverAgent(BaseAgent):
         )
         return self.think(prompt)
 
-    def verify_solution(self, solution: str) -> Dict[str, Any]:
+    def verify_solution(self, solution: str) -> dict[str, Any]:
         """
         Evaluates the steps in the solution. Uses the sympy_verify tool to check algebraic correctness.
         """
@@ -79,44 +81,38 @@ class ProverAgent(BaseAgent):
             f"Analyze the steps. Write python SymPy code and run it using 'sympy_verify' to check if "
             f"the algebraic steps are valid. Finally, give a critique describing if the proof is valid or where the error is."
         )
-        
+
         messages = [
             {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ]
-        
+
         # Execute tool calls if requested
         for _ in range(2):
             response = self.provider.complete(messages, tools=self.tools)
             content = response.get("content", "")
             tool_calls = response.get("tool_calls", [])
-            
+
             if not tool_calls:
                 # Parse explicit verdict from the inspection text
                 verified = self._parse_verdict(content)
-                return {
-                    "verified": verified,
-                    "critique": content
-                }
-                
+                return {"verified": verified, "critique": content}
+
             messages.append({"role": "assistant", "content": content})
-            
+
             tool_results = []
             for tc in tool_calls:
                 name = tc["name"]
                 args = tc["arguments"]
                 res = self.with_tool(name, args)
                 tool_results.append(f"Tool {name} returned:\n{res}")
-                
+
             messages.append({"role": "user", "content": "\n\n".join(tool_results)})
-            
+
         response = self.provider.complete(messages)
         content = response.get("content", "")
         verified = self._parse_verdict(content)
-        return {
-            "verified": verified,
-            "critique": content
-        }
+        return {"verified": verified, "critique": content}
 
     @staticmethod
     def _parse_verdict(content: str) -> bool:
@@ -154,10 +150,10 @@ class ProverAgent(BaseAgent):
         # Step 1: Generate initial solution
         solution_resp = self.generate_solution(request)
         solution = solution_resp.content
-        
+
         # Step 2: Verify solution
         verification = self.verify_solution(solution)
-        
+
         # Step 3: Revise if not verified
         if not verification["verified"]:
             revision_resp = self.revise(solution, verification["critique"])
@@ -176,9 +172,9 @@ class ProverAgent(BaseAgent):
                     content=content,
                     tool_calls=[],
                     confidence=0.5,
-                    metadata={"verified": False, "critique": verification["critique"]}
+                    metadata={"verified": False, "critique": verification["critique"]},
                 )
-                
+
         content = (
             f"{solution}\n\n"
             f"> [!NOTE]\n"
@@ -188,5 +184,5 @@ class ProverAgent(BaseAgent):
             content=content,
             tool_calls=[],
             confidence=1.0,
-            metadata={"verified": True, "critique": verification["critique"]}
+            metadata={"verified": True, "critique": verification["critique"]},
         )

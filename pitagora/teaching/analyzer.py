@@ -6,35 +6,38 @@ Single-character shortcuts bypass the LLM entirely (fast path).
 
 Each classification maps to a comprehension delta applied by TeachingSession.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Dict, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-class Classification(str, Enum):
+class Classification(StrEnum):
     correct = "correct"
     partial = "partial"
     confused = "confused"
     skip = "skip"
     deeper = "deeper"
+    different_style = "different_style"
     question = "question"
     off_topic = "off_topic"
 
 
 # Comprehension deltas per classification. Tunable; values chosen so a
 # correct streak lifts mastery from 0 to ~0.8 in ~6 interactions.
-DELTA: Dict[str, float] = {
+DELTA: dict[str, float] = {
     Classification.correct.value: 0.15,
     Classification.partial.value: 0.05,
     Classification.confused.value: -0.20,
     Classification.skip.value: -0.05,
     Classification.deeper.value: 0.05,
+    Classification.different_style.value: 0.0,
     Classification.question.value: 0.0,
     Classification.off_topic.value: -0.10,
 }
@@ -48,16 +51,15 @@ class ResponseClassification:
     via_shortcut: bool = False
 
 
-# Shortcut → classification map. These skip the LLM round-trip entirely.
-# Note: "n" is intentionally absent — it maps to "next" in TeachingSession.SHORTCUTS
-# and is handled by the session as an advance action, not a classification.
-SHORTCUT_CLASSIFICATION: Dict[str, str] = {
-    "e": Classification.partial.value,    # "explain differently" = didn't land
-    "d": Classification.deeper.value,     # "go deeper" = ready for more
+# Shortcut → classification/action map. These skip the LLM round-trip entirely.
+SHORTCUT_CLASSIFICATION: dict[str, str] = {
+    "n": Classification.skip.value,
+    "e": Classification.different_style.value,
+    "d": Classification.deeper.value,
     "s": Classification.skip.value,
     "?": Classification.confused.value,
-    "v": Classification.deeper.value,    # visualize = engagement
-    "q": Classification.deeper.value,     # quiz request = engagement
+    "v": "visualize",
+    "q": "quiz",
 }
 
 
@@ -70,6 +72,7 @@ CLASSIFICATION_SYSTEM_PROMPT = (
     "  confused    — the learner is confused or holds a misconception\n"
     "  skip        — the learner wants to move on without answering\n"
     "  deeper      — the learner asks to go deeper or shows advanced understanding\n"
+    "  different_style — the learner asks for a different explanation style\n"
     "  question    — the learner asks a clarifying question\n"
     "  off_topic   — the reply is unrelated to the sub-concept\n\n"
     "Respond with ONLY a JSON object: "
@@ -90,15 +93,15 @@ class ResponseAnalyzer:
         reply: str,
         topic: str,
         sub_concept: str,
-        config: Optional[Dict[str, Any]] = None,
-        model: Optional[str] = None,
+        config: dict[str, Any] | None = None,
+        model: str | None = None,
     ) -> ResponseClassification:
         # Fast path: single-character shortcut bypasses the LLM.
         label = SHORTCUT_CLASSIFICATION.get(reply.strip().lower())
         if label:
             return ResponseClassification(
                 label=label,
-                delta=DELTA[label],
+                delta=DELTA.get(label, 0.0),
                 rationale="shortcut",
                 via_shortcut=True,
             )
@@ -106,7 +109,7 @@ class ResponseAnalyzer:
         prompt = (
             f"Topic: {topic}\n"
             f"Sub-concept: {sub_concept}\n"
-            f"Learner reply:\n\"\"\"\n{reply}\n\"\"\"\n\n"
+            f'Learner reply:\n"""\n{reply}\n"""\n\n'
             f"Classify the reply."
         )
         messages = [
@@ -136,6 +139,8 @@ class ResponseAnalyzer:
                 s = s[:-3].strip()
         try:
             obj = json.loads(s)
+            if not isinstance(obj, dict):
+                raise json.JSONDecodeError("expected an object", s, 0)
             label = obj.get("label", "").strip().lower()
             if label not in DELTA:
                 # Unknown label → treat as partial (don't trust a hallucinated tag).
@@ -171,17 +176,15 @@ def demo() -> None:
         return '{"label": "correct", "rationale": "nailed it"}'
 
     a = ResponseAnalyzer(fake_chat)
-    # "n" is no longer a classification shortcut (handled by session as "next"),
-    # so it now goes through the LLM path.
     r = a.classify("n", "limits", "definition")
-    assert not r.via_shortcut and r.label == "correct"
-    r = a.classify("The limit is the value the function approaches.",
-                   "limits", "definition")
+    assert r.via_shortcut and r.label == "skip"
+    r = a.classify("The limit is the value the function approaches.", "limits", "definition")
     assert r.label == "correct" and r.delta == 0.15
 
     # Salvage path
     def fence_chat(messages, model=None, config=None):
-        return "```json\n{\"label\": \"confused\"}\n```"
+        return '```json\n{"label": "confused"}\n```'
+
     a2 = ResponseAnalyzer(fence_chat)
     r2 = a2.classify("huh?", "limits", "definition")
     assert r2.label == "confused"

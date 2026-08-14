@@ -11,19 +11,17 @@ historical, socratic, applied) work best for this learner.
 
 Serializable to a plain dict for JSON persistence (see journeys/store.py).
 """
+
 from __future__ import annotations
 
 import json
-import logging
-from dataclasses import dataclass, field, asdict
-from datetime import datetime
-from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
-
-logger = logging.getLogger(__name__)
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
 
 
-class TeachingState(str, Enum):
+class TeachingState(StrEnum):
     introducing = "introducing"
     exploring = "exploring"
     checking = "checking"
@@ -36,7 +34,7 @@ class TeachingState(str, Enum):
 
 
 # Single-character shortcuts the user can type instead of a free-form reply.
-SHORTCUTS: Dict[str, str] = {
+SHORTCUTS: dict[str, str] = {
     "n": "next",
     "e": "explain_differently",
     "d": "go_deeper",
@@ -50,6 +48,25 @@ SHORTCUTS: Dict[str, str] = {
 }
 
 ALL_STYLES = ("feynman", "formal", "visual", "historical", "socratic", "applied")
+MIN_DIFFICULTY = 1
+MAX_DIFFICULTY = 5
+LEVEL_DIFFICULTY = {"beginner": 1, "intermediate": 3, "advanced": 4}
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _timestamp(value: Any, default: str) -> str:
+    if not isinstance(value, str) or not value:
+        return default
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return default
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC).isoformat()
 
 
 @dataclass
@@ -57,8 +74,8 @@ class StyleEffectiveness:
     """Tracks per-style success rate. `attempts` feeds the EMA so a style
     that works once isn't crowned on a single sample."""
 
-    attempts: Dict[str, int] = field(default_factory=lambda: {s: 0 for s in ALL_STYLES})
-    success: Dict[str, float] = field(default_factory=lambda: {s: 0.0 for s in ALL_STYLES})
+    attempts: dict[str, int] = field(default_factory=lambda: {s: 0 for s in ALL_STYLES})
+    success: dict[str, float] = field(default_factory=lambda: {s: 0.0 for s in ALL_STYLES})
 
     def record(self, style: str, delta: float) -> None:
         if style not in self.attempts:
@@ -69,24 +86,35 @@ class StyleEffectiveness:
         a = self.attempts[style]
         self.success[style] = self.success[style] + (reward - self.success[style]) / a
 
-    def best(self) -> str:
-        # ponytail: argmax over attempts; ties broken by style order. Add
-        # confidence-weighted selection if sample sizes diverge wildly.
-        best_style, best_score = ALL_STYLES[0], -1.0
-        for s in ALL_STYLES:
-            if self.attempts[s] == 0:
-                continue
-            if self.success[s] > best_score:
-                best_style, best_score = s, self.success[s]
-        return best_style if best_score >= 0 else ALL_STYLES[0]
+    def reject(self, style: str) -> None:
+        """Record an explicit request not to use this style again."""
+        if style in self.attempts:
+            self.attempts[style] += 1
+            self.success[style] = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def best(self) -> str:
+        if not any(self.attempts.values()):
+            return ALL_STYLES[0]
+        # Untried styles start at a neutral prior so an explicitly rejected
+        # style yields to the next available teaching style.
+        return max(
+            ALL_STYLES,
+            key=lambda style: self.success[style] if self.attempts[style] else 0.5,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
         return {"attempts": self.attempts, "success": self.success}
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "StyleEffectiveness":
+    def from_dict(cls, d: dict[str, Any]) -> StyleEffectiveness:
         se = cls()
         if not d:
+            return se
+        if "attempts" not in d and "success" not in d:
+            for style in ALL_STYLES:
+                if style in d:
+                    se.attempts[style] = 1
+                    se.success[style] = float(d[style])
             return se
         for s in ALL_STYLES:
             se.attempts[s] = int(d.get("attempts", {}).get(s, 0))
@@ -100,15 +128,17 @@ class SubConcept:
     mastery: float = 0.0
     visited: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {"name": self.name, "mastery": self.mastery, "visited": self.visited}
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "SubConcept":
+    def from_dict(cls, d: dict[str, Any]) -> SubConcept:
+        mastery = d.get("mastery", d.get("mastery_score", 0.0))
+        status = d.get("status")
         return cls(
             name=d["name"],
-            mastery=float(d.get("mastery", 0.0)),
-            visited=bool(d.get("visited", False)),
+            mastery=max(0.0, min(1.0, float(mastery))),
+            visited=bool(d.get("visited", status in {"active", "mastered", "skipped"})),
         )
 
 
@@ -123,35 +153,34 @@ class TeachingSession:
     def __init__(
         self,
         topic: str,
-        sub_concepts: Optional[List[str]] = None,
+        sub_concepts: list[str] | None = None,
         user_level: str = "intermediate",
     ) -> None:
         self.topic = topic
         self.user_level = user_level
-        self.sub_concepts: List[SubConcept] = [
-            SubConcept(name=n) for n in (sub_concepts or [])
-        ]
+        self.sub_concepts: list[SubConcept] = [SubConcept(name=n) for n in (sub_concepts or [])]
         self.current_index: int = 0
         self.state: TeachingState = TeachingState.introducing
         self._prior_state: TeachingState = TeachingState.introducing
         self.comprehension_score: float = 0.0
         self.ema_alpha: float = 0.3  # comprehension smoothing
         self.style_effectiveness: StyleEffectiveness = StyleEffectiveness()
-        self.history: List[Dict[str, Any]] = []
+        self.history: list[dict[str, Any]] = []
         self.current_style: str = "feynman"
-        self.created_at: str = datetime.now().isoformat()
+        self.difficulty_level: int = LEVEL_DIFFICULTY.get(user_level.lower(), 3)
+        self.created_at: str = _utc_now()
         self.updated_at: str = self.created_at
         self.interaction_count: int = 0
 
     # ─── sub-concepts ───
 
     @property
-    def current_subconcept(self) -> Optional[SubConcept]:
+    def current_subconcept(self) -> SubConcept | None:
         if 0 <= self.current_index < len(self.sub_concepts):
             return self.sub_concepts[self.current_index]
         return None
 
-    def set_sub_concepts(self, names: List[str]) -> None:
+    def set_sub_concepts(self, names: list[str]) -> None:
         """Replace the sub-concept list (used after LLM generation)."""
         self.sub_concepts = [SubConcept(name=n) for n in names]
         self.current_index = 0
@@ -185,7 +214,7 @@ class TeachingSession:
             self._touch()
 
     def _touch(self) -> None:
-        self.updated_at = datetime.now().isoformat()
+        self.updated_at = _utc_now()
 
     # ─── comprehension + style tracking ───
 
@@ -193,20 +222,25 @@ class TeachingSession:
         self,
         classification: str,
         delta: float,
-        style: Optional[str] = None,
+        style: str | None = None,
     ) -> None:
         """Apply a response classification's comprehension delta and record
         style effectiveness. Called by the chat loop after ResponseAnalyzer."""
         self.interaction_count += 1
         # EMA update
-        self.comprehension_score = (
-            self.comprehension_score + self.ema_alpha * (delta - self.comprehension_score)
+        self.comprehension_score = self.comprehension_score + self.ema_alpha * (
+            delta - self.comprehension_score
         )
         # Clamp
         self.comprehension_score = max(0.0, min(1.0, self.comprehension_score))
 
-        if style:
+        if classification == "different_style" and style:
+            self.style_effectiveness.reject(style)
+            self.current_style = self.style_effectiveness.best()
+        elif style:
             self.style_effectiveness.record(style, delta)
+
+        self.regulate_difficulty(classification)
 
         # Update current sub-concept mastery using the classification delta
         sc = self.current_subconcept
@@ -214,15 +248,30 @@ class TeachingSession:
             sc.visited = True
             sc.mastery = max(0.0, min(1.0, sc.mastery + delta))
 
-        self.history.append({
-            "classification": classification,
-            "delta": delta,
-            "style": style,
-            "state": self.state.value,
-            "comprehension": self.comprehension_score,
-            "at": datetime.now().isoformat(),
-        })
+        self.history.append(
+            {
+                "classification": classification,
+                "delta": delta,
+                "style": style,
+                "state": self.state.value,
+                "comprehension": self.comprehension_score,
+                "difficulty_level": self.difficulty_level,
+                "at": _utc_now(),
+            }
+        )
         self._touch()
+
+    def regulate_difficulty(self, classification: str) -> int:
+        """Keep task difficulty in a minimal 1–5 ZPD band.
+
+        Explicit learner signals are the least ambiguous regulation input:
+        ``deeper`` raises the challenge and ``confused`` lowers it.
+        """
+        if classification == "deeper":
+            self.difficulty_level = min(MAX_DIFFICULTY, self.difficulty_level + 1)
+        elif classification == "confused":
+            self.difficulty_level = max(MIN_DIFFICULTY, self.difficulty_level - 1)
+        return self.difficulty_level
 
     # ─── shortcuts ───
 
@@ -232,10 +281,10 @@ class TeachingSession:
         return t in SHORTCUTS
 
     @staticmethod
-    def shortcut_action(text: str) -> Optional[str]:
+    def shortcut_action(text: str) -> str | None:
         return SHORTCUTS.get(text.strip().lower())
 
-    def handle_shortcut(self, text: str) -> Optional[str]:
+    def handle_shortcut(self, text: str) -> str | None:
         """Return the action name for a shortcut, applying state side-effects
         for pause/resume/help. Returns None if not a shortcut."""
         action = self.shortcut_action(text)
@@ -254,13 +303,23 @@ class TeachingSession:
         Returns one of: introduce, explain, check, adapt, visualize, quiz,
         review, advance, complete, pause."""
         st = self.state
-        if classification == "off_topic":
-            return "adapt"
-        if classification == "question":
-            return "adapt"
-        if classification == "deeper":
-            return "adapt"
-        if classification == "confused":
+        if st == TeachingState.completed:
+            return "complete"
+        if st == TeachingState.paused:
+            return "pause"
+        if st == TeachingState.reviewing:
+            return "complete"
+        if classification == "visualize":
+            return "visualize"
+        if classification == "quiz":
+            return "quiz"
+        if classification in {
+            "off_topic",
+            "question",
+            "deeper",
+            "different_style",
+            "confused",
+        }:
             return "adapt"
         if classification == "skip":
             return self._advance_or_complete()
@@ -291,7 +350,7 @@ class TeachingSession:
 
     # ─── serialization ───
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "topic": self.topic,
             "user_level": self.user_level,
@@ -303,6 +362,7 @@ class TeachingSession:
             "ema_alpha": self.ema_alpha,
             "style_effectiveness": self.style_effectiveness.to_dict(),
             "current_style": self.current_style,
+            "difficulty_level": self.difficulty_level,
             "history": self.history,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -310,31 +370,60 @@ class TeachingSession:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "TeachingSession":
+    def from_dict(cls, d: dict[str, Any]) -> TeachingSession:
+        raw_sub_concepts = d.get("sub_concepts", [])
+        if not isinstance(raw_sub_concepts, list):
+            raw_sub_concepts = []
         s = cls(
             topic=d["topic"],
-            sub_concepts=[sc["name"] for sc in d.get("sub_concepts", [])],
+            sub_concepts=[sc["name"] for sc in raw_sub_concepts],
             user_level=d.get("user_level", "intermediate"),
         )
-        s.sub_concepts = [SubConcept.from_dict(sc) for sc in d.get("sub_concepts", [])]
-        s.current_index = int(d.get("current_index", 0))
-        s.state = TeachingState(d.get("state", "introducing"))
-        s._prior_state = TeachingState(d.get("prior_state", "introducing"))
+        s.sub_concepts = [SubConcept.from_dict(sc) for sc in raw_sub_concepts]
+        raw_index = d.get("current_index", d.get("current_sub_concept_idx", 0))
+        s.current_index = max(0, int(raw_index))
+        if s.sub_concepts:
+            s.current_index = min(s.current_index, len(s.sub_concepts) - 1)
+
+        try:
+            s.state = TeachingState(d.get("state", "introducing"))
+        except ValueError:
+            s.state = TeachingState.introducing
+        history = d.get("history", d.get("interaction_history", []))
+        s.history = history if isinstance(history, list) else []
+        prior_state = d.get("prior_state", d.get("previous_state"))
+        if prior_state is None and s.state == TeachingState.paused:
+            for interaction in reversed(s.history):
+                candidate = interaction.get("state") if isinstance(interaction, dict) else None
+                if candidate and candidate != TeachingState.paused.value:
+                    prior_state = candidate
+                    break
+        try:
+            s._prior_state = TeachingState(prior_state or TeachingState.introducing.value)
+        except ValueError:
+            s._prior_state = TeachingState.introducing
         s.comprehension_score = float(d.get("comprehension_score", 0.0))
         s.ema_alpha = float(d.get("ema_alpha", 0.3))
         s.style_effectiveness = StyleEffectiveness.from_dict(d.get("style_effectiveness", {}))
-        s.current_style = d.get("current_style", "feynman")
-        s.history = d.get("history", [])
-        s.created_at = d.get("created_at", s.created_at)
-        s.updated_at = d.get("updated_at", s.updated_at)
-        s.interaction_count = int(d.get("interaction_count", 0))
+        current_style = d.get("current_style", d.get("preferred_style", "feynman"))
+        s.current_style = current_style if current_style in ALL_STYLES else "feynman"
+        raw_difficulty = d.get("difficulty_level", d.get("difficulty", s.difficulty_level))
+        s.difficulty_level = max(MIN_DIFFICULTY, min(MAX_DIFFICULTY, int(raw_difficulty)))
+        s.created_at = _timestamp(d.get("created_at"), s.created_at)
+        s.updated_at = _timestamp(
+            d.get("updated_at", d.get("last_active")),
+            s.created_at,
+        )
+        s.interaction_count = int(
+            d.get("interaction_count", d.get("total_interactions", len(s.history)))
+        )
         return s
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), indent=2)
 
     @classmethod
-    def from_json(cls, data: str) -> "TeachingSession":
+    def from_json(cls, data: str) -> TeachingSession:
         return cls.from_dict(json.loads(data))
 
 

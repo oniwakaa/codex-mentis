@@ -3,28 +3,29 @@
 State machine + LLM-backed response analysis + Rich UI widgets. Wired into
 the chat REPL via the /explore command (see chat.py).
 """
-from pitagora.teaching.session import TeachingSession, TeachingState, StyleEffectiveness
-from pitagora.teaching.analyzer import ResponseAnalyzer, ResponseClassification, Classification
+
+from pitagora.teaching.analyzer import Classification, ResponseAnalyzer, ResponseClassification
+from pitagora.teaching.session import StyleEffectiveness, TeachingSession, TeachingState
 from pitagora.teaching.ui import (
-    show_controls,
     show_comprehension_gauge,
+    show_controls,
+    show_journey_map,
+    show_session_summary,
     show_subconcept_progress,
     show_topic_overview,
-    show_session_summary,
-    show_journey_map,
 )
 
 __all__ = [
-    "TeachingSession",
-    "TeachingState",
-    "StyleEffectiveness",
+    "Classification",
     "ResponseAnalyzer",
     "ResponseClassification",
-    "Classification",
-    "show_controls",
+    "StyleEffectiveness",
+    "TeachingSession",
+    "TeachingState",
     "show_comprehension_gauge",
+    "show_controls",
+    "show_journey_map",
+    "show_session_summary",
     "show_subconcept_progress",
     "show_topic_overview",
-    "show_session_summary",
-    "show_journey_map",
 ]

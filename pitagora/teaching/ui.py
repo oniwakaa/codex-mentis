@@ -44,15 +44,12 @@ def _score_color(score: float) -> str:
 def build_comprehension_gauge(score: float) -> Text:
     color = _score_color(score)
     bar_width = 20
-    filled = int(round(score * bar_width))
+    filled = round(max(0.0, min(1.0, score)) * bar_width)
     return Text.assemble(
         ("█" * filled + "░" * (bar_width - filled), color),
         f" {score * 100:5.1f}% comprehension",
     )
 
-def show_comprehension_gauge(score: float, con: Console | None = None) -> None:
-    """Render comprehension as a colored progress bar."""
-    (con or console).print(build_comprehension_gauge(score))
 
 def show_comprehension_gauge(score: float, con: Console | None = None) -> None:
     """Render comprehension as a colored progress bar."""

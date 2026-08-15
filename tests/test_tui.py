@@ -37,3 +37,16 @@ async def test_tui_chat_input_submission():
         log_widget = app.screen.query_one("#message-log")
         assert len(log_widget.messages) == 1
         assert log_widget.messages[0]["content"] == "hello"
+
+
+@pytest.mark.asyncio
+async def test_tui_slash_command_execution():
+    app = PitagoraApp()
+    async with app.run_test(size=(120, 40)):
+        app.screen.process_user_input("/topic")
+        import asyncio
+
+        await asyncio.sleep(0.1)
+        log_widget = app.screen.query_one("#message-log")
+        assert len(log_widget.messages) >= 1
+        assert any("topic" in str(m.get("content", "")).lower() for m in log_widget.messages)

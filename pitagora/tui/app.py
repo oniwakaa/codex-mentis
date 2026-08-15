@@ -1,9 +1,11 @@
 """Main Textual Application for Pitagora."""
 
 from pathlib import Path
+from typing import Any
 
 from textual.app import App
 
+from pitagora.chat.controller import ChatController
 from pitagora.tui.bindings import TUI_BINDINGS
 from pitagora.tui.screens import ChatScreen, DashboardScreen, SettingsScreen
 
@@ -19,8 +21,9 @@ class PitagoraApp(App):
         "settings": SettingsScreen,
     }
 
-    def __init__(self, **kwargs):
+    def __init__(self, controller: ChatController | None = None, **kwargs: Any):
         super().__init__(**kwargs)
+        self.controller = controller or ChatController()
         self.reasoning_visible = False
         self.diff_visible = False
 

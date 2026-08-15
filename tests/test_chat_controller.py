@@ -16,6 +16,7 @@ def make_controller(completion=lambda messages, model=None, config=None: "answer
         completion=completion,
         rag_lookup=lambda query: "[rag]",
         concept_lookup=lambda topic: "[concept]",
+        memory_lookup=lambda query, topic: "",
         verify_math=lambda response: None,
         save_memory=lambda role, content, topic: None,
         record_study=lambda topic, user_input: None,
@@ -25,6 +26,7 @@ def make_controller(completion=lambda messages, model=None, config=None: "answer
     )
     defaults.update(overrides)
     return ChatController(**defaults)
+
 
 
 def test_freeform_turn_emits_user_status_markdown_state_changed():
@@ -282,3 +284,37 @@ def test_launch_chat_renders_controller_events():
     output = console.export_text()
     assert "answer" in output
     assert "Goodbye! Keep reasoning." in output
+
+
+def test_memory_lookup_injected_into_prompt():
+    controller = make_controller(
+        rag_lookup=lambda q: "",
+        concept_lookup=lambda t: "",
+        memory_lookup=lambda q, t: "[Relevant memory: User prefers Dirac notation]",
+    )
+
+    list(controller.handle_input("Show me quantum state equation"))
+
+    assert "[Relevant memory: User prefers Dirac notation]" in controller.messages[-2]["content"]
+    assert "User question: Show me quantum state equation" in controller.messages[-2]["content"]
+
+
+def test_get_memory_context_integration(tmp_path, monkeypatch):
+    from pitagora.core.models import MemoryEntry
+    from pitagora.memory.store import MemoryStore
+    from pitagora.chat.runtime import _get_memory_context
+
+    db_file = tmp_path / "test_memory.db"
+    store = MemoryStore(db_path=str(db_file))
+    store.create_memory_entry(
+        MemoryEntry(
+            layer="L1",
+            content="[user] I am studying quantum superposition and qubits.",
+            topic="quantum",
+        )
+    )
+
+    monkeypatch.setattr("pitagora.memory.store.MemoryStore", lambda *a, **kw: store)
+    ctx = _get_memory_context("quantum superposition", topic="quantum")
+    assert "quantum superposition" in ctx.lower() or "qubits" in ctx.lower()
+

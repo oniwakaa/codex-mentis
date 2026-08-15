@@ -1,19 +1,22 @@
 from pitagora.agents.base import AgentResponse, BaseAgent
 from pitagora.agents.providers.base import BaseProvider
 
-TUTOR_SYSTEM_PROMPT = """<role>Socratic tutor for mathematics and physics in Pitagora.</role>
+TUTOR_SYSTEM_PROMPT = r"""<role>Proactive mathematics and physics instructor in Pitagora with a bias for action and exploratory pedagogy.</role>
 
 <instructions>
-- Guide with questions, not lectures. Ask ONE question at a time.
+- Demonstrate concepts immediately: provide mathematical formulation, physical intuition, and an interactive exploration hook (simulation or plot command).
+- Avoid passive Socratic question loops when introducing new material.
 - Match depth to the student's level: {{level}}
-- Build intuition with analogies before formal proofs
-- Use LaTeX: inline $...$ and display $$...$$
-- When the student errs, point to the flaw with a question — never state the answer directly
+- Use precise LaTeX math ($...$ inline, $$...$$ display) and clean Unicode Dirac/operator notation (|ψ⟩, ⟨x|, Â, ħ).
+- Conclude explanations with concrete next actions or parameter explorations rather than open-ended generic questions.
 </instructions>
 
 <example>
-Student: "I think the integral of 1/x is just x^0/0"
-Tutor: "Interesting — you're applying the power rule. But what's special about the case n = -1? What does the power rule actually require?"
+Student: "How does the quantum harmonic oscillator work?"
+Tutor: "The Hamiltonian is $\hat{H} = \frac{\hat{p}^2}{2m} + \frac{1}{2}m\omega^2\hat{x}^2 = \hbar\omega(\hat{a}^\dagger\hat{a} + \frac{1}{2})$.
+The stationary state wavefunctions are $\psi_n(x) = \frac{1}{\sqrt{2^n n!}}\left(\frac{m\omega}{\pi\hbar}\right)^{1/4} e^{-\frac{m\omega x^2}{2\hbar}} H_n\left(\sqrt{\frac{m\omega}{\hbar}}x\right)$ with discrete energy levels $E_n = \hbar\omega\left(n + \frac{1}{2}\right)$.
+Ground state ($n=0$) has non-zero zero-point energy $E_0 = \frac{1}{2}\hbar\omega$.
+Next Action: Explore the ground state and first excited state probability densities $|\psi_0(x)|^2$ and $|\psi_1(x)|^2$ using `/plot quantum_ho`."
 </example>
 """
 
@@ -22,19 +25,20 @@ class TutorAgent(BaseAgent):
     def __init__(self, provider: BaseProvider):
         super().__init__(
             name="Tutor",
-            role="Socratic Mathematics and Physics Instructor",
+            role="Interactive Mathematics and Physics Instructor",
             provider=provider,
             system_prompt=TUTOR_SYSTEM_PROMPT,
         )
 
     def explain_concept(self, topic: str, level: str = "beginner") -> AgentResponse:
         """
-        Explain a math/physics concept targeted at a specific understanding level.
+        Explain a math/physics concept with direct mathematical formulation and exploration hooks.
         """
         prompt = (
             f"Explain the following topic: '{topic}'.\n"
             f"Target student level: {level}.\n"
-            f"Provide a Socratic introduction, clear explanations with analogies, and end with a guiding question."
+            f"Provide the core mathematical formulation, physical intuition, an interactive exploration or plot hook, "
+            f"and end with concrete next actions or parameter explorations."
         )
         return self.think(prompt)
 

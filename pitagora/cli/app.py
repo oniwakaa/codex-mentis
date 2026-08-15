@@ -52,10 +52,11 @@ def _select_chat_launcher(simple: bool):
     try:
         return _load_tui_launcher()
     except ModuleNotFoundError as exc:
-        if exc.name != "textual" and not (exc.name and exc.name.startswith("textual.")):
+        tui_pkgs = ("textual", "textual_plotext")
+        if exc.name not in tui_pkgs and not (exc.name and any(exc.name.startswith(f"{p}.") for p in tui_pkgs)):
             raise
         typer.echo(
-            "Textual is not installed; install it with "
+            "TUI dependencies not fully installed; install with "
             "`pip install pitagora[tui]`. Falling back to simple chat."
         )
         return _load_simple_launcher()

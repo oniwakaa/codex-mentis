@@ -209,26 +209,70 @@ def _get_concept_context(topic: str) -> str:
     return ""
 
 
+def _get_memory_context(query: str, topic: str = "general", max_entries: int = 3) -> str:
+    """Retrieve relevant episodic memories from past sessions for cross-session continuity."""
+    try:
+        from pitagora.memory.store import MemoryStore
+
+        store = MemoryStore()
+        # Search relevant memory entries by query embedding / similarity
+        results = store.retrieve(query, top_k=max_entries)
+        if not results:
+            # Fallback to recent entries for this topic
+            history = store.get_topic_history(topic)
+            if history:
+                results = history[-max_entries:]
+
+        if not results:
+            return ""
+
+        context_parts = ["[Relevant memory from previous conversations:]"]
+        for r in results:
+            content = r.get("content", "")
+            if content and (r.get("score") is None or r.get("score", 0.0) >= 0.1):
+                context_parts.append(f"- {content}")
+
+        if len(context_parts) > 1:
+            return "\n".join(context_parts)
+    except Exception as e:
+        log.debug("failed to retrieve memory context: %s", e)
+    return ""
+
+
 def _get_user_context() -> str:
+    """Get user profile context — level, mastery, recent activity, and persistent memory summary."""
     try:
         from pitagora.cli.commands.onboard import load_profile
 
         profile = load_profile()
-        if not profile:
-            return ""
+        parts = []
+        if profile:
+            parts.append(f"[User profile: {profile.get('name', 'Student')}]")
+            levels = profile.get("levels", {})
+            for subj, level in levels.items():
+                parts.append(f"  {subj}: {level}")
 
-        parts = [f"[User profile: {profile.get('name', 'Student')}]"]
-        levels = profile.get("levels", {})
-        for subj, level in levels.items():
-            parts.append(f"  {subj}: {level}")
+            interests = profile.get("interests", [])
+            if interests:
+                parts.append(f"  Interests: {', '.join(interests)}")
 
-        interests = profile.get("interests", [])
-        if interests:
-            parts.append(f"  Interests: {', '.join(interests)}")
+        # Include recent episodic memories summary if available
+        try:
+            from pitagora.memory.store import MemoryStore
+
+            store = MemoryStore()
+            recent_memories = store.list_memories()
+            if recent_memories:
+                recent_topics = list({m.topic for m in recent_memories[-10:] if m.topic})
+                if recent_topics:
+                    parts.append(f"  Recent topics studied: {', '.join(recent_topics[:5])}")
+        except Exception:
+            pass
 
         return "\n".join(parts)
     except Exception:
         return ""
+
 
 
 def _verify_math(response: str) -> str | None:

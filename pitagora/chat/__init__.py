@@ -11,6 +11,7 @@ from pitagora.chat.runtime import (
     _dispatch_rich_events,
     _generate_sub_concepts,
     _get_concept_context,
+    _get_memory_context,
     _get_rag_context,
     _get_user_context,
     _record_study,
@@ -36,6 +37,7 @@ __all__ = [
     "_seed_session_style",
     "_get_rag_context",
     "_get_concept_context",
+    "_get_memory_context",
     "_get_user_context",
     "_verify_math",
     "_save_to_memory",
@@ -48,3 +50,4 @@ __all__ = [
     "SUBCONCEPT_GEN_PROMPT",
     "STYLE_GUIDES",
 ]
+

@@ -86,23 +86,14 @@ def print_math(latex_str: str, return_str: bool = False):
 
     When return_str=True, return the rendered string instead of printing it.
     """
+    from pitagora.latex_render import render_latex_safe
 
-    def _render(latex_str: str) -> str:
-        # Try SymPy pretty-printing first; fall back to Unicode substitution.
-        try:
-            from sympy import pretty
-            from sympy.parsing.latex import parse_latex
-
-            expr = parse_latex(latex_str)
-            return pretty(expr)
-        except Exception:
-            return _unicode_substitute(latex_str)
-
-    out = _render(latex_str)
+    out = render_latex_safe(latex_str)
     if return_str:
         return out
     console.print("[bold cyan]Math Formula:[/bold cyan]")
     console.print(f"  [italic]{out}[/italic]")
+
 
 
 def _unicode_substitute(latex_str: str) -> str:

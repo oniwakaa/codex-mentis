@@ -7,7 +7,7 @@ from textual.app import App
 
 from pitagora.chat.controller import ChatController
 from pitagora.tui.bindings import TUI_BINDINGS
-from pitagora.tui.screens import ChatScreen, DashboardScreen, SettingsScreen
+from pitagora.tui.screens import ChatScreen, DashboardScreen, PlotScreen, SettingsScreen
 
 CSS_PATH = Path(__file__).parent / "styles.tcss"
 
@@ -18,6 +18,7 @@ class PitagoraApp(App):
     SCREENS = {
         "chat": ChatScreen,
         "dashboard": DashboardScreen,
+        "plot": PlotScreen,
         "settings": SettingsScreen,
     }
 
@@ -31,7 +32,7 @@ class PitagoraApp(App):
         self.push_screen("chat")
 
     def action_cycle_panels(self) -> None:
-        screens = ["chat", "dashboard", "settings"]
+        screens = ["chat", "plot", "dashboard", "settings"]
         current = self.screen.name if hasattr(self.screen, "name") else "chat"
         idx = (screens.index(current) + 1) % len(screens) if current in screens else 0
         self.switch_screen(screens[idx])
@@ -40,6 +41,11 @@ class PitagoraApp(App):
         self.notify("Operation cancelled.")
 
     def action_clear_screen(self) -> None:
+        try:
+            log_widget = self.screen.query_one("#message-log")
+            log_widget.messages = []
+        except Exception:
+            pass
         self.notify("Screen cleared.")
 
     def action_toggle_reasoning(self) -> None:
@@ -48,16 +54,38 @@ class PitagoraApp(App):
         self.notify(f"Reasoning trace {state}.")
 
     def action_open_palette(self) -> None:
-        self.notify("Command palette opened.")
+        try:
+            palette = self.screen.query_one("#command-palette")
+            is_visible = palette.styles.display == "block"
+            palette.styles.display = "none" if is_visible else "block"
+            if not is_visible:
+                chat_input = self.screen.query_one("#chat-input")
+                if not chat_input.value.startswith("/"):
+                    chat_input.value = "/"
+                chat_input.focus()
+        except Exception:
+            pass
+        self.notify("Command palette toggled.")
+
 
     def action_quit_app(self) -> None:
         self.exit()
 
     def action_scroll_down(self) -> None:
-        pass
+        if hasattr(self.screen, "scroll_log_down"):
+            self.screen.scroll_log_down()
 
     def action_scroll_up(self) -> None:
-        pass
+        if hasattr(self.screen, "scroll_log_up"):
+            self.screen.scroll_log_up()
+
+    def action_page_down(self) -> None:
+        if hasattr(self.screen, "page_log_down"):
+            self.screen.page_log_down()
+
+    def action_page_up(self) -> None:
+        if hasattr(self.screen, "page_log_up"):
+            self.screen.page_log_up()
 
     def action_next_session(self) -> None:
         self.notify("Switched to next session.")
@@ -74,4 +102,9 @@ class PitagoraApp(App):
         self.notify("Help overlay: press / for slash commands.")
 
     def action_close_modal(self) -> None:
-        pass
+        try:
+            palette = self.screen.query_one("#command-palette")
+            palette.styles.display = "none"
+        except Exception:
+            pass
+

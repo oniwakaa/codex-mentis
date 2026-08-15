@@ -23,6 +23,53 @@ class ChatRenderer:
         yield ChatEvent("renderable", render_equation_box(argument))
 
     @staticmethod
+    def cmd_plot(argument: str):
+        """Dispatch plot event for in-terminal / TUI interactive plotting."""
+        arg = argument.strip()
+        if not arg:
+            yield ChatEvent(
+                "plot",
+                {
+                    "plot_type": "quantum_ho",
+                    "quantum_n": 0,
+                    "title": "Quantum Harmonic Oscillator: |ψ₀(x)|² & V(x)",
+                },
+            )
+            return
+
+        if "quantum" in arg.lower() or "ho" in arg.lower():
+            n = 0
+            for part in arg.split():
+                if part.isdigit():
+                    n = int(part)
+            yield ChatEvent(
+                "plot",
+                {
+                    "plot_type": "quantum_ho",
+                    "quantum_n": n,
+                    "title": f"Quantum Harmonic Oscillator: |ψ_{n}(x)|² & V(x)",
+                },
+            )
+        elif "wave" in arg.lower() or "packet" in arg.lower():
+            yield ChatEvent(
+                "plot",
+                {
+                    "plot_type": "wave_packet",
+                    "quantum_n": 0,
+                    "title": "Wave-Particle Duality: Wave Packet |ψ(x)|²",
+                },
+            )
+        else:
+            yield ChatEvent(
+                "plot",
+                {
+                    "plot_type": "custom",
+                    "custom_expr": arg,
+                    "title": f"Function Plot: y = {arg}",
+                },
+            )
+
+    @staticmethod
     def cmd_help(argument: str):
         from rich.panel import Panel
 

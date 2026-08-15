@@ -34,6 +34,7 @@ class ChatController(ChatSessionState):
         "/dashboard": "_cmd_dashboard",
         "/workflow": "_cmd_workflow",
         "/latex": "_cmd_latex",
+        "/plot": "_cmd_plot",
         "/rate": "_cmd_rate",
         "/help": "_cmd_help",
         "/clear": "_cmd_clear",
@@ -57,9 +58,14 @@ class ChatController(ChatSessionState):
 
     def _handle_freeform_turn(self, user_input: str) -> Iterator[ChatEvent]:
         yield ChatEvent("user", user_input)
-        rag_context = self.rag_lookup(user_input)
-        concept_context = self.concept_lookup(self.topic)
-        contexts = [value for value in (rag_context, concept_context) if value]
+        rag_context = self.rag_lookup(user_input) if self.rag_lookup else ""
+        concept_context = self.concept_lookup(self.topic) if self.concept_lookup else ""
+        memory_context = (
+            self.memory_lookup(user_input, self.topic)
+            if getattr(self, "memory_lookup", None)
+            else ""
+        )
+        contexts = [value for value in (rag_context, concept_context, memory_context) if value]
         enriched = (
             "\n\n".join(contexts) + f"\n\nUser question: {user_input}" if contexts else user_input
         )
@@ -119,10 +125,21 @@ class ChatController(ChatSessionState):
         yield from self.cmd_resume(argument)
 
     def _cmd_quit(self, argument: str) -> Iterator[ChatEvent]:
+        try:
+            from pitagora.sessions import save_session
+
+            if len(self.messages) > 1:
+                save_session(self.messages, topic=self.topic, mode=self.mode)
+        except Exception:
+            pass
         yield ChatEvent("status", "Goodbye!", metadata={"quit": True})
+
 
     def _cmd_latex(self, argument: str) -> Iterator[ChatEvent]:
         yield from ChatRenderer.cmd_latex(argument)
+
+    def _cmd_plot(self, argument: str) -> Iterator[ChatEvent]:
+        yield from ChatRenderer.cmd_plot(argument)
 
     def _cmd_help(self, argument: str) -> Iterator[ChatEvent]:
         yield from ChatRenderer.cmd_help(argument)

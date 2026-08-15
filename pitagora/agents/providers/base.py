@@ -27,6 +27,12 @@ class ProviderConfig:
     completion_token_cost: float = 0.0
     extra_params: dict[str, Any] = field(default_factory=dict)
 
+    def __repr__(self) -> str:
+        key_repr = f"'{self.api_key[:3]}***'" if self.api_key else "None"
+        return (
+            f"ProviderConfig(model={self.model!r}, api_key={key_repr}, base_url={self.base_url!r})"
+        )
+
     @property
     def httpx_timeout(self) -> float | httpx.Timeout:
         """Return the legacy float or an httpx timeout with phase overrides."""
@@ -101,6 +107,17 @@ class BaseProvider(ABC):
         """Stream asynchronously. Default: falls back to acomplete()."""
         result = await self.acomplete(messages)
         yield result.get("content", "")
+
+    async def stream_completion(
+        self,
+        messages: list[dict[str, str]],
+        tools: list[dict[str, Any]] | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream completion events: token, tool_call, done."""
+        async for chunk in self.astream(messages):
+            yield {"type": "token", "content": chunk}
+        yield {"type": "done", "content": {}}
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings. Default: raises NotImplementedError."""

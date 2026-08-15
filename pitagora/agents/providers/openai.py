@@ -266,6 +266,43 @@ class OpenAIProvider(BaseProvider):
                     if content:
                         yield content
 
+    async def stream_completion(
+        self,
+        messages: list[dict[str, str]],
+        tools: list[dict[str, Any]] | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream completion events from OpenAI streaming API."""
+        payload = self._build_payload(messages, tools=tools, stream=True)
+        async with httpx.AsyncClient(timeout=self.config.httpx_timeout) as client:
+            async with client.stream(
+                "POST",
+                self._get_url(),
+                headers=self._get_headers(),
+                json=payload,
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    line = line.strip()
+                    if not line or not line.startswith("data: "):
+                        continue
+                    data_json = line[6:]
+                    if data_json == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data_json)
+                        delta = chunk["choices"][0].get("delta", {})
+                        content = delta.get("content")
+                        tool_calls = delta.get("tool_calls")
+                        if content:
+                            yield {"type": "token", "content": content}
+                        if tool_calls:
+                            yield {"type": "tool_call", "content": tool_calls}
+                    except (json.JSONDecodeError, KeyError, IndexError, TypeError):
+                        continue
+
+        yield {"type": "done", "content": {}}
+
     def embed(self, texts: list[str]) -> list[list[float]]:
         payload = {
             "model": self.config.extra_params.get(

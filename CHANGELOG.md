@@ -3,6 +3,45 @@
 All notable changes to Pitagora are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0] — 2026-08-15
+
+### Added
+
+- **Model Context Protocol (MCP) Server Integration** — `pitagora/mcp/` (`server.py`, `tools.py`, `resources.py`) providing stdio JSON-RPC server with 4 tools and 3 resources.
+- **Self-Improving Prompt Loop Hardening** — Versioned `prompt_revisions` table, prompt injection safety filter, and rollback command in `SelfImproverAgent`.
+- **Homebrew Formula & Release Workflow** — `Formula/pitagora.rb` and `.github/workflows/release.yml` for PyPI and GitHub releases.
+- **Security Audit & Hardening** — Path traversal checks with `.is_relative_to()`, masked API keys in `ProviderConfig.__repr__`, AST security validation, and `tests/test_security_audit.py`.
+- **ReAct Agent Loop Engine** — 6-phase ReAct execution loop in `pitagora/agents/loop.py` with parallel read execution.
+- **Tool Registry** — JSON Schema tool registration and permission dispatch in `pitagora/agents/tools/`.
+- **Adaptive Context Compaction** — Context window sliding budget and tool result summarization in `pitagora/agents/context.py`.
+- **Graduated Permission System** — 5-level escalation manager in `pitagora/agents/permissions.py`.
+- **Textual TUI Application** — Full-screen Textual TUI in `pitagora/tui/` with interactive widgets and keybindings.
+- **Multi-Provider Support** — Added `AnthropicProvider`, `OllamaProvider`, and `LMStudioProvider` implementations.
+- **Agent Loop Safety Guards** — `LoopGuard` for max iterations, wall clock timeout, cost budget, and doom-loop detection.
+- **Append-Only Session State** — Messages array as single source of truth in `pitagora/sessions.py`.
+- **Docker Support** — Production `Dockerfile` and `.dockerignore`.
+
+## [Unreleased]
+
+### Added
+
+- **Agent loop safety guards** — `LoopGuard` in `pitagora/agents/guards.py` for max iterations, timeout, cost budget, and doom-loop detection.
+- **ReAct Agent Loop** — `AgentLoop` in `pitagora/agents/loop.py` implementing 6-phase lifecycle with parallel read execution.
+- **Tool Registry** — `ToolRegistry` and `ToolSpec` in `pitagora/agents/tools/` with JSON schema validation and permission levels.
+- **Adaptive Context Compaction** — `ContextManager` in `pitagora/agents/context.py` with sliding window and tool call summarization.
+- **Graduated Permission System** — `PermissionManager` in `pitagora/agents/permissions.py` with 5-level escalation.
+- **Textual TUI Migration** — Replaced legacy Rich TUI with full-screen Textual application in `pitagora/tui/`.
+- **Streaming Token Display** — `stream_completion` in providers and live token velocity rendering.
+- **Append-Only Session State** — Message array as single source of truth in `pitagora/sessions.py`.
+- **Multi-Provider Fallback** — `AnthropicProvider`, `OllamaProvider`, and `LMStudioProvider` implementations.
+- **Session metadata tracking** — token count, cost tracking, iteration count, and tool calls recording in `pitagora/sessions.py`.
+- **Packaging and Docker support** — `Dockerfile` and `.dockerignore` for containerized execution.
+
+### Changed
+
+- **Consolidated test suite** — Removed legacy root test files (`test_legacy.py`, `test_new_agents.py`, `test_new_features_legacy.py`, `test_system_legacy.py`) and ported all assertions into `tests/`.
+- **Modularized chat controller** — Refactored `chat_controller.py` into modular `pitagora/chat/` package (`controller.py`, `session.py`, `renderer.py`, `runtime.py`).
+
 ## [0.2.0] — 2026-08-14
 
 ### Added

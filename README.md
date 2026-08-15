@@ -34,7 +34,50 @@ pip install 'pitagora[all]'
 
 `pitagora` launches the TUI in a terminal, while `pitagora --simple` and `pitagora chat --simple` launch the Rich REPL.
 
-### Quick Start
+## 📐 Architecture
+
+```mermaid
+graph TD
+    CLI[Pitagora CLI / Textual TUI] --> Loop[AgentLoop ReAct Engine]
+    Loop --> Reg[ToolRegistry & Permissions]
+    Loop --> Context[ContextManager Compaction]
+    Reg --> Sandbox[SymPy Sandbox]
+    Reg --> KB[KnowledgeBase & WebFetch]
+    Reg --> Memory[SQLite MemoryStore]
+    Loop --> Providers[OpenAI / Anthropic / Ollama / LMStudio]
+    CLI --> MCP[MCP Stdio Server]
+```
+
+## ⌨️ TUI Keybindings
+
+| Keybinding | Action |
+|------------|--------|
+| `Enter` | Send message |
+| `Shift+Enter` | Insert newline |
+| `Tab` | Cycle panels (Chat / Dashboard / Settings) |
+| `Ctrl+C` | Cancel current operation |
+| `Ctrl+L` | Clear screen log |
+| `Ctrl+R` | Toggle reasoning trace visibility |
+| `/` | Open slash command palette |
+| `q` | Quit application |
+| `n` / `p` | Switch to next / previous session |
+| `d` | Toggle diff view |
+| `?` | Show help overlay |
+
+## 🔌 Model Context Protocol (MCP) Integration
+
+Pitagora acts as an official MCP server, exposing its reasoning, verification, and knowledge engine to any MCP client (Claude Desktop, Cursor, AI agents).
+
+```bash
+# Run stdio MCP server
+pitagora mcp serve
+```
+
+### Exposed MCP Tools & Resources
+- **Tools**: `pitagora_solve`, `pitagora_verify`, `pitagora_explain`, `pitagora_concept_status`
+- **Resources**: `pitagora://concepts/{concept}`, `pitagora://journeys/{id}`, `pitagora://memory/stats`
+
+## 🚀 Quick Start
 
 ```bash
 # Launch the interactive TUI (default)

@@ -109,3 +109,27 @@ def test_orchestrate_standalone():
 
     assert isinstance(res, str)
     assert len(res) > 0
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_parallel_reasoning(mock_provider):
+    from pitagora.agents import BaseAgent
+
+    tutor = BaseAgent("Tutor", "Teacher", mock_provider, "Tutor prompt")
+    prover = BaseAgent("Prover", "Math expert", mock_provider, "Prover prompt")
+
+    mock_provider.responses.extend(
+        [
+            {"content": "Tutor explanation output", "tool_calls": []},
+            {"content": "Prover derivation output", "tool_calls": []},
+        ]
+    )
+
+    orchestrator = Orchestrator(agents={"tutor": tutor, "prover": prover})
+
+    res = await orchestrator.aprocess(
+        "Derive Lagrangian and explain it", mode="parallel_tutor_prover"
+    )
+
+    assert "Tutor explanation output" in res.content
+    assert "Prover derivation output" in res.content

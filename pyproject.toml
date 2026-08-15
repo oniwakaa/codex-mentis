@@ -1,6 +1,6 @@
 [project]
 name = "pitagora"
-version = "0.2.0"
+version = "1.0.0"
 description = "An AI-powered CLI for studying, exploring, and reasoning through complex mathematics and physics. Multi-agent architecture with specialized tutor, researcher, prover, reviewer, explainer, and self-improving agents."
 readme = "README.md"
 requires-python = ">=3.11"

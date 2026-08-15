@@ -124,12 +124,12 @@ def test_provider_factory_claude_via_openai():
 
 
 def test_get_provider_returns_openai():
-    """get_provider always returns OpenAI-compatible."""
+    """get_provider returns BaseProvider implementations."""
     config = ProviderConfig(api_key="key", model="model")
-    assert isinstance(get_provider("gpt", config), OpenAIProvider)
-    assert isinstance(get_provider("claude", config), OpenAIProvider)
-    assert isinstance(get_provider("gemini", config), OpenAIProvider)
-    assert isinstance(get_provider("ollama", config), OpenAIProvider)
+    assert isinstance(get_provider("gpt", config), BaseProvider)
+    assert isinstance(get_provider("claude", config), BaseProvider)
+    assert isinstance(get_provider("gemini", config), BaseProvider)
+    assert isinstance(get_provider("ollama", config), BaseProvider)
 
 
 def test_fallback_provider():
@@ -442,3 +442,27 @@ async def test_fallback_astream_catches_errors_raised_during_iteration():
     chunks = [chunk async for chunk in fallback.astream(MESSAGES)]
 
     assert chunks == ["Default Mock stream chunk"]
+
+
+@pytest.mark.asyncio
+async def test_stream_completion_events():
+    prov = MockProvider()
+    events = [event async for event in prov.stream_completion(MESSAGES)]
+    assert len(events) >= 2
+    assert events[0]["type"] == "token"
+    assert events[-1]["type"] == "done"
+
+
+def test_get_provider_factory():
+    cfg = ProviderConfig(api_key="test")
+    p_openai = get_provider("openai", cfg)
+    assert isinstance(p_openai, OpenAIProvider)
+
+    p_anthropic = get_provider("anthropic", cfg)
+    assert p_anthropic.__class__.__name__ == "AnthropicProvider"
+
+    p_ollama = get_provider("ollama", cfg)
+    assert p_ollama.__class__.__name__ == "OllamaProvider"
+
+    p_lmstudio = get_provider("lmstudio", cfg)
+    assert p_lmstudio.__class__.__name__ == "LMStudioProvider"

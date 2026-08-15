@@ -184,7 +184,18 @@ def create_provider(config: ProviderConfig) -> BaseProvider:
     return OpenAIProvider(config)
 
 
+from pitagora.agents.providers.anthropic import AnthropicProvider
+from pitagora.agents.providers.lmstudio import LMStudioProvider
+from pitagora.agents.providers.ollama import OllamaProvider
+
+
 def get_provider(provider_name: str, config: ProviderConfig) -> BaseProvider:
-    """Create a provider by name; all names use the compatible protocol."""
-    del provider_name
+    """Create a provider by name."""
+    name = provider_name.lower()
+    if name == "anthropic":
+        return AnthropicProvider(config)
+    if name == "ollama":
+        return OllamaProvider(config)
+    if name == "lmstudio":
+        return LMStudioProvider(config)
     return OpenAIProvider(config)

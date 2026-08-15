@@ -49,6 +49,24 @@ CLASSIFICATION_QUALITY: dict[str, int] = {
     "different_style": 3,
 }
 
+SAFETY_KEYWORDS = [
+    "ignore previous instructions",
+    "system override",
+    "jailbreak",
+    "chmod",
+    "rm -rf",
+    "sudo",
+]
+
+
+def is_safe_prompt(prompt: str) -> bool:
+    """Check if candidate prompt passes safety constraints."""
+    prompt_lower = prompt.lower()
+    for kw in SAFETY_KEYWORDS:
+        if kw in prompt_lower:
+            return False
+    return True
+
 
 def quality_from_classification(label: str) -> int:
     """Convert a teaching classification label to a 1-5 quality score."""
@@ -250,6 +268,16 @@ class SelfImproverAgent(BaseAgent):
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_metrics_strategy " "ON strategy_metrics(strategy_used)"
         )
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS prompt_revisions (
+                version INTEGER PRIMARY KEY AUTOINCREMENT,
+                strategy_name TEXT NOT NULL,
+                prompt_text TEXT NOT NULL,
+                explanation TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
         # 6. Prompt variants (WS1) — evolved prompts with lineage
         cursor.execute("""
@@ -718,6 +746,13 @@ class SelfImproverAgent(BaseAgent):
         finally:
             conn.close()
 
+        if not is_safe_prompt(evolved.new_prompt_template):
+            return {"error": "Candidate prompt rejected by safety filter: prohibited content"}
+
+        self.save_prompt_revision(
+            strategy_name, evolved.new_prompt_template, evolved.explanation_of_changes
+        )
+
         return {
             "strategy_name": strategy_name,
             "revised": True,
@@ -727,6 +762,59 @@ class SelfImproverAgent(BaseAgent):
             "new_prompt": evolved.new_prompt_template,
             "explanation": evolved.explanation_of_changes,
         }
+
+    def save_prompt_revision(
+        self, strategy_name: str, prompt_text: str, explanation: str = ""
+    ) -> int:
+        """Save a prompt version to prompt_revisions table."""
+        if not is_safe_prompt(prompt_text):
+            raise ValueError("Prompt rejected by safety filter")
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT INTO prompt_revisions (strategy_name, prompt_text, explanation) VALUES (?, ?, ?)",
+                (strategy_name, prompt_text, explanation),
+            )
+            conn.commit()
+            return cur.lastrowid or 1
+        finally:
+            conn.close()
+
+    def rollback_prompt(
+        self, strategy_name: str, target_version: int | None = None
+    ) -> dict[str, Any]:
+        """Roll back strategy prompt to a previous version."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cur = conn.cursor()
+            if target_version:
+                cur.execute(
+                    "SELECT version, prompt_text FROM prompt_revisions WHERE strategy_name = ? AND version = ?",
+                    (strategy_name, target_version),
+                )
+            else:
+                cur.execute(
+                    "SELECT version, prompt_text FROM prompt_revisions WHERE strategy_name = ? ORDER BY version DESC LIMIT 1 OFFSET 1",
+                    (strategy_name,),
+                )
+            row = cur.fetchone()
+            if not row:
+                return {"error": f"No previous version found for strategy '{strategy_name}'"}
+            version, text = row
+            cur.execute(
+                "INSERT INTO prompt_revisions (strategy_name, prompt_text, explanation) VALUES (?, ?, ?)",
+                (strategy_name, text, f"Rolled back to version {version}"),
+            )
+            conn.commit()
+            return {
+                "status": "rolled_back",
+                "strategy_name": strategy_name,
+                "version": version,
+                "prompt_text": text,
+            }
+        finally:
+            conn.close()
 
     def digest(self) -> dict[str, Any]:
         """Weekly-style digest: top/bottom strategies, trending topics, focus areas."""

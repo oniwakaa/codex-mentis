@@ -195,11 +195,11 @@ class CorrectAnalyzer:
 def test_explore_starts_teaching_and_emits_inline_widgets(monkeypatch):
     controller = make_controller()
     monkeypatch.setattr(
-        "pitagora.chat_controller.chat_runtime._generate_sub_concepts",
+        "pitagora.chat.controller.chat_runtime._generate_sub_concepts",
         lambda topic, config, model: ["Definition", "Examples"],
     )
     monkeypatch.setattr(
-        "pitagora.chat_controller.ResponseAnalyzer",
+        "pitagora.chat.controller.ResponseAnalyzer",
         lambda completion: CorrectAnalyzer(),
     )
     monkeypatch.setattr(

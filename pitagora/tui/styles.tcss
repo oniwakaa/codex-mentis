@@ -1,0 +1,68 @@
+/* Pitagora Textual TUI Stylesheet */
+
+Screen {
+    layout: grid;
+    grid-size: 3 1;
+    grid-columns: 24 1fr 28;
+    background: $surface;
+    color: $text;
+}
+
+#sidebar {
+    background: $surface-darken-1;
+    border-right: heavy $primary-muted;
+    padding: 1;
+}
+
+#main-panel {
+    background: $surface;
+    padding: 1;
+    layout: vertical;
+}
+
+#inspector {
+    background: $surface-darken-1;
+    border-left: heavy $primary-muted;
+    padding: 1;
+}
+
+AgentStatusWidget {
+    height: 3;
+    border: solid $accent;
+    content-align: center middle;
+}
+
+TokenMeterWidget {
+    height: 1;
+    margin: 1 0;
+}
+
+ConceptTreeWidget {
+    height: 1fr;
+    border: round $primary;
+}
+
+JourneyBarWidget {
+    height: 3;
+    margin: 1 0;
+}
+
+MessageLogWidget {
+    height: 1fr;
+    border: solid $secondary;
+    overflow-y: scroll;
+}
+
+CommandPaletteWidget {
+    height: 10;
+    border: double $accent;
+    display: none;
+}
+
+.modal-open CommandPaletteWidget {
+    display: block;
+}
+
+.hidden {
+    display: none;
+}

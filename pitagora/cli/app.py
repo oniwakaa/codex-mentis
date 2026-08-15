@@ -36,9 +36,13 @@ def _load_simple_launcher():
 
 
 def _load_tui_launcher():
-    from pitagora.cli.tui import launch_tui
+    from pitagora.tui import PitagoraApp
 
-    return launch_tui
+    def launch_tui_app(**kwargs):
+        app = PitagoraApp()
+        app.run()
+
+    return launch_tui_app
 
 
 def _select_chat_launcher(simple: bool):
@@ -125,6 +129,14 @@ app.command("derive")(reason.derive)
 app.command("solve")(reason.derive)
 app.command("verify")(verify.verify)
 app.command("plot")(visualize.plot_expression)
+
+
+@app.command("mcp")
+def mcp_cmd(action: str = typer.Argument("serve", help="Action: serve")):
+    """Run Pitagora Model Context Protocol (MCP) server over stdio."""
+    from pitagora.mcp.server import run_mcp_server
+
+    run_mcp_server()
 
 
 @app.command("dashboard")

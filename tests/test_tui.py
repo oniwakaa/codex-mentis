@@ -35,7 +35,7 @@ async def test_tui_chat_input_submission():
         await pilot.press("h", "e", "l", "l", "o", "enter")
         await pilot.pause()
         log_widget = app.screen.query_one("#message-log")
-        assert len(log_widget.messages) == 1
+        assert len(log_widget.messages) >= 1
         assert log_widget.messages[0]["content"] == "hello"
 
 

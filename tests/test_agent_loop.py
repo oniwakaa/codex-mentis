@@ -256,3 +256,49 @@ async def test_agent_loop_result_metadata(mock_provider):
     assert res.session_id.startswith("session_")
     assert res.total_tokens == 40
     assert res.total_cost_usd == pytest.approx(0.005)
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_with_tool_registry(mock_provider):
+    from pitagora.agents.tools.registry import ToolRegistry, ToolSpec
+
+    registry = ToolRegistry()
+
+    async def double(n: int) -> dict:
+        return {"result": n * 2}
+
+    registry.register(
+        ToolSpec(
+            name="double",
+            description="Double a number",
+            input_schema={"type": "object", "properties": {"n": {"type": "integer"}}},
+            required_permission="read",
+            category="math",
+            handler=double,
+        )
+    )
+
+    mock_provider.responses.extend(
+        [
+            {
+                "content": "Using double tool",
+                "tool_calls": [{"name": "double", "arguments": {"n": 21}}],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+            },
+            {
+                "content": "The answer is 42.",
+                "tool_calls": [],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+            },
+        ]
+    )
+
+    loop = AgentLoop(
+        provider=mock_provider, tools=registry, config=LoopConfig(thinking_enabled=False)
+    )
+    res = await loop.run("What is 21 * 2?")
+
+    assert res.response == "The answer is 42."
+    assert res.stop_reason == "completed"
+    assert len(res.tool_calls) == 1
+    assert res.tool_calls[0]["call"]["name"] == "double"

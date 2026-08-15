@@ -98,6 +98,9 @@ class AgentLoop:
         if self.tool_executor:
             return await self.tool_executor(tool_call)
 
+        if hasattr(self.tools, "execute"):
+            return await self.tools.execute(name, args)
+
         for spec in self.tools:
             spec_name = spec.get("name") if isinstance(spec, dict) else getattr(spec, "name", "")
             if spec_name == name:
@@ -120,14 +123,19 @@ class AgentLoop:
         for tc in tool_calls:
             name = tc.get("name", "")
             perm = "read"
-            for spec in self.tools:
-                spec_name = getattr(spec, "name", "") or (
-                    spec.get("name") if isinstance(spec, dict) else ""
-                )
-                if spec_name == name:
+            if hasattr(self.tools, "_tools"):
+                spec = self.tools._tools.get(name)
+                if spec:
                     perm = getattr(spec, "required_permission", "read")
-                    if isinstance(spec, dict):
-                        perm = spec.get("required_permission", "read")
+            else:
+                for spec in self.tools:
+                    spec_name = getattr(spec, "name", "") or (
+                        spec.get("name") if isinstance(spec, dict) else ""
+                    )
+                    if spec_name == name:
+                        perm = getattr(spec, "required_permission", "read")
+                        if isinstance(spec, dict):
+                            perm = spec.get("required_permission", "read")
 
             if perm == "read":
                 reads.append(tc)
@@ -191,8 +199,10 @@ class AgentLoop:
 
             # Phase 2: Action (LLM call with tools)
             self._state = LoopState.ACTION
-            tool_schemas = (
-                [
+            if hasattr(self.tools, "get_schemas"):
+                tool_schemas = self.tools.get_schemas("admin")
+            elif self.tools:
+                tool_schemas = [
                     {
                         "name": getattr(
                             t, "name", t.get("name", "") if isinstance(t, dict) else ""
@@ -210,9 +220,8 @@ class AgentLoop:
                     }
                     for t in self.tools
                 ]
-                if self.tools
-                else None
-            )
+            else:
+                tool_schemas = None
 
             action_res = await self.provider.acomplete(self._messages, tools=tool_schemas)
             usage = action_res.get("usage", {})

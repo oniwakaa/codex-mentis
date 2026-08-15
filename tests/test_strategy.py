@@ -20,6 +20,12 @@ def test_strategy_help_lists_subcommands():
     assert result.exit_code == 0
     assert "report" in result.output
     assert "digest" in result.output
+    assert "rollback" in result.output
+
+
+def test_strategy_rollback_cli():
+    result = runner.invoke(app, ["strategy", "rollback", "--strategy", "socratic"])
+    assert result.exit_code == 0
 
 
 def test_strategy_report_empty():

@@ -114,3 +114,19 @@ def digest():
         lines.append("[bold yellow]Focus areas[/bold yellow]")
         lines.append("  " + ", ".join(d["focus"]))
     print_panel("\n".join(lines), title="Weekly Digest", style="cyan")
+
+
+@app.command("rollback")
+def rollback_cmd(
+    strategy: str = typer.Option("socratic", "--strategy", "-s", help="Strategy to rollback"),
+    version: int | None = typer.Option(
+        None, "--version", "-v", help="Target prompt revision version"
+    ),
+):
+    """Roll back strategy prompt template to a previous version."""
+    improver = _improver()
+    res = improver.rollback_prompt(strategy, target_version=version)
+    if "error" in res:
+        typer.echo(f"Error: {res['error']}")
+    else:
+        typer.echo(f"Successfully rolled back strategy '{strategy}' to version {res['version']}.")

@@ -1,39 +1,52 @@
 /* Pitagora Textual TUI Stylesheet */
 
 Screen {
-    layout: grid;
-    grid-size: 3 1;
-    grid-columns: 24 1fr 28;
+    layout: vertical;
     background: $surface;
     color: $text;
 }
 
+#workspace {
+    height: 1fr;
+    layout: horizontal;
+}
+
 #sidebar {
+    width: 28;
     background: $surface-darken-1;
-    border-right: heavy $primary-muted;
+    border-right: heavy $primary;
     padding: 1;
 }
 
 #main-panel {
+    width: 1fr;
+    height: 1fr;
     background: $surface;
     padding: 1;
     layout: vertical;
 }
 
 #inspector {
+    width: 32;
     background: $surface-darken-1;
-    border-left: heavy $primary-muted;
+    border-left: heavy $primary;
     padding: 1;
 }
 
-AgentStatusWidget {
+Input#chat-input {
+    margin-top: 1;
     height: 3;
+    border: solid $accent;
+}
+
+AgentStatusWidget {
+    height: 5;
     border: solid $accent;
     content-align: center middle;
 }
 
 TokenMeterWidget {
-    height: 1;
+    height: 3;
     margin: 1 0;
 }
 

@@ -26,3 +26,14 @@ async def test_tui_app_actions():
         app.action_cycle_panels()
         app.action_cancel_op()
         app.action_clear_screen()
+
+
+@pytest.mark.asyncio
+async def test_tui_chat_input_submission():
+    app = PitagoraApp()
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.press("h", "e", "l", "l", "o", "enter")
+        await pilot.pause()
+        log_widget = app.screen.query_one("#message-log")
+        assert len(log_widget.messages) == 1
+        assert log_widget.messages[0]["content"] == "hello"

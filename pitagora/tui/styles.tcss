@@ -105,40 +105,37 @@ CommandPaletteWidget {
     layout: vertical;
 }
 
-InteractivePlotWidget {
-    height: 1fr;
+InlinePlotCard, InteractivePlotWidget {
+    height: 22;
+    width: 100%;
+    margin: 1 0;
     background: #1e1e2e;
     border: round #7aa2f7;
     padding: 0 1;
     layout: vertical;
 }
 
-#inspector InteractivePlotWidget {
-    height: 24;
-    display: none;
-    margin: 1 0;
-}
-
-#inspector InteractivePlotWidget.plot-active {
-    display: block;
-}
-
-#plot-workspace InteractivePlotWidget {
+#plot-workspace InteractivePlotWidget, #plot-workspace InlinePlotCard {
     display: block;
     height: 1fr;
 }
 
-#plot-header {
+#plot-card-header, #plot-header {
     height: 1;
     margin-bottom: 0;
 }
 
-#plot-canvas {
-    height: 1fr;
+#plot-card-formula {
+    height: 1;
+    margin-bottom: 0;
+}
+
+#plot-card-canvas, #plot-canvas {
+    height: 14;
     background: #181825;
 }
 
-#plot-toolbar {
+#plot-card-toolbar, #plot-toolbar {
     height: 3;
     align: center middle;
     background: #11111b;
@@ -146,21 +143,21 @@ InteractivePlotWidget {
     padding: 0 1;
 }
 
-#plot-toolbar Button {
+#plot-card-toolbar Button, #plot-toolbar Button {
     margin: 0 1;
-    min-width: 10;
+    min-width: 8;
     height: 1;
     border: none;
     background: #313244;
     color: #cdd6f4;
 }
 
-#plot-toolbar Button:hover {
-    background: #89b4fa;
+#plot-card-toolbar Button:hover, #plot-toolbar Button:hover {
+    background: #7aa2f7;
     color: #11111b;
 }
 
-#plot-toolbar Button.-active {
+#plot-card-toolbar Button.-active, #plot-toolbar Button.-active {
     background: #a6e3a1;
     color: #11111b;
 }

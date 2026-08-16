@@ -1,4 +1,9 @@
-"""Interactive textual-plotext plotting widget for Pitagora TUI."""
+"""InlinePlotCard and InteractivePlotWidget for Pitagora TUI.
+
+Provides first-class interactive math and physics plotting widget embedded directly
+into chat messages with dedicated layout boundaries, HD Braille rendering, and client-side
+interactive parameter buttons.
+"""
 
 from __future__ import annotations
 
@@ -12,8 +17,9 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Button, Label, Static
+from textual.widgets import Button, Static
 
+from pitagora.latex_render import latex_to_unicode
 from pitagora.tui.events import DisplayPlot
 
 try:
@@ -24,38 +30,44 @@ except ImportError:
     PlotextPlot = None
 
 
-class InteractivePlotWidget(Widget):
-    """Interactive math and physics plotting widget with HD Braille rendering."""
+class InlinePlotCard(Widget):
+    """First-class chat card widget embedding an interactive PlotextPlot and control toolbar."""
 
     DEFAULT_CSS = """
-    InteractivePlotWidget {
-        height: 24;
+    InlinePlotCard {
+        height: 22;
+        width: 100%;
         margin: 1 0;
         background: #1e1e2e;
         border: round #7aa2f7;
         padding: 0 1;
         layout: vertical;
     }
-    
-    #plot-header {
+
+    #plot-card-header {
         height: 1;
         margin-bottom: 0;
     }
-    
-    #plot-canvas {
-        height: 18;
+
+    #plot-card-formula {
+        height: 1;
+        margin-bottom: 0;
+    }
+
+    #plot-card-canvas {
+        height: 14;
         background: #181825;
     }
-    
-    #plot-toolbar {
+
+    #plot-card-toolbar {
         height: 3;
         align: center middle;
         background: #11111b;
         margin-top: 0;
         padding: 0 1;
     }
-    
-    #plot-toolbar Button {
+
+    #plot-card-toolbar Button {
         margin: 0 1;
         min-width: 8;
         height: 1;
@@ -63,41 +75,30 @@ class InteractivePlotWidget(Widget):
         background: #313244;
         color: #cdd6f4;
     }
-    
-    #plot-toolbar Button:hover {
+
+    #plot-card-toolbar Button:hover {
         background: #7aa2f7;
         color: #11111b;
     }
-    
-    #plot-toolbar Button.-active {
-        background: #7dcfff;
+
+    #plot-card-toolbar Button.-active {
+        background: #a6e3a1;
         color: #11111b;
     }
     """
 
-    BINDINGS = [
-        Binding("+", "zoom_in", "Zoom In", show=False),
-        Binding("-", "zoom_out", "Zoom Out", show=False),
-        Binding("0", "set_state_0", "n=0", show=False),
-        Binding("1", "set_state_1", "n=1", show=False),
-        Binding("2", "set_state_2", "n=2", show=False),
-        Binding("3", "set_state_3", "n=3", show=False),
-        Binding("p", "toggle_potential", "Toggle Potential", show=False),
-    ]
-
     plot_type: reactive[str] = reactive("quantum_ho")
     quantum_n: reactive[int] = reactive(0)
+    loss_variant: reactive[str] = reactive("mse")
     x_min: reactive[float] = reactive(-5.0)
     x_max: reactive[float] = reactive(5.0)
     show_potential: reactive[bool] = reactive(True)
     custom_expr: reactive[str] = reactive("")
     plot_title: reactive[str] = reactive("Wavefunction & Probability Density")
+    math_formula: reactive[str] = reactive("")
     x_label: reactive[str] = reactive("x")
     y_label: reactive[str] = reactive("y")
     series_data: reactive[list] = reactive(list)
-
-    # Theme palette aligned with Pitagora dark / Tokyo Night / Catppuccin
-    THEME_COLORS = ["#7dcfff", "#bb9af7", "#7aa2f7", "#9ece6a", "#e0af68", "#f7768e"]
 
     def __init__(
         self,
@@ -109,6 +110,7 @@ class InteractivePlotWidget(Widget):
         series: list[dict] | None = None,
         x_label: str = "x",
         y_label: str = "y",
+        math_formula: str = "",
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
@@ -119,65 +121,75 @@ class InteractivePlotWidget(Widget):
         self.plot_title = title
         self.x_label = x_label
         self.y_label = y_label
+        self.math_formula = math_formula
         self.series_data = series or []
 
     def compose(self) -> ComposeResult:
-        yield Static(Text(f"📊 {self.plot_title}", style="bold #7aa2f7"), id="plot-header")
+        rendered_title = latex_to_unicode(self.plot_title)
+        yield Static(Text(f"📊 {rendered_title}", style="bold #7aa2f7"), id="plot-card-header")
+
+        if self.math_formula:
+            rendered_math = latex_to_unicode(self.math_formula)
+            yield Static(Text(f"📐 Formula: {rendered_math}", style="italic #bb9af7"), id="plot-card-formula")
+
         if HAS_PLOTEXT and PlotextPlot is not None:
-            yield PlotextPlot(id="plot-canvas")
-            with Horizontal(id="plot-toolbar"):
-                yield Button("n=0", id="btn-n0", classes="-active" if self.quantum_n == 0 else "")
-                yield Button("n=1", id="btn-n1", classes="-active" if self.quantum_n == 1 else "")
-                yield Button("n=2", id="btn-n2", classes="-active" if self.quantum_n == 2 else "")
-                yield Button("n=3", id="btn-n3", classes="-active" if self.quantum_n == 3 else "")
-                yield Button("V(x)", id="btn-toggle-v")
+            yield PlotextPlot(id="plot-card-canvas")
+            with Horizontal(id="plot-card-toolbar"):
+                # Check whether quantum, loss, or generic controls fit
+                p_lower = self.plot_type.lower()
+                if "loss" in p_lower or "cost" in p_lower:
+                    yield Button("MSE", id="btn-mse", classes="-active" if self.loss_variant == "mse" else "")
+                    yield Button("MAE", id="btn-mae", classes="-active" if self.loss_variant == "mae" else "")
+                    yield Button("Huber", id="btn-huber", classes="-active" if self.loss_variant == "huber" else "")
+                else:
+                    yield Button("n=0", id="btn-n0", classes="-active" if self.quantum_n == 0 else "")
+                    yield Button("n=1", id="btn-n1", classes="-active" if self.quantum_n == 1 else "")
+                    yield Button("n=2", id="btn-n2", classes="-active" if self.quantum_n == 2 else "")
+                    yield Button("n=3", id="btn-n3", classes="-active" if self.quantum_n == 3 else "")
+                    yield Button("V(x)", id="btn-toggle-v")
                 yield Button("Zoom +", id="btn-zoom-in")
                 yield Button("Zoom -", id="btn-zoom-out")
                 yield Button("Reset", id="btn-reset")
         else:
             yield Static(
                 "PlotextPlot unavailable. Install with `pip install textual-plotext` or `pip install pitagora[tui]`.",
-                id="plot-canvas",
+                id="plot-card-canvas",
             )
 
     def on_mount(self) -> None:
         if HAS_PLOTEXT:
             self.render_plot()
 
-    def on_display_plot(self, event: DisplayPlot) -> None:
-        """Handle DisplayPlot event dispatched by LLM tool or sub-agent."""
-        self.plot_title = event.title
-        self.plot_type = event.plot_type
-        self.x_label = event.x_label
-        self.y_label = event.y_label
-        self.series_data = event.series
-        if hasattr(event, "quantum_n") and event.quantum_n is not None:
-            self.quantum_n = event.quantum_n
-        if hasattr(event, "domain") and event.domain and len(event.domain) == 2:
-            self.x_min, self.x_max = float(event.domain[0]), float(event.domain[1])
-        if event.math_formula:
-            self.custom_expr = event.math_formula
-        try:
-            header = self.query_one("#plot-header", Static)
-            header.update(Text(f"📊 {self.plot_title}", style="bold #7aa2f7"))
-        except Exception:
-            pass
-        self._update_button_states()
-        self.render_plot()
-
     def _update_button_states(self) -> None:
         """Update active button styling to reflect current state."""
         try:
             for n_idx in range(4):
-                btn = self.query_one(f"#btn-n{n_idx}", Button)
-                if n_idx == self.quantum_n:
-                    btn.add_class("-active")
-                else:
-                    btn.remove_class("-active")
+                try:
+                    btn = self.query_one(f"#btn-n{n_idx}", Button)
+                    if n_idx == self.quantum_n:
+                        btn.add_class("-active")
+                    else:
+                        btn.remove_class("-active")
+                except Exception:
+                    pass
+
+            for loss_id in ("mse", "mae", "huber"):
+                try:
+                    btn = self.query_one(f"#btn-{loss_id}", Button)
+                    if self.loss_variant == loss_id:
+                        btn.add_class("-active")
+                    else:
+                        btn.remove_class("-active")
+                except Exception:
+                    pass
         except Exception:
             pass
 
     def watch_quantum_n(self, old_val: int, new_val: int) -> None:
+        self._update_button_states()
+        self.render_plot()
+
+    def watch_loss_variant(self, old_val: str, new_val: str) -> None:
         self._update_button_states()
         self.render_plot()
 
@@ -200,6 +212,12 @@ class InteractivePlotWidget(Widget):
             self.quantum_n = 2
         elif button_id == "btn-n3":
             self.quantum_n = 3
+        elif button_id == "btn-mse":
+            self.loss_variant = "mse"
+        elif button_id == "btn-mae":
+            self.loss_variant = "mae"
+        elif button_id == "btn-huber":
+            self.loss_variant = "huber"
         elif button_id == "btn-toggle-v":
             self.action_toggle_potential()
         elif button_id == "btn-zoom-in":
@@ -207,8 +225,7 @@ class InteractivePlotWidget(Widget):
         elif button_id == "btn-zoom-out":
             self.action_zoom_out()
         elif button_id == "btn-reset":
-            self.x_min = -5.0
-            self.x_max = 5.0
+            self.action_reset()
 
     def action_zoom_in(self) -> None:
         span = (self.x_max - self.x_min) * 0.2
@@ -239,6 +256,10 @@ class InteractivePlotWidget(Widget):
     def action_toggle_potential(self) -> None:
         self.show_potential = not self.show_potential
 
+    def action_reset(self) -> None:
+        self.x_min = -5.0
+        self.x_max = 5.0
+
     def _compute_quantum_ho_wavefunction(self, x: np.ndarray, n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute Harmonic Oscillator wavefunction psi_n(x), density |psi_n(x)|^2, and potential V(x)."""
         if n == 0:
@@ -262,13 +283,11 @@ class InteractivePlotWidget(Widget):
         return psi, density, V
 
     def render_plot(self) -> None:
-        """Render high-resolution Braille plot onto the Plotext canvas."""
+        """Render high-resolution Braille plot onto the embedded Plotext canvas."""
         try:
             plot_canvas = self.query_one(PlotextPlot)
         except Exception:
             return
-
-        from pitagora.latex_render import latex_to_unicode
 
         plt = plot_canvas.plt
         plt.clf()
@@ -300,7 +319,26 @@ class InteractivePlotWidget(Widget):
         # 2. Preset or mathematical function plotting
         x_vals = np.linspace(self.x_min, self.x_max, 140)
 
-        if self.plot_type == "quantum_ho" or self.plot_type.startswith("quantum"):
+        if "loss" in self.plot_type.lower() or "cost" in self.plot_type.lower():
+            # Loss function curves
+            err = x_vals
+            if self.loss_variant == "mae":
+                loss = np.abs(err)
+                name = r"L_{MAE}(e) = |e|"
+            elif self.loss_variant == "huber":
+                delta = 1.0
+                loss = np.where(np.abs(err) <= delta, 0.5 * err**2, delta * (np.abs(err) - 0.5 * delta))
+                name = r"L_{Huber}(e, \delta=1)"
+            else:
+                loss = 0.5 * err**2
+                name = r"L_{MSE}(e) = \frac{1}{2} e^2"
+
+            plt.title(f"Loss Function: {self.loss_variant.upper()}")
+            plt.plot(err.tolist(), loss.tolist(), label=latex_to_unicode(name), color="cyan", marker="braille")
+            plt.xlabel("Error e = y - ŷ")
+            plt.ylabel("Loss L(e)")
+
+        elif self.plot_type == "quantum_ho" or self.plot_type.startswith("quantum"):
             n = self.quantum_n
             psi, density, V = self._compute_quantum_ho_wavefunction(x_vals, n)
             energy = n + 0.5
@@ -350,3 +388,8 @@ class InteractivePlotWidget(Widget):
             plt.ylabel("Amplitude")
 
         plot_canvas.refresh()
+
+
+class InteractivePlotWidget(InlinePlotCard):
+    """Backward-compatible alias for InlinePlotCard."""
+    pass

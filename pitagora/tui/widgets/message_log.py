@@ -175,7 +175,7 @@ class MessageLogWidget(Static):
             )
 
             # Build HD braille plot representation
-            plot_text = ""
+            plot_renderable: RenderableType
             try:
                 import plotext as plt
 
@@ -204,16 +204,17 @@ class MessageLogWidget(Static):
                     else:
                         plt.plot(x, y, label=name, color=color, marker="braille")
 
-                plot_text = plt.build()
+                plot_ansi = plt.build()
+                plot_renderable = Text.from_ansi(plot_ansi)
             except Exception as e:
-                plot_text = f"[Visual plot rendering error: {e}]"
+                plot_renderable = Text(f"[Visual plot rendering error: {e}]", style="#f38ba8")
 
             math_formula = plot_data.get("math_formula", "")
             panel_content: list[RenderableType] = []
             if math_formula:
                 formula_rendered = latex_to_unicode(math_formula)
                 panel_content.append(Text(f"📐 Formula: {formula_rendered}\n", style="italic #bb9af7"))
-            panel_content.append(Text(plot_text, style="#cdd6f4"))
+            panel_content.append(plot_renderable)
 
             return Panel(
                 Group(*panel_content),

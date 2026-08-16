@@ -29,7 +29,7 @@ Screen {
 }
 
 #inspector {
-    width: 34;
+    width: 44;
     background: #11111b;
     border-left: round #45475a;
     padding: 0 1;
@@ -108,9 +108,24 @@ CommandPaletteWidget {
 InteractivePlotWidget {
     height: 1fr;
     background: #1e1e2e;
-    border: round #89b4fa;
+    border: round #7aa2f7;
     padding: 0 1;
     layout: vertical;
+}
+
+#inspector InteractivePlotWidget {
+    height: 24;
+    display: none;
+    margin: 1 0;
+}
+
+#inspector InteractivePlotWidget.plot-active {
+    display: block;
+}
+
+#plot-workspace InteractivePlotWidget {
+    display: block;
+    height: 1fr;
 }
 
 #plot-header {

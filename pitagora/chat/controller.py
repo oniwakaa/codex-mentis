@@ -72,21 +72,54 @@ class ChatController(ChatSessionState):
         self.messages.append({"role": "user", "content": enriched})
         yield ChatEvent("status", "Thinking...", {"busy": True})
         try:
-            response = self.completion(
-                self.messages,
-                model=self.model,
-                config=self.config,
-            )
+            from pitagora.agents.tools import ALL_AGENT_TOOLS
+
+            try:
+                raw_response = self.completion(
+                    self.messages,
+                    model=self.model,
+                    config=self.config,
+                    tools=ALL_AGENT_TOOLS,
+                )
+            except TypeError:
+                raw_response = self.completion(
+                    self.messages,
+                    model=self.model,
+                    config=self.config,
+                )
         except Exception:
             self.messages.pop()
             raise
-        self.messages.append({"role": "assistant", "content": response})
-        yield ChatEvent("markdown", response)
-        verification = self.verify_math(response)
+
+        response_text = ""
+        tool_calls = []
+        if isinstance(raw_response, dict):
+            response_text = raw_response.get("content", "")
+            tool_calls = raw_response.get("tool_calls", [])
+        else:
+            response_text = str(raw_response)
+
+        # Handle structured tool calls if emitted
+        for tc in tool_calls:
+            func = tc.get("function", {}) if "function" in tc else tc
+            name = func.get("name", "")
+            args = func.get("arguments", {})
+            if isinstance(args, str):
+                import json
+                try:
+                    args = json.loads(args)
+                except Exception:
+                    args = {}
+            if name == "render_terminal_plot" and isinstance(args, dict):
+                yield ChatEvent("plot", args)
+
+        self.messages.append({"role": "assistant", "content": response_text})
+        yield ChatEvent("markdown", response_text)
+        verification = self.verify_math(response_text)
         if verification:
             yield ChatEvent("status", verification, {"verification": True})
         self.save_memory("user", user_input, topic=self.topic)
-        self.save_memory("assistant", response, topic=self.topic)
+        self.save_memory("assistant", response_text, topic=self.topic)
         self.record_study(self.topic, user_input)
         self.message_count += 1
         self.last_freeform = {"topic": self.topic, "strategy": "socratic"}
@@ -329,17 +362,49 @@ class ChatController(ChatSessionState):
         self.messages.append({"role": "user", "content": prompt})
         yield ChatEvent("status", "Teaching...", {"busy": True})
         try:
-            response = self.completion(
-                self.messages,
-                model=self.model,
-                config=self.config,
-            )
+            from pitagora.agents.tools import ALL_AGENT_TOOLS
+
+            try:
+                raw_response = self.completion(
+                    self.messages,
+                    model=self.model,
+                    config=self.config,
+                    tools=ALL_AGENT_TOOLS,
+                )
+            except TypeError:
+                raw_response = self.completion(
+                    self.messages,
+                    model=self.model,
+                    config=self.config,
+                )
         except Exception:
             self.messages.pop()
             raise
-        self.messages.append({"role": "assistant", "content": response})
 
-        yield ChatEvent("markdown", response)
+        response_text = ""
+        tool_calls = []
+        if isinstance(raw_response, dict):
+            response_text = raw_response.get("content", "")
+            tool_calls = raw_response.get("tool_calls", [])
+        else:
+            response_text = str(raw_response)
+
+        for tc in tool_calls:
+            func = tc.get("function", {}) if "function" in tc else tc
+            name = func.get("name", "")
+            args = func.get("arguments", {})
+            if isinstance(args, str):
+                import json
+                try:
+                    args = json.loads(args)
+                except Exception:
+                    args = {}
+            if name == "render_terminal_plot" and isinstance(args, dict):
+                yield ChatEvent("plot", args)
+
+        self.messages.append({"role": "assistant", "content": response_text})
+
+        yield ChatEvent("markdown", response_text)
         yield ChatEvent("comprehension", session.comprehension_score)
         yield ChatEvent(
             "subconcepts",

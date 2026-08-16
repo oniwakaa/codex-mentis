@@ -99,16 +99,11 @@ async def test_tui_widgets_render():
 
 @pytest.mark.asyncio
 async def test_tui_plot_widget():
-    from pitagora.tui.screens.plot_screen import PlotScreen
     from pitagora.tui.widgets.interactive_plot import InteractivePlotWidget
 
-    plot_screen = PlotScreen(plot_type="quantum_ho", quantum_n=1)
     app = PitagoraApp()
-    app.SCREENS["plot_custom"] = lambda: plot_screen
     async with app.run_test(size=(120, 40)):
-        app.switch_screen("plot")
-        await app.screen.recompose()
-        widget = app.screen.query_one(InteractivePlotWidget)
+        widget = app.screen.query_one("#interactive-plot", InteractivePlotWidget)
         assert widget is not None
         assert widget.quantum_n == 0
         widget.action_set_state_2()
@@ -116,5 +111,119 @@ async def test_tui_plot_widget():
         widget.action_zoom_in()
         widget.action_zoom_out()
         widget.action_toggle_potential()
+
+
+@pytest.mark.asyncio
+async def test_tui_display_plot_message():
+    from pitagora.tui.events import DisplayPlot
+    from pitagora.tui.widgets.interactive_plot import InteractivePlotWidget
+
+    app = PitagoraApp()
+    async with app.run_test(size=(120, 40)):
+        widget = app.screen.query_one("#interactive-plot", InteractivePlotWidget)
+        msg = DisplayPlot(
+            title="Test Wavefunction",
+            plot_type="line",
+            series=[{"name": "psi", "x": [0, 1, 2], "y": [0, 1, 0]}],
+            x_label="x (nm)",
+            y_label="|psi|^2",
+            math_formula="y = sin(pi*x)",
+        )
+        widget.on_display_plot(msg)
+        assert widget.plot_title == "Test Wavefunction"
+        assert len(widget.series_data) == 1
+        assert widget.x_label == "x (nm)"
+        assert widget.y_label == "|psi|^2"
+
+
+@pytest.mark.asyncio
+async def test_plot_architect_agent_and_payload():
+    from pitagora.agents.plot_architect import PlotArchitectAgent
+    from pitagora.agents.providers.base import BaseProvider, ProviderConfig
+
+    class _MockProv(BaseProvider):
+        def __init__(self):
+            super().__init__(ProviderConfig(api_key="k", model="m"))
+        def complete(self, messages, **kwargs):
+            return {"content": "ok", "tool_calls": []}
+        async def acomplete(self, messages, **kwargs):
+            return {"content": "ok", "tool_calls": []}
+        def stream(self, messages):
+            yield ""
+        async def astream(self, messages):
+            yield ""
+        def embed(self, texts):
+            return [[0.0] for _ in texts]
+        async def aembed(self, texts):
+            return [[0.0] for _ in texts]
+
+    agent = PlotArchitectAgent(_MockProv())
+    assert agent.should_visualize("Explain the quantum harmonic oscillator wavefunction") is True
+    assert agent.should_visualize("Compute dispersion relation in graphene") is True
+    assert agent.should_visualize("Definition of integer arithmetic") is False
+
+    payload = agent.generate_plot_payload("quantum harmonic oscillator", quantum_n=2)
+    assert payload["plot_type"] == "line"
+    assert "series" in payload
+    assert len(payload["series"]) >= 2
+    assert "math_formula" in payload
+    assert payload["quantum_n"] == 2
+
+
+@pytest.mark.asyncio
+async def test_dynamic_plot_reveal_on_chat_screen():
+    from pitagora.tui.widgets.interactive_plot import InteractivePlotWidget
+
+    app = PitagoraApp()
+    async with app.run_test(size=(120, 40)):
+        widget = app.screen.query_one("#interactive-plot", InteractivePlotWidget)
+        assert "plot-active" not in widget.classes
+
+        from pitagora.tui.events import DisplayPlot
+
+        widget.add_class("plot-active")
+        widget.styles.display = "block"
+        msg = DisplayPlot(
+            title="Dynamic Reveal Plot",
+            plot_type="line",
+            series=[{"name": "test", "x": [0, 1], "y": [0, 1]}],
+            x_label="x",
+            y_label="y",
+            quantum_n=1,
+        )
+        widget.on_display_plot(msg)
+        assert "plot-active" in widget.classes
+        assert widget.quantum_n == 1
+
+
+@pytest.mark.asyncio
+async def test_message_log_plot_card_renders_latex_legend():
+    from pitagora.tui.widgets.message_log import MessageLogWidget
+
+    app = PitagoraApp()
+    async with app.run_test(size=(120, 40)):
+        msg_log = app.screen.query_one("#message-log", MessageLogWidget)
+        msg_log.messages = [
+            {
+                "role": "plot",
+                "content": r"Quantum State \psi_1",
+                "metadata": {
+                    "plot_data": {
+                        "title": r"Quantum State \psi_1",
+                        "plot_type": "line",
+                        "x_label": r"Position x (\mu m)",
+                        "y_label": r"|\psi(x)|^2",
+                        "math_formula": r"\psi(x) = \sqrt{2/L} \sin(\pi x / L)",
+                        "series": [
+                            {"name": r"|\psi_1(x)|^2 (Density)", "x": [0.0, 1.0, 2.0], "y": [0.0, 1.0, 0.0]},
+                            {"name": r"\psi_1(x) (Wave)", "x": [0.0, 1.0, 2.0], "y": [0.0, 1.0, 0.0]},
+                        ],
+                    }
+                },
+            }
+        ]
+        renderable = msg_log.render()
+        assert renderable is not None
+
 
 

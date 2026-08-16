@@ -8,7 +8,7 @@ cover the free-form study turn path and the controller's neutral contract.
 from pitagora.chat_controller import ChatController, ChatEvent
 
 
-def make_controller(completion=lambda messages, model=None, config=None: "answer", **overrides):
+def make_controller(completion=lambda messages, model=None, config=None, **kwargs: "answer", **overrides):
     defaults = dict(
         mode="study",
         topic="limits",
@@ -317,4 +317,44 @@ def test_get_memory_context_integration(tmp_path, monkeypatch):
     monkeypatch.setattr("pitagora.memory.store.MemoryStore", lambda *a, **kw: store)
     ctx = _get_memory_context("quantum superposition", topic="quantum")
     assert "quantum superposition" in ctx.lower() or "qubits" in ctx.lower()
+
+
+def test_tool_call_render_terminal_plot_emits_plot_event():
+    def mock_completion(messages, model=None, config=None, tools=None):
+        return {
+            "content": "Here is the quantum harmonic oscillator ground state.",
+            "tool_calls": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "render_terminal_plot",
+                        "arguments": {
+                            "title": "Quantum Harmonic Oscillator: n=0",
+                            "plot_type": "line",
+                            "x_label": "Position x",
+                            "y_label": "|ψ₀(x)|²",
+                            "series": [
+                                {
+                                    "name": "|ψ₀(x)|²",
+                                    "x": [-2.0, 0.0, 2.0],
+                                    "y": [0.05, 0.56, 0.05],
+                                }
+                            ],
+                            "math_formula": "ψ₀(x) = (mω/πħ)^{1/4} e^{-mω x²/2ħ}",
+                        },
+                    },
+                }
+            ],
+        }
+
+    controller = make_controller(completion=mock_completion)
+    events = list(controller.handle_input("Plot harmonic oscillator"))
+
+    event_kinds = [e.kind for e in events]
+    assert "plot" in event_kinds
+    plot_event = next(e for e in events if e.kind == "plot")
+    assert plot_event.content["title"] == "Quantum Harmonic Oscillator: n=0"
+    assert plot_event.content["plot_type"] == "line"
+    assert len(plot_event.content["series"]) == 1
+
 

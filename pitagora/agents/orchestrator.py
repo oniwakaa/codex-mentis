@@ -105,8 +105,10 @@ class Orchestrator:
             return {"route_type": "agent", "name": "prover"}
         if "verify" in input_lower or "review" in input_lower or "critique" in input_lower:
             return {"route_type": "agent", "name": "reviewer"}
+        if "plot_architect" in input_lower or "spatial" in input_lower or "wavefunction" in input_lower or "potential well" in input_lower or "dispersion" in input_lower:
+            return {"route_type": "agent", "name": "plot_architect"}
         if "plot" in input_lower or "graph" in input_lower or "visualize" in input_lower:
-            return {"route_type": "agent", "name": "visualizer"}
+            return {"route_type": "agent", "name": "plot_architect" if "plot_architect" in self.agents else "visualizer"}
         if "research" in input_lower or "search" in input_lower or "web" in input_lower:
             return {"route_type": "agent", "name": "researcher"}
         if "self_improve" in input_lower or "optimize prompt" in input_lower:
@@ -234,9 +236,12 @@ class Orchestrator:
         elif mode_clean in ("verify", "review", "reviewer"):
             route_type = "agent"
             route_name = "reviewer"
+        elif mode_clean in ("plot_architect", "plot-architect", "architect"):
+            route_type = "agent"
+            route_name = "plot_architect"
         elif mode_clean in ("plot", "visualize", "visualizer"):
             route_type = "agent"
-            route_name = "visualizer"
+            route_name = "plot_architect" if "plot_architect" in self.agents else "visualizer"
         elif mode_clean in ("explain", "explainer"):
             route_type = "agent"
             route_name = "explainer"
@@ -665,6 +670,7 @@ def orchestrate(query: str, mode: str, topic: str, context: str = "") -> str:
     """
     from pitagora.agents.data_analyst import DataAnalystAgent
     from pitagora.agents.explainer import ExplainerAgent
+    from pitagora.agents.plot_architect import PlotArchitectAgent
     from pitagora.agents.prover import ProverAgent
     from pitagora.agents.providers import ProviderConfig, get_provider
     from pitagora.agents.researcher import ResearchAgent
@@ -714,6 +720,7 @@ def orchestrate(query: str, mode: str, topic: str, context: str = "") -> str:
         "prover": ProverAgent(prov),
         "reviewer": ReviewerAgent(prov),
         "visualizer": VisualizerAgent(prov),
+        "plot_architect": PlotArchitectAgent(prov),
         "explainer": ExplainerAgent(prov),
         "self_improver": SelfImproverAgent(prov),
         "data_analyst": DataAnalystAgent(prov),

@@ -39,6 +39,7 @@ class ChatScreen(Screen):
                 yield CommandPaletteWidget(id="command-palette")
             with Vertical(id="inspector"):
                 yield AgentStatusWidget(id="agent-status")
+                yield InteractivePlotWidget(id="interactive-plot")
                 yield TokenMeterWidget(id="token-meter")
                 yield MemoryInspectorWidget(id="memory-inspector")
         yield Footer()
@@ -135,8 +136,41 @@ class ChatScreen(Screen):
             elif event.kind == "plot":
                 plot_data = event.content if isinstance(event.content, dict) else {}
                 title = plot_data.get("title", "Interactive Plot")
+                plot_type = plot_data.get("plot_type", "line")
+                series = plot_data.get("series", [])
+                x_label = plot_data.get("x_label", "x")
+                y_label = plot_data.get("y_label", "y")
+                math_formula = plot_data.get("math_formula", "")
+                quantum_n = plot_data.get("quantum_n", 0)
+                domain = plot_data.get("domain", [])
+
+                try:
+                    plot_widget = self.query_one("#interactive-plot", InteractivePlotWidget)
+                    plot_widget.add_class("plot-active")
+                    plot_widget.styles.display = "block"
+                    if quantum_n is not None:
+                        plot_widget.quantum_n = quantum_n
+                    plot_widget.post_message(
+                        DisplayPlot(
+                            title=title,
+                            plot_type=plot_type,
+                            series=series,
+                            x_label=x_label,
+                            y_label=y_label,
+                            math_formula=math_formula,
+                            quantum_n=quantum_n,
+                            domain=domain,
+                        )
+                    )
+                except Exception:
+                    pass
+
                 msg_log.messages = list(msg_log.messages) + [
-                    {"role": "assistant", "content": f"📊 Rendered interactive plot: **{title}**"}
+                    {
+                        "role": "plot",
+                        "content": title,
+                        "metadata": {"plot_data": plot_data},
+                    }
                 ]
                 status_widget.tool_status = "success"
 

@@ -56,7 +56,8 @@ def chat_completion(
     model: str | None = None,
     config: dict | None = None,
     stream: bool = False,
-) -> str:
+    tools: list | None = None,
+) -> Any:
     """Send a chat completion request and return the response."""
     if config is None:
         config = load_provider_config()
@@ -70,12 +71,14 @@ def chat_completion(
         "Content-Type": "application/json",
     }
 
-    payload = {
+    payload: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "max_tokens": 4096,
         "temperature": 0.7,
     }
+    if tools:
+        payload["tools"] = tools
 
     try:
         with httpx.Client(timeout=120.0) as client:
@@ -87,7 +90,11 @@ def chat_completion(
             response.raise_for_status()
             data = response.json()
 
-        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        choice_msg = data.get("choices", [{}])[0].get("message", {})
+        content = choice_msg.get("content") or ""
+        tool_calls = choice_msg.get("tool_calls", [])
+        if tool_calls:
+            return {"content": content, "tool_calls": tool_calls}
         return content
     except httpx.ConnectError:
         return "[Error: Cannot connect to API. Is CLIProxy running? Try `pitagora setup` to reconfigure.]"

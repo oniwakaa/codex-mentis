@@ -161,6 +161,68 @@ class MessageLogWidget(Static):
                 padding=(0, 1),
             )
 
+        elif role == "plot":
+            plot_data = metadata.get("plot_data", {})
+            title = plot_data.get("title", raw_content or "Interactive Visual Plot")
+            from pitagora.latex_render import latex_to_unicode
+            rendered_title = latex_to_unicode(title)
+
+            header = Text.assemble(
+                ("📊 ", "bold #7aa2f7"),
+                (f"PLOT: {rendered_title}", "bold #7aa2f7"),
+                ("  ", "dim"),
+                ("• visual model", "dim #6c7086"),
+            )
+
+            # Build HD braille plot representation
+            plot_text = ""
+            try:
+                import plotext as plt
+
+                plt.clf()
+                plt.theme("dark")
+                plt.grid(True, True)
+                plt.plotsize(72, 16)
+                plt.title(rendered_title)
+                plt.xlabel(latex_to_unicode(plot_data.get("x_label", "x")))
+                plt.ylabel(latex_to_unicode(plot_data.get("y_label", "y")))
+
+                series = plot_data.get("series", [])
+                colors = ["cyan", "magenta", "blue", "green", "yellow", "red"]
+                plot_type = str(plot_data.get("plot_type", "line")).lower()
+
+                for idx, s in enumerate(series):
+                    x = s.get("x", [])
+                    y = s.get("y", [])
+                    raw_name = s.get("name", f"Series {idx+1}")
+                    name = latex_to_unicode(raw_name)
+                    color = colors[idx % len(colors)]
+                    if plot_type == "scatter":
+                        plt.scatter(x, y, label=name, color=color, marker="braille")
+                    elif plot_type == "bar":
+                        plt.bar(x, y, label=name, color=color)
+                    else:
+                        plt.plot(x, y, label=name, color=color, marker="braille")
+
+                plot_text = plt.build()
+            except Exception as e:
+                plot_text = f"[Visual plot rendering error: {e}]"
+
+            math_formula = plot_data.get("math_formula", "")
+            panel_content: list[RenderableType] = []
+            if math_formula:
+                formula_rendered = latex_to_unicode(math_formula)
+                panel_content.append(Text(f"📐 Formula: {formula_rendered}\n", style="italic #bb9af7"))
+            panel_content.append(Text(plot_text, style="#cdd6f4"))
+
+            return Panel(
+                Group(*panel_content),
+                title=header,
+                title_align="left",
+                border_style="#7aa2f7",
+                padding=(0, 1),
+            )
+
         elif role == "reasoning":
             header = Text.assemble(
                 ("💭 ", "dim #f9e2af"),

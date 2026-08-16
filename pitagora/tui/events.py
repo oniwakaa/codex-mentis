@@ -54,3 +54,28 @@ class DiagnosticsUpdated(Message):
         self.velocity_tps = velocity_tps
         self.tool_status = tool_status
         self.last_verification = last_verification
+
+
+class DisplayPlot(Message):
+    """Fired when an agent or tool generates an interactive plot."""
+
+    def __init__(
+        self,
+        title: str,
+        plot_type: str = "line",
+        series: list[dict] | None = None,
+        x_label: str = "x",
+        y_label: str = "y",
+        math_formula: str = "",
+        quantum_n: int = 0,
+        domain: list[float] | None = None,
+    ) -> None:
+        super().__init__()
+        self.title = title
+        self.plot_type = plot_type
+        self.series = series or []
+        self.x_label = x_label
+        self.y_label = y_label
+        self.math_formula = math_formula
+        self.quantum_n = quantum_n
+        self.domain = domain or []

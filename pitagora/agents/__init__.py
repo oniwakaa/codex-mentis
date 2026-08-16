@@ -4,6 +4,7 @@ from pitagora.agents.data_analyst import AnalysisRequest, DataAnalystAgent
 from pitagora.agents.debate import DebateAgent, DebateSynthesis
 from pitagora.agents.explainer import ExplainerAgent
 from pitagora.agents.orchestrator import Orchestrator, OrchestratorResponse, orchestrate
+from pitagora.agents.plot_architect import PlotArchitectAgent
 from pitagora.agents.prover import ProverAgent
 from pitagora.agents.researcher import ResearchAgent
 from pitagora.agents.reviewer import ReviewerAgent

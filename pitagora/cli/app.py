@@ -175,6 +175,44 @@ def dashboard_cmd():
     concept.show_review_queue()
 
 
+@app.command("learn")
+@app.command("proactive")
+def learn_cmd():
+    """Run proactive diagnosis: identify knowledge gaps, due reviews, and launch next Socratic session."""
+    from rich.console import Console
+    from rich.table import Table
+    from pitagora.knowledge.proactive import ProactiveLearner
+
+    console = Console()
+    learner = ProactiveLearner()
+    diag = learner.diagnose()
+
+    console.print("\n[bold gold1]△ PITAGORA PROACTIVE LEARNER[/bold gold1]")
+    console.print(f"[bold]Mastered Concepts:[/bold] {diag.mastered_count} | [bold]In Progress:[/bold] {diag.in_progress_count}")
+
+    if diag.due_reviews:
+        console.print(f"\n[yellow]⚠️ Concepts Due for Review:[/yellow] {', '.join(diag.due_reviews)}")
+
+    if diag.zpd_candidates:
+        table = Table(title="Zone of Proximal Development (Ready to Learn)", show_header=True)
+        table.add_column("Concept", style="cyan")
+        table.add_column("Domain", style="magenta")
+        table.add_column("Mastery", style="green")
+        for c in diag.zpd_candidates[:4]:
+            table.add_row(c["name"], c.get("domain", "stem"), f"{c['mastery'] * 100:.0f}%")
+        console.print()
+        console.print(table)
+
+    console.print(f"\n[bold green]Recommended Next Concept:[/bold green] {diag.recommended_topic}")
+    console.print(f"[dim]{diag.recommended_reason}[/dim]\n")
+
+    if diag.recommended_topic:
+        console.print(f"[bold cyan]Starting proactive Socratic journey on '{diag.recommended_topic}'...[/bold cyan]\n")
+        from pitagora.chat import launch_chat
+        launch_chat(mode="EXPLORE", topic=diag.recommended_topic)
+
+
+
 @app.command("research")
 def research_cmd(
     topic: str = typer.Argument(..., help="Topic to research"),

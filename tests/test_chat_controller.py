@@ -358,3 +358,14 @@ def test_tool_call_render_terminal_plot_emits_plot_event():
     assert len(plot_event.content["series"]) == 1
 
 
+def test_cmd_learn_emits_markdown_diagnosis():
+    controller = make_controller()
+    events = list(controller.handle_input("/learn"))
+
+    event_kinds = [e.kind for e in events]
+    assert "markdown" in event_kinds or "error" in event_kinds
+    md_event = next(e for e in events if e.kind == "markdown")
+    assert "PROACTIVE" in md_event.content or "Mastered" in md_event.content
+
+
+

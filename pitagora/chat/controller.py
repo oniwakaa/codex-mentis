@@ -35,6 +35,8 @@ class ChatController(ChatSessionState):
         "/workflow": "_cmd_workflow",
         "/latex": "_cmd_latex",
         "/plot": "_cmd_plot",
+        "/learn": "_cmd_learn",
+        "/proactive": "_cmd_learn",
         "/rate": "_cmd_rate",
         "/help": "_cmd_help",
         "/clear": "_cmd_clear",
@@ -173,6 +175,9 @@ class ChatController(ChatSessionState):
 
     def _cmd_plot(self, argument: str) -> Iterator[ChatEvent]:
         yield from ChatRenderer.cmd_plot(argument)
+
+    def _cmd_learn(self, argument: str) -> Iterator[ChatEvent]:
+        yield from ChatRenderer.cmd_learn(self, argument)
 
     def _cmd_help(self, argument: str) -> Iterator[ChatEvent]:
         yield from ChatRenderer.cmd_help(argument)

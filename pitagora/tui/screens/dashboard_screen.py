@@ -53,7 +53,16 @@ class DashboardScreen(Screen):
                 )
             if not strong and not weak:
                 lines.append("  • Concepts will appear as you study and practice.")
+
+            from pitagora.knowledge.proactive import ProactiveLearner
+
+            learner = ProactiveLearner(mastery_tracker=tracker)
+            diag = learner.diagnose()
+            if diag.recommended_topic:
+                lines.append(f"\n[bold gold1]Proactive Next Recommendation:[/bold gold1]")
+                lines.append(f"  ⚡ [bold]{diag.recommended_topic}[/bold] — {diag.recommended_reason}")
         except Exception:
             lines.append("  • Concept tracker initializing...")
 
         return "\n".join(lines)
+

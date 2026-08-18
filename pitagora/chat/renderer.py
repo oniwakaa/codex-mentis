@@ -361,3 +361,53 @@ class ChatRenderer:
             yield ChatEvent("markdown", final)
         except Exception as e:
             yield ChatEvent("error", f"Workflow failed: {e}")
+
+    @staticmethod
+    def cmd_learn(state: ChatSessionState, argument: str):
+        from io import StringIO
+        from rich.console import Console
+        from rich.table import Table
+        from pitagora.knowledge.proactive import ProactiveLearner
+
+        try:
+            learner = ProactiveLearner()
+            diag = learner.diagnose()
+
+            buf = StringIO()
+            console = Console(file=buf, force_terminal=False, width=80)
+
+            console.print("[bold gold1]△ PITAGORA PROACTIVE LEARNING DIAGNOSIS[/bold gold1]\n")
+            console.print(
+                f"[bold]Mastered Concepts:[/bold] {diag.mastered_count} | "
+                f"[bold]In Progress:[/bold] {diag.in_progress_count}"
+            )
+
+            if diag.due_reviews:
+                console.print(
+                    f"[yellow]⚠️ Due for Spaced Review:[/yellow] {', '.join(diag.due_reviews)}"
+                )
+
+            if diag.zpd_candidates:
+                table = Table(
+                    title="Zone of Proximal Development (Ready to Learn)", show_header=True
+                )
+                table.add_column("Concept", style="cyan")
+                table.add_column("Domain", style="magenta")
+                table.add_column("Current Mastery", style="green")
+                for c in diag.zpd_candidates[:4]:
+                    table.add_row(
+                        c["name"], c.get("domain", "stem"), f"{c['mastery'] * 100:.0f}%"
+                    )
+                console.print(table)
+
+            console.print(f"\n[bold green]Recommended Next Step:[/bold green] {diag.recommended_topic}")
+            console.print(f"[dim]{diag.recommended_reason}[/dim]\n")
+            console.print(
+                f"[cyan]Tip:[/cyan] Type [bold]/explore {diag.recommended_topic or ''}[/bold] "
+                f"to begin a personalized Socratic session."
+            )
+
+            yield ChatEvent("markdown", buf.getvalue().rstrip())
+        except Exception as e:
+            yield ChatEvent("error", f"Proactive diagnosis failed: {e}")
+

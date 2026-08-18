@@ -17,9 +17,14 @@ from pitagora.knowledge.base import KnowledgeBase
 from pitagora.knowledge.extractor import KnowledgeExtractor
 from pitagora.knowledge.webfetch_bridge import WebfetchBridge
 
+from pitagora.knowledge.proactive import ProactiveDiagnosis, ProactiveLearner
+
 __all__ = [
     "KnowledgeAcquisition",
     "KnowledgeBase",
     "WebfetchBridge",
     "KnowledgeExtractor",
+    "ProactiveLearner",
+    "ProactiveDiagnosis",
 ]
+

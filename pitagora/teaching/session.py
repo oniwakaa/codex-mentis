@@ -223,6 +223,8 @@ class TeachingSession:
         classification: str,
         delta: float,
         style: str | None = None,
+        bloom_level: str = "understand",
+        cognitive_load: str = "optimal",
     ) -> None:
         """Apply a response classification's comprehension delta and record
         style effectiveness. Called by the chat loop after ResponseAnalyzer."""
@@ -240,7 +242,7 @@ class TeachingSession:
         elif style:
             self.style_effectiveness.record(style, delta)
 
-        self.regulate_difficulty(classification)
+        self.regulate_difficulty(classification, bloom_level=bloom_level, cognitive_load=cognitive_load)
 
         # Update current sub-concept mastery using the classification delta
         sc = self.current_subconcept
@@ -256,20 +258,27 @@ class TeachingSession:
                 "state": self.state.value,
                 "comprehension": self.comprehension_score,
                 "difficulty_level": self.difficulty_level,
+                "bloom_level": bloom_level,
+                "cognitive_load": cognitive_load,
                 "at": _utc_now(),
             }
         )
         self._touch()
 
-    def regulate_difficulty(self, classification: str) -> int:
+    def regulate_difficulty(
+        self,
+        classification: str,
+        bloom_level: str = "understand",
+        cognitive_load: str = "optimal",
+    ) -> int:
         """Keep task difficulty in a minimal 1–5 ZPD band.
 
         Explicit learner signals are the least ambiguous regulation input:
         ``deeper`` raises the challenge and ``confused`` lowers it.
         """
-        if classification == "deeper":
+        if classification == "deeper" or bloom_level in {"evaluate", "create"}:
             self.difficulty_level = min(MAX_DIFFICULTY, self.difficulty_level + 1)
-        elif classification == "confused":
+        elif classification == "confused" or cognitive_load == "overloaded":
             self.difficulty_level = max(MIN_DIFFICULTY, self.difficulty_level - 1)
         return self.difficulty_level
 

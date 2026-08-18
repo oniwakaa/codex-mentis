@@ -2,13 +2,13 @@
 
 This is what makes Pitagora different: instead of hardcoded concepts,
 the agent actively researches topics, finds papers, extracts knowledge,
-and builds a growing, source-cited knowledge base.
+and builds a growing, source-cited knowledge base across Math, Physics, and Philosophy.
 
 Pipeline:
   1. Intent → What does the user want to learn?
-  2. Search  → webfetch multi-engine search (free, zero-config)
+  2. Search  → webfetch multi-engine search (free, zero-config, arXiv, SEP, Gutenberg)
   3. Fetch   → webfetch local extraction (clean markdown, no API cost)
-  4. Extract → Parse equations, definitions, theorems, relationships
+  4. Extract → Parse equations, definitions, theorems, arguments, relationships
   5. Store   → Save to knowledge base with full citations
   6. Graph   → Update concept graph with discovered relationships
 """
@@ -22,7 +22,7 @@ from pitagora.knowledge.webfetch_bridge import WebfetchBridge
 
 
 class KnowledgeAcquisition:
-    """Orchestrates knowledge discovery and storage."""
+    """Orchestrates knowledge discovery and storage across STEM and Philosophy."""
 
     def __init__(self, knowledge_base=None, concept_graph=None):
         self.webfetch = WebfetchBridge()
@@ -138,17 +138,14 @@ class KnowledgeAcquisition:
         }
 
     def search_papers(self, query: str, max_results: int = 5) -> list[dict[str, Any]]:
-        """Search for academic papers specifically."""
-        # Try arxiv-specific search
+        """Search for academic papers specifically (arXiv, academic portals)."""
         arxiv_query = f"site:arxiv.org {query}"
         results = self.webfetch.search(arxiv_query, max_results=max_results)
 
-        # Also try general academic search
         general_results = self.webfetch.search(
             f"{query} paper mathematics physics", max_results=max_results
         )
 
-        # Deduplicate by URL
         seen = set()
         combined = []
         for r in results + general_results:
@@ -161,15 +158,12 @@ class KnowledgeAcquisition:
 
     def fetch_paper(self, arxiv_url: str) -> dict[str, Any]:
         """Fetch and extract content from an arxiv paper page or PDF."""
-        # If it's an arxiv abstract page, fetch it
         if "arxiv.org/abs/" in arxiv_url:
-            # Convert to HTML version for better extraction
             html_url = arxiv_url.replace("/abs/", "/html/")
             fetched = self.webfetch.fetch_url(html_url)
             if fetched.get("text"):
                 return self._process_paper(fetched, arxiv_url)
 
-        # Fallback to the original URL
         fetched = self.webfetch.fetch_url(arxiv_url)
         return self._process_paper(fetched, arxiv_url)
 
@@ -193,7 +187,6 @@ class KnowledgeAcquisition:
 
     def _extract_abstract(self, text: str) -> str:
         """Try to extract the abstract from paper text."""
-        # Look for "Abstract" section
         abstract_match = re.search(
             r"(?:Abstract|ABSTRACT)[:\s]*(.*?)(?:\n\n|Introduction|INTRODUCTION|1\.|Keywords)",
             text,
@@ -201,5 +194,78 @@ class KnowledgeAcquisition:
         )
         if abstract_match:
             return abstract_match.group(1).strip()[:1000]
-        # Fallback: first 500 chars
         return text[:500].strip()
+
+    def search_philosophy(self, query: str, max_results: int = 5) -> list[dict[str, Any]]:
+        """Search Stanford Encyclopedia of Philosophy (SEP) and philosophy repositories."""
+        sep_query = f"site:plato.stanford.edu {query}"
+        results = self.webfetch.search(sep_query, max_results=max_results)
+
+        general_phil = self.webfetch.search(
+            f"{query} Stanford Encyclopedia of Philosophy epistemology logic metaphysics",
+            max_results=max_results,
+        )
+
+        seen = set()
+        combined = []
+        for r in results + general_phil:
+            url = r.get("url", "")
+            if url and url not in seen:
+                seen.add(url)
+                combined.append(r)
+
+        return combined[:max_results]
+
+    def fetch_sep_entry(self, sep_url_or_slug: str) -> dict[str, Any]:
+        """Fetch and extract structured knowledge from a Stanford Encyclopedia of Philosophy entry."""
+        url = sep_url_or_slug.strip()
+        if not url.startswith("http"):
+            slug = url.strip("/")
+            url = f"https://plato.stanford.edu/entries/{slug}/"
+
+        fetched = self.webfetch.fetch_url(url)
+        text = fetched.get("text", "")
+        if not text:
+            return {"error": "Could not fetch SEP entry", "url": url}
+
+        extracted = self.extractor.extract_knowledge(text, topic="")
+
+        preamble_match = re.search(r"^(.*?)(?:\n#+\s*1|\n1\.\s+)", text, re.DOTALL)
+        preamble = preamble_match.group(1).strip()[:1500] if preamble_match else text[:1000].strip()
+
+        return {
+            "title": fetched.get("title", "SEP Entry"),
+            "url": url,
+            "preamble": preamble,
+            "key_points": extracted.get("key_points", []),
+            "concepts": extracted.get("concepts", []),
+            "full_text_length": len(text),
+            "source_type": "sep_philosophy",
+        }
+
+    def fetch_classic_text(self, query: str, gutenberg_id: int | None = None) -> dict[str, Any]:
+        """Fetch classic open philosophy / physics foundational treatise (Gutenberg, Internet Archive)."""
+        if gutenberg_id:
+            url = f"https://www.gutenberg.org/files/{gutenberg_id}/{gutenberg_id}-0.txt"
+            fetched = self.webfetch.fetch_url(url)
+        else:
+            search_res = self.webfetch.search(f"site:gutenberg.org {query} text", max_results=1)
+            if search_res:
+                url = search_res[0].get("url", "")
+                fetched = self.webfetch.fetch_url(url) if url else {}
+            else:
+                fetched = {}
+
+        text = fetched.get("text", "")
+        if not text:
+            return {"error": f"Could not fetch classic text for '{query}'"}
+
+        extracted = self.extractor.extract_knowledge(text[:8000], topic=query)
+        return {
+            "title": fetched.get("title", query),
+            "url": fetched.get("url", ""),
+            "excerpt": text[:2000].strip(),
+            "concepts": extracted.get("concepts", []),
+            "key_points": extracted.get("key_points", []),
+            "source_type": "classic_text",
+        }

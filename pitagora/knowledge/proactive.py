@@ -141,13 +141,17 @@ class ProactiveLearner:
         )
 
     def prepare_study_context(self, topic: str, auto_fetch: bool = True) -> dict[str, Any]:
-        """Fetch papers, open texts, and build a proactive study context for a session."""
+        """Fetch papers, open texts, and build a proactive study context with cross-domain synthesis."""
         sources: list[dict[str, Any]] = []
+        from pitagora.knowledge.synthesis import CrossDomainSynthesizer
+
+        synthesizer = CrossDomainSynthesizer()
+        bridges = synthesizer.find_connections(topic)
 
         if auto_fetch:
             try:
                 # Query arXiv and general academic sources
-                papers = self.acq.search_papers(topic, max_results=3)
+                papers = self.acq.search_papers(topic, max_results=2)
                 for p in papers:
                     sources.append({
                         "type": "paper",
@@ -155,6 +159,17 @@ class ProactiveLearner:
                         "url": p.get("url", ""),
                         "snippet": p.get("snippet", ""),
                     })
+
+                # If philosophy or cross-domain, fetch SEP entries
+                if any(kw in topic.lower() for kw in ["phil", "logic", "epistem", "metaphys", "ethic", "truth", "action", "quantum", "entropy"]):
+                    phil_sources = self.acq.search_philosophy(topic, max_results=2)
+                    for ps in phil_sources:
+                        sources.append({
+                            "type": "philosophy_sep",
+                            "title": ps.get("title", ""),
+                            "url": ps.get("url", ""),
+                            "snippet": ps.get("snippet", ""),
+                        })
             except Exception as e:
                 log.debug("Proactive source fetch failed: %s", e)
 
@@ -162,4 +177,14 @@ class ProactiveLearner:
             "topic": topic,
             "generated_at": datetime.now(UTC).isoformat(),
             "sources": sources,
+            "cross_domain_bridges": [
+                {
+                    "source": b.source_concept,
+                    "target": b.target_concept,
+                    "relation": b.relation_type,
+                    "description": b.description,
+                    "key_question": b.key_question,
+                }
+                for b in bridges
+            ],
         }

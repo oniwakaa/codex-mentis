@@ -15,9 +15,9 @@ MCP: uvx webfetch-llm (runs as MCP server)
 from pitagora.knowledge.acquisition import KnowledgeAcquisition
 from pitagora.knowledge.base import KnowledgeBase
 from pitagora.knowledge.extractor import KnowledgeExtractor
-from pitagora.knowledge.webfetch_bridge import WebfetchBridge
-
 from pitagora.knowledge.proactive import ProactiveDiagnosis, ProactiveLearner
+from pitagora.knowledge.synthesis import CANONICAL_BRIDGES, CrossDomainSynthesizer, DomainConnection
+from pitagora.knowledge.webfetch_bridge import WebfetchBridge
 
 __all__ = [
     "KnowledgeAcquisition",
@@ -26,5 +26,7 @@ __all__ = [
     "KnowledgeExtractor",
     "ProactiveLearner",
     "ProactiveDiagnosis",
+    "CrossDomainSynthesizer",
+    "DomainConnection",
+    "CANONICAL_BRIDGES",
 ]
-

@@ -236,3 +236,35 @@ def show_review_queue():
                     [name, cid, f"{row['mastery_score']*100:.1f}%", row["last_reviewed"] or "Never"]
                 )
         print_table(headers, display_rows, title="Due for Review (Spaced Repetition)")
+
+
+@app.command("export")
+def export_concepts_cmd(
+    output_path: str = typer.Argument(..., help="Output destination file path"),
+    format_type: str = typer.Option("mermaid", "--format", "-f", help="Format: mermaid / canvas / dot / json"),
+):
+    """Export concept DAG to Mermaid markdown, Obsidian Canvas, Graphviz DOT, or JSON."""
+    from pitagora.concepts.graph import ConceptGraph
+    from pitagora.concepts.export import export_graph_to_mermaid, export_graph_to_canvas
+
+    graph = ConceptGraph()
+    mastery = get_mastery_dict()
+    fmt = format_type.lower()
+
+    if fmt in ["mermaid", "mmd"]:
+        mmd_content = export_graph_to_mermaid(graph, mastery)
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(mmd_content)
+        typer.echo(f"✓ Exported Mermaid flowchart to {output_path}")
+    elif fmt in ["canvas", "obsidian"]:
+        count = export_graph_to_canvas(graph, output_path, mastery)
+        typer.echo(f"✓ Exported {count} nodes to Obsidian Canvas at {output_path}")
+    elif fmt in ["dot", "graphviz"]:
+        graph.export_to_dot(output_path)
+        typer.echo(f"✓ Exported Graphviz DOT to {output_path}")
+    elif fmt == "json":
+        graph.export_to_json(output_path)
+        typer.echo(f"✓ Exported concept graph JSON to {output_path}")
+    else:
+        typer.echo(f"Unsupported format '{format_type}'. Choose mermaid, canvas, dot, or json.")
+

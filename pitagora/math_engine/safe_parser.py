@@ -302,7 +302,7 @@ def _ast_validate(node: ast.AST, depth: int = 0) -> int:
 
     # Reject ListComp / SetComp / GeneratorExp / DictComp / Comprehension
     if isinstance(
-        node, (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp, ast.Comprehension)
+        node, (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp, ast.comprehension)
     ):
         raise SafeParseError("Comprehensions are forbidden")
 

@@ -674,7 +674,7 @@ class MemoryStore:
             return cursor.rowcount > 0
 
     def get_misconceptions(
-        self, topic: str | None = None, unresolved_only: bool = True
+        self, topic: str | None = None, concept: str | None = None, unresolved_only: bool = True
     ) -> list[dict[str, Any]]:
         """Retrieve tracked misconceptions."""
         with self._db_connection() as conn:
@@ -685,6 +685,9 @@ class MemoryStore:
             if topic:
                 where.append("topic = ?")
                 params.append(topic)
+            if concept:
+                where.append("concept = ?")
+                params.append(concept)
             if unresolved_only:
                 where.append("resolved = 0")
             if where:

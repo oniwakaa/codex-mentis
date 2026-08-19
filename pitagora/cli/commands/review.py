@@ -169,3 +169,25 @@ def review_add(
     sr.schedule_review(concept, quality=0)
     console.print(f"[green]✓ Added '{concept}' to review deck.[/green]")
     console.print("[dim]It will appear for review based on the SM-2 schedule.[/dim]")
+
+
+@app.command("export")
+def review_export(
+    output_path: str = typer.Argument(..., help="Output destination file path"),
+    format_type: str = typer.Option("anki", "--format", "-f", help="Format: anki / markdown"),
+):
+    """Export spaced repetition deck & misconceptions to Anki TSV or Markdown."""
+    from rich.console import Console
+    from pitagora.memory.export import export_deck_to_anki, export_deck_to_markdown
+
+    console = Console()
+    fmt = format_type.lower()
+    if fmt in ["anki", "tsv", "csv"]:
+        count = export_deck_to_anki(output_path)
+        console.print(f"[green]✓ Exported {count} cards to Anki TSV at {output_path}[/green]")
+    elif fmt in ["markdown", "md", "obsidian"]:
+        count = export_deck_to_markdown(output_path)
+        console.print(f"[green]✓ Exported {count} cards to Obsidian Markdown at {output_path}[/green]")
+    else:
+        console.print(f"[red]Unsupported format '{format_type}'. Choose 'anki' or 'markdown'.[/red]")
+

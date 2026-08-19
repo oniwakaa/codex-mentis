@@ -76,10 +76,10 @@ except ImportError as e:
     doctor = None
 
 try:
-    from pitagora.cli.commands import ingest, onboard, profile, session, setup
+    from pitagora.cli.commands import dilemma, ingest, onboard, profile, session, setup, teach_back
 except ImportError as e:
-    log.warning("Failed to import %s: %s", "profile, session, onboard, ingest, setup", e)
-    profile = session = onboard = ingest = setup = None
+    log.warning("Failed to import %s: %s", "profile, session, onboard, ingest, setup, dilemma, teach_back", e)
+    profile = session = onboard = ingest = setup = dilemma = teach_back = None
 
 app = typer.Typer(
     name="pitagora",
@@ -108,6 +108,11 @@ if setup:
     app.add_typer(setup.app, name="setup")
 if ingest:
     app.add_typer(ingest.app, name="ingest")
+if dilemma:
+    app.add_typer(dilemma.app, name="dilemma")
+if teach_back:
+    app.add_typer(teach_back.app, name="teach-back")
+    app.add_typer(teach_back.app, name="feynman")
 
 # Onboarding command
 if onboard:

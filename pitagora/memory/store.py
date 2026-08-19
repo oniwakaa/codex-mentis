@@ -144,6 +144,27 @@ class MemoryStore:
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            # Table: learner_profile
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS learner_profile (
+                    key TEXT PRIMARY KEY,
+                    category TEXT NOT NULL DEFAULT 'preference',
+                    value TEXT NOT NULL,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            # Table: misconceptions
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS misconceptions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    topic TEXT NOT NULL,
+                    concept TEXT NOT NULL,
+                    misconception TEXT NOT NULL,
+                    resolution TEXT,
+                    resolved INTEGER DEFAULT 0,
+                    recorded_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             conn.commit()
 
     def _float_list_to_blob(self, floats: list[float]) -> bytes:
@@ -584,3 +605,117 @@ class MemoryStore:
                     return False
         except Exception:
             return False
+
+    # --- Learner Profile & Cross-Session Fact Store ---
+    def record_learner_fact(self, key: str, value: Any, category: str = "preference") -> None:
+        """Store or update a persistent learner fact (preference, target pace, known background)."""
+        val_str = json.dumps(value) if not isinstance(value, str) else value
+        with self._db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """INSERT INTO learner_profile (key, category, value, updated_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(key) DO UPDATE SET
+                    category = excluded.category,
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP""",
+                (key, category, val_str),
+            )
+            conn.commit()
+
+    def get_learner_facts(self, category: str | None = None) -> dict[str, Any]:
+        """Retrieve stored learner facts."""
+        with self._db_connection() as conn:
+            cursor = conn.cursor()
+            if category:
+                cursor.execute(
+                    "SELECT key, value FROM learner_profile WHERE category = ?", (category,)
+                )
+            else:
+                cursor.execute("SELECT key, value FROM learner_profile")
+            rows = cursor.fetchall()
+        facts = {}
+        for k, v in rows:
+            try:
+                facts[k] = json.loads(v)
+            except Exception:
+                facts[k] = v
+        return facts
+
+    # --- Misconceptions Tracking ---
+    def record_misconception(
+        self, topic: str, concept: str, misconception: str, resolution: str | None = None
+    ) -> int:
+        """Record a misconception encountered by the user for targeted review."""
+        with self._db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """INSERT INTO misconceptions (topic, concept, misconception, resolution, resolved, recorded_at)
+                VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP)""",
+                (topic, concept, misconception, resolution),
+            )
+            conn.commit()
+            return int(cursor.lastrowid) if cursor.lastrowid else 0
+
+    def resolve_misconception(self, misconception_id: int, resolution: str | None = None) -> bool:
+        """Mark a misconception as resolved."""
+        with self._db_connection() as conn:
+            cursor = conn.cursor()
+            if resolution:
+                cursor.execute(
+                    "UPDATE misconceptions SET resolved = 1, resolution = ? WHERE id = ?",
+                    (resolution, misconception_id),
+                )
+            else:
+                cursor.execute(
+                    "UPDATE misconceptions SET resolved = 1 WHERE id = ?", (misconception_id,)
+                )
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def get_misconceptions(
+        self, topic: str | None = None, unresolved_only: bool = True
+    ) -> list[dict[str, Any]]:
+        """Retrieve tracked misconceptions."""
+        with self._db_connection() as conn:
+            cursor = conn.cursor()
+            query = "SELECT id, topic, concept, misconception, resolution, resolved, recorded_at FROM misconceptions"
+            params: list[Any] = []
+            where = []
+            if topic:
+                where.append("topic = ?")
+                params.append(topic)
+            if unresolved_only:
+                where.append("resolved = 0")
+            if where:
+                query += " WHERE " + " AND ".join(where)
+            query += " ORDER BY recorded_at DESC"
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+        return [
+            {
+                "id": r[0],
+                "topic": r[1],
+                "concept": r[2],
+                "misconception": r[3],
+                "resolution": r[4],
+                "resolved": bool(r[5]),
+                "recorded_at": r[6],
+            }
+            for r in rows
+        ]
+
+    def get_learner_snapshot(self, topic: str | None = None) -> str:
+        """Generate a dense, high-signal summary of learner state across sessions."""
+        facts = self.get_learner_facts()
+        misconceptions = self.get_misconceptions(topic=topic, unresolved_only=True)
+        parts = []
+        if facts:
+            pref_strs = [f"{k}={v}" for k, v in facts.items() if k not in ("name", "id")]
+            if pref_strs:
+                parts.append(f"Learner preferences: {', '.join(pref_strs[:4])}")
+        if misconceptions:
+            misc_strs = [f"'{m['concept']}': {m['misconception']}" for m in misconceptions[:2]]
+            parts.append(f"Known hurdles to reinforce: {'; '.join(misc_strs)}")
+        return "\n".join(parts)
+

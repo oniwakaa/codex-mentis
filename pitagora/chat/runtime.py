@@ -263,11 +263,14 @@ def _get_user_context() -> str:
             if interests:
                 parts.append(f"  Interests: {', '.join(interests)}")
 
-        # Include recent episodic memories summary if available
+        # Include recent episodic memories & learner profile summary if available
         try:
             from pitagora.memory.store import MemoryStore
 
             store = MemoryStore()
+            snapshot = store.get_learner_snapshot()
+            if snapshot:
+                parts.append(f"  {snapshot}")
             recent_memories = store.list_memories()
             if recent_memories:
                 recent_topics = list({m.topic for m in recent_memories[-10:] if m.topic})
@@ -366,12 +369,12 @@ SUBCONCEPT_GEN_PROMPT = (
 )
 
 STYLE_GUIDES = {
-    "feynman": "Use the Feynman technique: explain as if to a curious beginner, use analogies and plain language before formalism.",
-    "formal": "Use a formal, rigorous style: precise definitions, theorems, and symbolic notation.",
-    "visual": "Use a visual style: describe diagrams, geometric intuition, and spatial relationships in words.",
-    "historical": "Use a historical style: motivate the concept through the problem its inventors were trying to solve.",
-    "socratic": "Use a Socratic style: lead the learner with guiding questions rather than stating answers directly.",
-    "applied": "Use an applied style: ground the concept in a concrete real-world example or computation.",
+    "feynman": "Feynman technique: explain simply with an intuitive analogy, pinpoint the core mechanism, state the equation, keep it ultra-concise.",
+    "formal": "Formal mathematical rigor: concise definitions, theorems, symbolic notation, and exact conditions without conversational filler.",
+    "visual": "Visual geometric style: describe spatial curves, phase portraits, and physical trajectories directly with plot commands.",
+    "historical": "Historical motivation: briefly state the concrete dilemma or paradox that forced the discovery, followed by the resolving equation.",
+    "socratic": "Focused Socratic step: ask a single, targeted guiding question based on the user's reasoning to help them derive the next step.",
+    "applied": "Applied computation: ground the concept in a concrete numerical or physical calculation with immediate code/formula.",
 }
 
 
@@ -403,22 +406,22 @@ def _build_teaching_prompt(session, action: str, style: str) -> str:
     sc_name = sc.name if sc else session.topic
     guide = STYLE_GUIDES.get(style, STYLE_GUIDES["feynman"])
     action_intro = {
-        "introduce": f"Introduce the sub-concept '{sc_name}'. Give a short, clear motivation and definition.",
-        "explain": f"Explain the sub-concept '{sc_name}'. {guide}",
-        "check": f"Check the learner's understanding of '{sc_name}'. Pose a focused question or small exercise and wait for their answer.",
-        "adapt": f"The learner needs a different angle on '{sc_name}'. {guide} Address the likely misconception directly.",
-        "visualize": f"Describe a visualization or diagram for '{sc_name}' in words, then explain what it shows.",
-        "quiz": f"Give a short quiz problem on '{sc_name}'. State the problem, then offer hints. Do NOT reveal the solution yet.",
-        "review": f"Review what we covered. Summarize the key ideas of '{session.topic}' and the sub-concepts visited.",
-        "advance": f"We are moving on to the next sub-concept: '{sc_name}'. Introduce it briefly.",
-        "complete": f"Wrap up the session on '{session.topic}'. Summarize and suggest next steps.",
+        "introduce": f"Introduce the sub-concept '{sc_name}'. Give a concise, 1-2 sentence motivation and exact mathematical definition.",
+        "explain": f"Explain the sub-concept '{sc_name}'. {guide} Keep explanation tight and high-signal (max 2 paragraphs).",
+        "check": f"Check the learner's understanding of '{sc_name}'. Pose a single focused question or calculation and await their answer.",
+        "adapt": f"The learner needs a different angle on '{sc_name}'. {guide} Address the likely misconception directly in 2-3 sentences.",
+        "visualize": f"Describe the geometric intuition for '{sc_name}' and suggest the relevant `/plot` exploration.",
+        "quiz": f"Give a single, punchy practice problem on '{sc_name}'. State the problem clearly. Do NOT reveal the answer yet.",
+        "review": f"Review key milestones of '{session.topic}' and sub-concept '{sc_name}' in 3 concise bullet points.",
+        "advance": f"Advance to the next sub-concept: '{sc_name}'. Introduce its core equation and motivation in 2 sentences.",
+        "complete": f"Wrap up the session on '{session.topic}'. Summarize the key equations and suggest 2 next topics to explore.",
     }.get(action, f"Continue teaching '{sc_name}'. {guide}")
     return (
         f"{action_intro}\n\n"
         f"[Teaching context] topic: {session.topic} | sub-concept: {sc_name} | "
         f"comprehension: {session.comprehension_score:.2f} | style: {style} | "
         f"learner level: {session.user_level}\n"
-        f"Keep it concise and focused. Use LaTeX for any equations."
+        f"Directives: High signal, ultra-concise, zero fluff. Use LaTeX for all mathematical equations ($...$, $$...$$)."
     )
 
 

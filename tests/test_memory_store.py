@@ -139,3 +139,42 @@ def test_backup_and_export(temp_db, tmp_path):
         data = json.load(f)
         assert len(data) == 1
         assert data[0]["content"] == "Content to export"
+
+
+def test_learner_facts_and_misconceptions(temp_db):
+    store = MemoryStore(db_path=temp_db)
+
+    # 1. Learner facts
+    store.record_learner_fact("explanation_style", "concise", category="preference")
+    store.record_learner_fact("level", "advanced", category="skill")
+    facts = store.get_learner_facts()
+    assert facts["explanation_style"] == "concise"
+    assert facts["level"] == "advanced"
+
+    pref_facts = store.get_learner_facts(category="preference")
+    assert "explanation_style" in pref_facts
+    assert "level" not in pref_facts
+
+    # 2. Misconceptions
+    m_id = store.record_misconception(
+        topic="quantum_mechanics",
+        concept="wavefunction_collapse",
+        misconception="Believes collapse is an instantaneous physical signal violation of SR",
+    )
+    assert m_id > 0
+
+    unresolved = store.get_misconceptions(topic="quantum_mechanics", unresolved_only=True)
+    assert len(unresolved) == 1
+    assert unresolved[0]["concept"] == "wavefunction_collapse"
+    assert unresolved[0]["resolved"] is False
+
+    # Snapshot check
+    snapshot = store.get_learner_snapshot(topic="quantum_mechanics")
+    assert "explanation_style" in snapshot
+    assert "wavefunction_collapse" in snapshot
+
+    # Resolve misconception
+    assert store.resolve_misconception(m_id, resolution="Decoherence explains pointer states") is True
+    unresolved_after = store.get_misconceptions(topic="quantum_mechanics", unresolved_only=True)
+    assert len(unresolved_after) == 0
+

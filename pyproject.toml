@@ -38,6 +38,7 @@ dependencies = [
     "httpx>=0.24.0",
     "aiofiles>=23.0",
     "webfetch-llm>=0.1.0",
+    "antlr4-python3-runtime>=4.11.0",
 ]
 
 [project.optional-dependencies]

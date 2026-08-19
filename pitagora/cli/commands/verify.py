@@ -16,7 +16,11 @@ def verify(
     typer.echo(f"Reviewer Agent analyzing claim: '{claim}'...")
 
     with create_spinner("Parsing symbols and running algebraic simplification...") as status:
-        if "=" not in claim:
+        if "==" in claim:
+            parts = claim.split("==")
+        elif "=" in claim:
+            parts = claim.split("=")
+        else:
             # Maybe just evaluate or simplify expression
             try:
                 expr = sp.sympify(claim)
@@ -32,9 +36,8 @@ def verify(
                 typer.echo(f"Error parsing expression: {e}")
                 raise typer.Exit(1)
 
-        parts = claim.split("=")
         if len(parts) != 2:
-            typer.echo("Error: Claim must have exactly one '=' sign for equations.")
+            typer.echo("Error: Claim must have exactly one '=' or '==' sign for equations.")
             raise typer.Exit(1)
 
         lhs_str, rhs_str = parts

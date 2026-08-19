@@ -46,33 +46,29 @@ class MasteryTracker:
         """
         try:
             row = self.db["concept_mastery"].get(concept)
-            if row is None:
-                return 0.0
-            score = float(row.get("mastery_score", 0.0))
-            if not apply_decay:
-                return score
-
-            last_updated_str = row.get("last_updated")
-            if not last_updated_str:
-                return score
-
-            try:
-                last_updated = datetime.datetime.strptime(last_updated_str, "%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                # If timestamp is corrupt, avoid corrupting score further; return raw
-                return score
-            days_elapsed = (datetime.datetime.now() - last_updated).total_seconds() / (
-                24.0 * 3600.0
-            )
-
-            # Forgetting curve: S = S_0 * e^(-d * t)
-            decayed_score = score * math.exp(-self.decay_rate * max(0.0, days_elapsed))
-            return max(0.0, min(1.0, float(decayed_score)))
-        except Exception as exc:
-            import logging
-
-            logging.getLogger(__name__).warning("get_mastery failed for %s: %s", concept, exc)
+        except Exception:
             return 0.0
+
+        score = float(row.get("mastery_score", 0.0))
+        if not apply_decay:
+            return score
+
+        last_updated_str = row.get("last_updated")
+        if not last_updated_str:
+            return score
+
+        try:
+            last_updated = datetime.datetime.strptime(last_updated_str, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            # If timestamp is corrupt, avoid corrupting score further; return raw
+            return score
+        days_elapsed = (datetime.datetime.now() - last_updated).total_seconds() / (
+            24.0 * 3600.0
+        )
+
+        # Forgetting curve: S = S_0 * e^(-d * t)
+        decayed_score = score * math.exp(-self.decay_rate * max(0.0, days_elapsed))
+        return max(0.0, min(1.0, float(decayed_score)))
 
     def update_mastery(self, concept: str, performance: float, spaced_rep: Any | None = None):
         """
@@ -84,22 +80,13 @@ class MasteryTracker:
 
         try:
             row = self.db["concept_mastery"].get(concept)
-            if row is not None:
-                current_score = float(row.get("mastery_score", 0.0))
-                attempts = int(row.get("attempts", 0)) + 1
-                new_score = current_score * 0.75 + performance * 0.25
-            else:
-                current_score = 0.0
-                attempts = 1
-                new_score = performance
-        except Exception as exc:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "update_mastery read failed for %s: %s", concept, exc
-            )
-            new_score = performance
+            current_score = float(row.get("mastery_score", 0.0))
+            attempts = int(row.get("attempts", 0)) + 1
+            new_score = current_score * 0.75 + performance * 0.25
+        except Exception:
+            current_score = 0.0
             attempts = 1
+            new_score = performance
 
         new_score = max(0.0, min(1.0, float(new_score)))
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")

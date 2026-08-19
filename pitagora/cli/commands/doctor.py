@@ -67,7 +67,10 @@ def doctor(ctx: typer.Context):
         checks.append(("Config file", config_file.exists(), str(config_file)))
 
         profile_file = config_dir / "profile.yaml"
-        checks.append(("User profile", profile_file.exists(), str(profile_file)))
+        if profile_file.exists():
+            checks.append(("User profile", True, str(profile_file)))
+        else:
+            checks.append(("User profile", None, "not created yet (run 'pitagora onboard')"))
 
     # 5. Check webfetch
     try:
